@@ -17,38 +17,77 @@
 
 ## Prerequisites
 
-1.  **Python 3.10+**
-2.  **LM Studio** (or any OpenAI-compatible local LLM server) running on port `1234`.
+Before running the application, you need to set up your environment.
 
-## Quick Start
+### 1. Python
+Ensure you have **Python 3.10** or higher installed. You can download it from [python.org](https://www.python.org/).
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/yourusername/mysqlhelper.git
-    cd mysqlhelper
-    ```
+### 2. Local AI Server (LM Studio)
+This application relies on a local AI model to function.
 
-2.  **Set up environment:**
+1.  **Download & Install:** Get **[LM Studio](https://lmstudio.ai/)** (or any OpenAI-compatible local server).
+2.  **Get a Model:** Search for and download a model of your choice.
+    *   *Recommendations:* `RNJ1`, `Qwen 2.5 Coder`, `Mistral (devstral)`, or `Gemma`.
+    *   *Tip:* Pick a model size (quantization) that fits your computer's RAM/VRAM.
+3.  **Enable Server Mode:**
+    *   Click the **Developer** tab (the `<>` icon) on the left sidebar.
+    *   Toggle **"Start Local Server"** to ON.
+    *   Ensure the port is set to `1234` (default).
+4.  **Load the Model:**
+    *   Select your downloaded model from the top dropdown.
+    *   Adjust settings if needed (Context Length, Max Tokens, Temperature).
+    *   Wait for the green bar to indicate the model is loaded.
+5.  **Done! 🔥** Your AI brain is ready.
+
+## Quick Start Guide
+
+Follow these steps to get the app running on your computer.
+
+### Step 1: Get the Code
+Open your terminal (Command Prompt, PowerShell, or Terminal on Mac) and run the following command to download the project:
+
+```bash
+git clone https://github.com/reisset/mysqlhelper.git
+```
+
+### Step 2: Navigate to the Project
+Move into the newly created folder:
+
+```bash
+cd mysqlhelper
+```
+
+### Step 3: Create a Virtual Environment
+This isolates the project's libraries from your system. Run the command for your OS:
+
+*   **Windows:**
     ```bash
     python -m venv venv
-    # Windows:
     .\venv\Scripts\activate
-    # Mac/Linux:
+    ```
+*   **Mac / Linux:**
+    ```bash
+    python3 -m venv venv
     source venv/bin/activate
     ```
 
-3.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+### Step 4: Install Dependencies
+Install all the required Python tools:
 
-4.  **Run the app:**
-    ```bash
-    flask run
-    ```
+```bash
+pip install -r requirements.txt
+```
 
-5.  **Open in Browser:**
-    Go to `http://127.0.0.1:5000`
+### Step 5: Run the App
+Start the web server:
+
+```bash
+flask run
+```
+
+### Step 6: Use It!
+Open your web browser (Chrome, Firefox, Edge) and go to:
+[http://127.0.0.1:5000](http://127.0.0.1:5000)
 
 ## Architecture
 
