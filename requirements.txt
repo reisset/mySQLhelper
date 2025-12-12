@@ -1,0 +1,5 @@
+Flask
+SQLAlchemy
+pandas
+requests
+Flask-Session

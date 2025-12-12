@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mySQLhelper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='lib/marked.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>mySQLhelper</h2>
+            </div>
+            <div class="sidebar-content">
+                <div class="file-upload">
+                    <form id="upload-form" enctype="multipart/form-data">
+                        <div class="file-upload-buttons">
+                            <label for="database-file" class="custom-file-upload">Choose File</label>
+                            <input type="file" id="database-file" name="database_file" accept=".db, .sqlite, .sqlite3, .sql, .csv">
+                            <input type="submit" value="Upload & Load">
+                        </div>
+                    </form>
+                    <span id="file-name-display">No file chosen</span>
+                </div>
+            <button id="export-chat-button" class="sidebar-button">Export Chat</button>
+                <div id="schema-display" class="schema-display">
+                    <!-- Schema will be displayed here -->
+                </div>
+            </div>
+        </div>
+        <div class="main-chat" id="main-chat">
+            <button id="sidebar-toggle" title="Toggle Sidebar">☰</button>
+            <div class="chat-container">
+                <div class="chat-history" id="chat-history">
+                    <div class="chat-message bot-message">
+                        <p>Welcome to mySQLhelper! Please upload a database file using the panel on the left to get started.</p>
+                    </div>
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="user-input" placeholder="Ask a question about your database...">
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</body>
+</html>
