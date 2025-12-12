@@ -1,6 +1,6 @@
 # mySQLhelper
 
-**mySQLhelper** is a private, offline-first AI analytics tool that allows you to chat with your local SQLite databases. It bridges the gap between natural language questions and SQL execution, all running securely on your local machine.
+**mySQLhelper** is a private, offline-first AI analytics tool that allows you to chat with your local LLM about SQLite databases. It bridges the gap between natural language questions and SQL execution, all running securely on your local machine.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
