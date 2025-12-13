@@ -266,7 +266,7 @@ def _generate_chat_html(chat_history):
                 for row in preview:
                     table += "<tr>" + "".join(f"<td>{row[h]}</td>" for h in headers) + "</tr>"
                 table += "</tbody></table>"
-                parts.append(table)
+                parts.append(f'<div class="results-table-container">{table}</div>')
             
             chat_html_parts.append(f'<div class="chat-message bot-message">{"".join(parts)}</div>')
             
@@ -283,9 +283,13 @@ def export_chat():
     <style>{_get_css_content()}</style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-history">
-            {_generate_chat_html(chat_history)}
+    <div class="app-container">
+        <div class="main-chat">
+            <div class="chat-container">
+                <div class="chat-history">
+                    {_generate_chat_html(chat_history)}
+                </div>
+            </div>
         </div>
     </div>
 </body>

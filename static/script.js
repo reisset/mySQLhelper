@@ -8,6 +8,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('sidebar');
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const fileNameDisplay = document.getElementById('file-name-display');
+    const welcomeScreen = document.getElementById('welcome-screen');
+
+    function checkWelcomeScreen() {
+        // If there are any messages besides the welcome screen, hide it.
+        if (chatHistory.children.length > 1 || 
+            (chatHistory.children.length === 1 && chatHistory.firstElementChild.id !== 'welcome-screen')) {
+            if (welcomeScreen) welcomeScreen.style.display = 'none';
+        } else {
+            if (welcomeScreen) welcomeScreen.style.display = 'block';
+        }
+    }
 
     // --- Event Listeners ---
     sendButton.addEventListener('click', sendMessage);
@@ -27,10 +38,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     uploadForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        uploadForm.querySelector('input[type="submit"]').click();
+        uploadFile();
     });
     
-    uploadForm.querySelector('input[type="submit"]').addEventListener('click', uploadFile);
+    // uploadForm.querySelector('input[type="submit"]').addEventListener('click', uploadFile); // Removed to prevent double firing
 
     sidebarToggle.addEventListener('click', () => {
         sidebar.classList.toggle('collapsed');
@@ -67,6 +78,12 @@ document.addEventListener('DOMContentLoaded', function() {
     async function sendMessage() {
         const message = userInput.value.trim();
         if (!message) return;
+
+        // Robustly check for and remove welcome screen
+        const welcomeScreenEl = document.getElementById('welcome-screen');
+        if (welcomeScreenEl) {
+            welcomeScreenEl.remove();
+        }
 
         appendMessage(message, 'user');
         userInput.value = '';
@@ -320,8 +337,27 @@ document.addEventListener('DOMContentLoaded', function() {
     function uploadFile() {
         const file = databaseFile.files[0];
         if (file) {
+            // Check for existing chat history (excluding welcome screen)
+            const welcomeScreenEl = document.getElementById('welcome-screen');
+            const hasHistory = chatHistory.children.length > 0;
+            const isOnlyWelcome = (chatHistory.children.length === 1 && chatHistory.firstElementChild.id === 'welcome-screen');
+
+            if (hasHistory && !isOnlyWelcome) {
+                if (!confirm("A database is already loaded. Uploading a new one will clear the chat history. Continue?")) {
+                    return; // User cancelled
+                }
+            }
+
             const formData = new FormData();
             formData.append('database_file', file);
+
+            // Robustly check for and remove welcome screen
+            if (welcomeScreenEl) {
+                welcomeScreenEl.remove();
+            }
+            
+            // Clear history on new upload (confirmed by user or empty start)
+            chatHistory.innerHTML = ''; 
 
             fetch('/upload', {
                 method: 'POST',
@@ -332,8 +368,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.error) {
                     alert(data.error);
                 } else {
-                    // Clear history visually
-                    chatHistory.innerHTML = '<div class="chat-message bot-message"><div class="content-container"><p>Database loaded successfully. You can now ask questions about it.</p></div></div>';
+                    appendMessage('Database loaded successfully. You can now ask questions about it.', 'bot');
                     renderSchema(data.schema);
                 }
             })
@@ -361,4 +396,6 @@ document.addEventListener('DOMContentLoaded', function() {
             schemaDisplay.appendChild(tableElement);
         }
     }
+
+    checkWelcomeScreen();
 });

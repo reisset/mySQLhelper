@@ -28,6 +28,7 @@ body {
     margin: 0;
     padding: 0;
     font-size: 16px;
+    overflow: hidden; /* Prevent body scroll, rely on inner flex scrolling */
 }
 
 .app-container {
@@ -131,6 +132,29 @@ body {
     word-wrap: break-word;
 }
 
+
+#welcome-screen {
+    text-align: center;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+#welcome-screen pre {
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 0.7em; /* Adjust size of ASCII art */
+    color: var(--primary);
+    margin-bottom: 1rem;
+}
+
+#welcome-screen p {
+    font-size: 1.1rem;
+    color: var(--foreground-dark);
+}
+
 .schema-display {
     color: var(--foreground-dark);
 }
@@ -162,6 +186,7 @@ body {
     flex-direction: column;
     height: 100vh;
     position: relative; /* For sidebar-toggle */
+    min-width: 0; /* Prevent flex item from overflowing horizontally */
 }
 
 #sidebar-toggle {
@@ -187,8 +212,11 @@ body {
 .chat-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex-grow: 1;
+    overflow: hidden;
     background-color: var(--background);
+    min-height: 0; /* Important for nested flex scrolling */
+    min-width: 0; /* Important for nested flex shrinking */
 }
 
 .chat-history {
@@ -198,10 +226,11 @@ body {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    min-height: 0; /* Important for nested flex scrolling */
 }
 
 .chat-message {
-    max-width: 75%; /* Reduced slightly */
+    max-width: 90%; /* Allow more width for tables */
     line-height: 1.6;
 }
 
@@ -232,6 +261,9 @@ body {
     max-width: 100%; /* Important: ensure it doesn't exceed parent's width */
     box-sizing: border-box; /* Include padding/border in width calculation */
 }
+.bot-message .content-container > p:first-child {
+    margin-bottom: 1rem;
+}
 
 /* Thinking Indicator */
 .thinking-spinner {
@@ -254,7 +286,8 @@ body {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 0.75rem;
-    margin-top: 0.75rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
     white-space: pre-wrap;
     word-wrap: break-word;
     position: relative;
@@ -286,7 +319,7 @@ body {
     overflow: auto; /* Handles both x and y scroll */
     max-height: 400px;
     max-width: 100%; /* Ensure it's not trying to grow beyond 100% of its parent */
-    margin-top: 0.75rem;
+    margin-top: 1rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
 }
@@ -295,21 +328,22 @@ body {
     width: 100%;
     border-collapse: collapse;
     background-color: var(--background-light);
-    table-layout: fixed; /* Important for controlling column width */
 }
 
 .bot-message th, .bot-message td {
     border: 1px solid var(--border);
     padding: 0.5rem 0.75rem;
-    white-space: normal; /* Allow wrapping */
-    word-wrap: break-word; /* Force break long words */
-    max-width: 250px; /* Prevent columns from getting too wide */
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap; /* Prevent wrapping for better column alignment */
+    min-width: 150px; /* Ensure a minimum width */
+    font-size: 0.85em;
 }
+
 .bot-message th {
     background-color: #222;
     font-weight: 600;
+    position: sticky; /* Keep headers visible on scroll */
+    top: 0;
+    z-index: 1;
 }
 
 /* --- Chat Input --- */
@@ -371,3 +405,4 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
+

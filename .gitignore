@@ -11,6 +11,8 @@ instance/
 .webassets-cache
 
 # Project Specific
+GEMINI.md
+initial-prompt.md
 flask_session/
 uploads/
 temp_*.db
@@ -27,4 +29,5 @@ Thumbs.db
 .idea/
 
 # Exports
+asciiart.txt
 chat_export.html
