@@ -8,6 +8,7 @@ https://github.com/user-attachments/assets/cf6117b7-8e14-4a5b-8088-cd7da465706c
 
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/flask-3.x-green)
 
@@ -18,7 +19,17 @@ https://github.com/user-attachments/assets/cf6117b7-8e14-4a5b-8088-cd7da465706c
 *   **💬 Natural Language Chat:** Ask "Who are the top 5 customers?" and get results.
 *   **🧠 Transparent AI:** See the exact SQL generated before it runs.
 *   **📊 Rich Visualization:** Interactive tables and Markdown explanations.
-*   **💾 Exportable:** Save your entire analysis session as an HTML file.
+*   **✨ Polished UI/UX:** Responsive dark theme with optimized scrolling for large datasets.
+*   **🛡️ Safe Mode:** Confirmation dialogs prevent accidental data loss when switching databases.
+*   **💾 Exportable:** Save your entire analysis session as an HTML file with high-fidelity layout.
+
+## Changelog
+
+### v1.1 - UI/UX Polish & Robustness
+- **UI:** Fixed "double scrollbar" issues and optimized layout for windowed modes.
+- **Safety:** Added confirmation dialogs when uploading a new database during an active chat.
+- **Export:** Enhanced chat export to perfectly mirror the application's visual style and layout.
+- **Fix:** Resolved event listener conflicts preventing double-submission on upload.
 
 ## Prerequisites
 

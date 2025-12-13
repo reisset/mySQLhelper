@@ -146,7 +146,11 @@ body {
 #welcome-screen pre {
     font-family: 'Fira Code', 'Courier New', monospace;
     font-size: 0.7em; /* Adjust size of ASCII art */
-    color: var(--primary);
+    /* Gradient text effect */
+    background-image: linear-gradient(to right, #6a82fb, #fc5c7d); /* Example gradient */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent; /* Fallback for browsers that don't support text-fill-color */
     margin-bottom: 1rem;
 }
 
