@@ -1,6 +1,6 @@
 # mySQLhelper
 
-**mySQLhelper** is a private, offline-first AI analytics tool that allows you to chat with your local LLM about SQLite databases. It bridges the gap between natural language questions and SQL execution, all running securely on your local machine.
+**mySQLhelper** is a private, offline-first AI analytics tool that allows you to chat with your local LLM about SQLite databases. It bridges the gap between natural language questions and SQL execution, all running securely on your local machine. 
 
 
 https://github.com/user-attachments/assets/cf6117b7-8e14-4a5b-8088-cd7da465706c
@@ -23,13 +23,6 @@ https://github.com/user-attachments/assets/cf6117b7-8e14-4a5b-8088-cd7da465706c
 *   **🛡️ Safe Mode:** Confirmation dialogs prevent accidental data loss when switching databases.
 *   **💾 Exportable:** Save your entire analysis session as an HTML file with high-fidelity layout.
 
-## Changelog
-
-### v1.1 - UI/UX Polish & Robustness
-- **UI:** Fixed "double scrollbar" issues and optimized layout for windowed modes.
-- **Safety:** Added confirmation dialogs when uploading a new database during an active chat.
-- **Export:** Enhanced chat export to perfectly mirror the application's visual style and layout.
-- **Fix:** Resolved event listener conflicts preventing double-submission on upload.
 
 ## Prerequisites
 
@@ -113,4 +106,8 @@ Open your web browser (Chrome, Firefox, Edge) and go to:
 
 ## License
 
-MIT
+MIT - Use freely in your projects
+
+## Author
+
+Created by Reisset
