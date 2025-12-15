@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const decoder = new TextDecoder();
             let accumulatedText = '';
             let fullResponse = '';
+            let tokenUsage = null;  // Track token usage
             let firstChunk = true;
 
             while (true) {
@@ -127,17 +128,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (firstChunk) {
                     spinner.remove();
-                    pText.textContent = ''; 
+                    pText.textContent = '';
                     firstChunk = false;
                 }
 
                 const chunk = decoder.decode(value, { stream: true });
                 const endToken = '<|END_OF_STREAM|>';
+                const tokenToken = '<|TOKEN_USAGE|>';
 
                 if (chunk.includes(endToken)) {
                     const parts = chunk.split(endToken);
                     accumulatedText += parts[0];
-                    fullResponse = parts[1]; // The clean full response
+
+                    // Check if token usage data is present
+                    const metadata = parts[1];
+                    if (metadata.includes(tokenToken)) {
+                        const metaParts = metadata.split(tokenToken);
+                        fullResponse = metaParts[0];
+                        try {
+                            tokenUsage = JSON.parse(metaParts[1]);
+                        } catch (e) {
+                            console.warn('Failed to parse token usage:', e);
+                            tokenUsage = null;
+                        }
+                    } else {
+                        // Backward compatibility: No token data
+                        fullResponse = metadata;
+                    }
                     break;
                 } else {
                     accumulatedText += chunk;
@@ -150,11 +167,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // Final render
             renderText(pText, accumulatedText);
 
-            // SAVE THE ASSISTANT MESSAGE TO SESSION
+            // Add token counter to chat bubble if usage data available
+            if (tokenUsage) {
+                addTokenCounter(contentContainer, tokenUsage);
+            }
+
+            // SAVE THE ASSISTANT MESSAGE TO SESSION (with token usage)
             await fetch('/save_assistant_message', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: fullResponse }),
+                body: JSON.stringify({
+                    content: fullResponse,
+                    token_usage: tokenUsage  // Include token data
+                }),
             });
 
             // Execute SQL if present
@@ -311,6 +336,54 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Initial Render
         renderBatch();
+    }
+
+    function addTokenCounter(containerElement, tokenUsage) {
+        // Remove existing token counter if present (for updates)
+        const existingCounter = containerElement.querySelector('.token-counter');
+        if (existingCounter) {
+            existingCounter.remove();
+        }
+
+        const promptTokens = tokenUsage.prompt_tokens || 0;
+        const completionTokens = tokenUsage.completion_tokens || 0;
+        const totalTokens = tokenUsage.total_tokens || 0;
+
+        // Calculate cumulative total from all bot messages
+        let cumulativeTotal = 0;
+        document.querySelectorAll('.bot-message .token-counter').forEach(counter => {
+            const existingTokens = parseInt(counter.getAttribute('data-tokens')) || 0;
+            cumulativeTotal += existingTokens;
+        });
+        cumulativeTotal += totalTokens;
+
+        // Create token counter element
+        const tokenCounter = document.createElement('div');
+        tokenCounter.className = 'token-counter';
+        tokenCounter.setAttribute('data-tokens', totalTokens);
+
+        const tokenSpan = document.createElement('span');
+        tokenSpan.textContent = `${totalTokens} tokens (${cumulativeTotal} total)`;
+        tokenSpan.title = `Prompt: ${promptTokens} | Completion: ${completionTokens}`;
+
+        tokenCounter.appendChild(tokenSpan);
+
+        // Insert as first child of content container
+        containerElement.insertBefore(tokenCounter, containerElement.firstChild);
+    }
+
+    function updateAllTokenCounters() {
+        let runningTotal = 0;
+        document.querySelectorAll('.bot-message .token-counter').forEach(counter => {
+            const messageTokens = parseInt(counter.getAttribute('data-tokens')) || 0;
+            runningTotal += messageTokens;
+            const span = counter.querySelector('span');
+            if (span) {
+                const title = span.title; // Preserve tooltip
+                span.textContent = `${messageTokens} tokens (${runningTotal} total)`;
+                span.title = title;
+            }
+        });
     }
 
     function appendMessage(message, sender) {

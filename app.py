@@ -144,9 +144,16 @@ SELECT ...
     
     def stream_llm_response():
         headers = {"Content-Type": "application/json"}
-        payload = {"messages": messages_to_send, "mode": "chat", "temperature": 0.1, "stream": True}
-        
+        payload = {
+            "messages": messages_to_send,
+            "mode": "chat",
+            "temperature": 0.1,
+            "stream": True,
+            "stream_options": {"include_usage": True}  # Request token usage data
+        }
+
         full_response = ""
+        token_usage = None  # Initialize token tracking
         try:
             with requests.post(LLM_API_URL, headers=headers, json=payload, stream=True) as r:
                 r.raise_for_status()
@@ -154,8 +161,18 @@ SELECT ...
                     if line:
                         decoded_line = line.decode('utf-8')
                         if decoded_line.startswith('data: '):
+                            # Check for [DONE] marker
+                            if decoded_line.strip() == 'data: [DONE]':
+                                continue
+
                             try:
                                 json_data = json.loads(decoded_line[6:])
+
+                                # Capture token usage if present (appears in final chunk)
+                                if 'usage' in json_data:
+                                    token_usage = json_data['usage']
+
+                                # Stream content chunks as before
                                 if 'choices' in json_data and json_data['choices']:
                                     delta = json_data['choices'][0].get('delta', {})
                                     content_chunk = delta.get('content', '')
@@ -164,10 +181,15 @@ SELECT ...
                                         yield content_chunk
                             except json.JSONDecodeError:
                                 continue
-            
-            
-            # Send End Token
-            yield f"<|END_OF_STREAM|>{full_response}"
+
+
+            # Enhanced End Token: Include token usage in metadata
+            # Format: <|END_OF_STREAM|>{full_response}<|TOKEN_USAGE|>{json_encoded_usage}
+            if token_usage:
+                yield f"<|END_OF_STREAM|>{full_response}<|TOKEN_USAGE|>{json.dumps(token_usage)}"
+            else:
+                # Fallback: No token data available (old LM Studio or unsupported model)
+                yield f"<|END_OF_STREAM|>{full_response}"
 
         except requests.exceptions.RequestException as e:
             yield f"LLM Error: {str(e)}"
@@ -177,12 +199,22 @@ SELECT ...
 @app.route('/save_assistant_message', methods=['POST'])
 def save_assistant_message():
     content = request.json.get('content')
+    token_usage = request.json.get('token_usage')  # Optional: may be None
+
     if not content:
         return jsonify({'error': 'No content provided'}), 400
-    
+
     chat_history = session.get('chat_history', [])
-    chat_history.append({"role": "assistant", "content": content})
+
+    # Build assistant message with optional token usage
+    assistant_message = {"role": "assistant", "content": content}
+    if token_usage:
+        assistant_message['token_usage'] = token_usage
+
+    chat_history.append(assistant_message)
     session['chat_history'] = chat_history
+    session.modified = True  # Critical: Force session update
+
     return jsonify({'status': 'success'})
 
 @app.route('/execute_sql', methods=['POST'])
@@ -246,19 +278,33 @@ def _get_css_content():
 
 def _generate_chat_html(chat_history):
     chat_html_parts = []
+    cumulative_tokens = 0  # Track cumulative tokens for export
+
     for entry in chat_history:
         role = entry.get("role")
         content = entry.get("content", "")
-        
+
         if role == "user":
             user_text = content.split("User Question: ")[-1] if "User Question: " in content else content
             chat_html_parts.append(f'<div class="chat-message user-message"><p>{user_text}</p></div>')
-        
+
         elif role == "assistant":
+            # Build token counter HTML if usage data exists
+            token_html = ""
+            token_usage = entry.get("token_usage")
+            if token_usage:
+                prompt_tokens = token_usage.get('prompt_tokens', 0)
+                completion_tokens = token_usage.get('completion_tokens', 0)
+                total_tokens = token_usage.get('total_tokens', 0)
+                cumulative_tokens += total_tokens
+                token_html = f'''<div class="token-counter" data-tokens="{total_tokens}">
+                    <span title="Prompt: {prompt_tokens} | Completion: {completion_tokens}">{total_tokens} tokens ({cumulative_tokens} total)</span>
+                </div>'''
+
             parts = [f"<p>{content}</p>"]
             if entry.get("sql_query"):
                 parts.append(f"<pre><code>{entry['sql_query']}</code></pre>")
-            
+
             preview = entry.get("query_results_preview")
             if preview:
                 headers = preview[0].keys()
@@ -267,9 +313,11 @@ def _generate_chat_html(chat_history):
                     table += "<tr>" + "".join(f"<td>{row[h]}</td>" for h in headers) + "</tr>"
                 table += "</tbody></table>"
                 parts.append(f'<div class="results-table-container">{table}</div>')
-            
-            chat_html_parts.append(f'<div class="chat-message bot-message">{"".join(parts)}</div>')
-            
+
+            # Wrap in content-container with token counter
+            content_html = f'<div class="content-container">{token_html}{"".join(parts)}</div>'
+            chat_html_parts.append(f'<div class="chat-message bot-message">{content_html}</div>')
+
     return "\n".join(chat_html_parts)
 
 @app.route('/export_chat', methods=['GET'])

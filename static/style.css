@@ -269,6 +269,36 @@ body {
     margin-bottom: 1rem;
 }
 
+/* Token Counter in Bot Messages */
+.bot-message .content-container {
+    position: relative; /* Enable absolute positioning for token counter */
+}
+
+.bot-message .token-counter {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background-color: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    padding: 3px 8px;
+    font-size: 0.75rem;
+    color: var(--foreground-dark);
+    font-family: 'Fira Code', 'Courier New', monospace;
+    z-index: 10;
+    pointer-events: auto; /* Ensure hover works */
+    transition: background-color 0.2s ease;
+}
+
+.bot-message .token-counter:hover {
+    background-color: var(--background-lighter);
+    color: var(--foreground);
+}
+
+.bot-message .token-counter span {
+    cursor: help; /* Indicate tooltip on hover */
+}
+
 /* Thinking Indicator */
 .thinking-spinner {
     border: 3px solid var(--border);

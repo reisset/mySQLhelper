@@ -1,0 +1,14 @@
+CHANGELOG
+
+### v1.2 - Token Usage Tracking
+- **Feature:** Display token usage in top-right of LLM chat bubbles showing per-message and cumulative totals.
+- **Details:** Hover over token counter to see prompt/completion breakdown.
+- **Backend:** Captures token usage from LM Studio API (v0.3.18+) via stream_options parameter.
+- **Session:** Token data persists in session and is included in HTML exports.
+- **Compatibility:** Graceful degradation for older LM Studio versions - no errors if token data unavailable.
+
+### v1.1 - UI/UX Polish & Robustness
+- **UI:** Fixed "double scrollbar" issues and optimized layout for windowed modes.
+- **Safety:** Added confirmation dialogs when uploading a new database during an active chat.
+- **Export:** Enhanced chat export to perfectly mirror the application's visual style and layout.
+- **Fix:** Resolved event listener conflicts preventing double-submission on upload.
