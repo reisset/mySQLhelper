@@ -1,5 +1,11 @@
 CHANGELOG
 
+### v1.5 - UI/UX Overhaul & Drag-and-Drop
+- **Feature:** Implemented a dedicated drag-and-drop zone for database uploads, replacing the basic file input.
+- **UX:** Added a persistent, minimized welcome screen that stays at the top of the chat history for better branding and visual continuity.
+- **UX:** Fixed the "empty message bubble" glitch that appeared after file uploads.
+- **Visuals:** Refined the welcome screen transition animations and solved ASCII art clipping issues in the minimized state.
+
 ### v1.4 - Forensic Hardening & Security
 - **Feature:** Added SHA256 hashing for all uploaded evidence files.
 - **Feature:** Implemented comprehensive audit logging (`logs/`) with daily rotation.

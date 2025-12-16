@@ -15,7 +15,7 @@ https://github.com/user-attachments/assets/cf6117b7-8e14-4a5b-8088-cd7da465706c
 ## Features
 
 *   **🔒 100% Offline:** No data leaves your network. Works with local LLMs (via LM Studio).
-*   **📂 Drag-and-Drop:** Upload `.db` or `.sqlite` files instantly.
+*   **📂 Visual Drag-and-Drop:** dedicated drop zone for uploading `.db` or `.sqlite` files instantly with visual feedback.
 *   **💬 Natural Language Chat:** Ask "Who are the top 5 customers?" and get results.
 *   **🧠 Transparent AI:** See the exact SQL generated before it runs.
 *   **📊 Rich Visualization:** Interactive tables and Markdown explanations.

@@ -15,13 +15,17 @@
                 <!-- Database Source Section -->
                 <div class="sidebar-section">
                     <h3 class="section-label">Database Source</h3>
-                    <div class="file-upload">
+                    <div id="drop-zone" class="file-upload">
                         <form id="upload-form" enctype="multipart/form-data">
-                            <div class="file-upload-buttons">
-                                <label for="database-file" class="custom-file-upload">Choose File</label>
-                                <input type="file" id="database-file" name="database_file" accept=".db, .sqlite, .sqlite3, .sql, .csv">
-                                <input type="submit" value="Upload & Load">
+                            <div class="drop-zone-content">
+                                <p class="drop-text">Drag & drop database here</p>
+                                <p class="drop-text-small">or</p>
+                                <div class="file-upload-buttons">
+                                    <label for="database-file" class="custom-file-upload">Choose File</label>
+                                    <input type="file" id="database-file" name="database_file" accept=".db, .sqlite, .sqlite3, .sql, .csv">
+                                </div>
                             </div>
+                            <input type="submit" value="Upload & Load" class="upload-submit-btn">
                         </form>
                         <span id="file-name-display">No file chosen</span>
                     </div>

@@ -4,21 +4,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatHistory = document.getElementById('chat-history');
     const uploadForm = document.getElementById('upload-form');
     const databaseFile = document.getElementById('database-file');
+    const dropZone = document.getElementById('drop-zone');
     const schemaDisplay = document.getElementById('schema-display');
     const sidebar = document.getElementById('sidebar');
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const fileNameDisplay = document.getElementById('file-name-display');
     const welcomeScreen = document.getElementById('welcome-screen');
-
-    function checkWelcomeScreen() {
-        // If there are any messages besides the welcome screen, hide it.
-        if (chatHistory.children.length > 1 || 
-            (chatHistory.children.length === 1 && chatHistory.firstElementChild.id !== 'welcome-screen')) {
-            if (welcomeScreen) welcomeScreen.style.display = 'none';
-        } else {
-            if (welcomeScreen) welcomeScreen.style.display = 'block';
-        }
-    }
 
     // --- Event Listeners ---
     sendButton.addEventListener('click', sendMessage);
@@ -28,13 +19,61 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // File Input Change
     databaseFile.addEventListener('change', () => {
-        if (databaseFile.files.length > 0) {
-            fileNameDisplay.textContent = databaseFile.files[0].name;
+        handleFiles(databaseFile.files);
+    });
+
+    // Drag and Drop Events
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        dropZone.classList.add('drag-over');
+    }
+
+    function unhighlight(e) {
+        dropZone.classList.remove('drag-over');
+    }
+
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            databaseFile.files = files; // Assign to input for consistency
+            handleFiles(files);
+            // Optional: Auto-upload on drop? 
+            // The user prompt implies "drag-and-drop feature", which usually implies loading.
+            // Let's stick to selecting for now to let user confirm with "Upload & Load" 
+            // or we could just trigger uploadFile() here.
+            // Given the UI has a distinct button, selecting first is safer UX to avoid accidental uploads.
+        }
+    }
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            fileNameDisplay.textContent = files[0].name;
         } else {
             fileNameDisplay.textContent = 'No file chosen';
         }
-    });
+    }
 
     uploadForm.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -79,10 +118,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const message = userInput.value.trim();
         if (!message) return;
 
-        // Robustly check for and remove welcome screen
-        const welcomeScreenEl = document.getElementById('welcome-screen');
-        if (welcomeScreenEl) {
-            welcomeScreenEl.remove();
+        // Minimize welcome screen instead of removing it
+        if (welcomeScreen) {
+            welcomeScreen.classList.add('minimized');
         }
 
         appendMessage(message, 'user');
@@ -435,6 +473,13 @@ document.addEventListener('DOMContentLoaded', function() {
             contentDiv = document.createElement('div');
             contentDiv.className = 'content-container';
             div.appendChild(contentDiv);
+            
+            // Fix: Actually render the message text if provided (e.g. for upload success message)
+            if (message) {
+                const p = document.createElement('p');
+                p.textContent = message;
+                contentDiv.appendChild(p);
+            }
         }
         
         chatHistory.appendChild(div);
@@ -460,11 +505,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Check for existing chat history (excluding welcome screen)
-            const welcomeScreenEl = document.getElementById('welcome-screen');
-            const hasHistory = chatHistory.children.length > 0;
-            const isOnlyWelcome = (chatHistory.children.length === 1 && chatHistory.firstElementChild.id === 'welcome-screen');
-
-            if (hasHistory && !isOnlyWelcome) {
+            const hasHistory = chatHistory.querySelectorAll('.chat-message').length > 0;
+            
+            if (hasHistory) {
                 if (!confirm("A database is already loaded. Uploading a new one will clear the chat history. Continue?")) {
                     return; // User cancelled
                 }
@@ -473,13 +516,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData();
             formData.append('database_file', file);
 
-            // Robustly check for and remove welcome screen
-            if (welcomeScreenEl) {
-                welcomeScreenEl.remove();
+            // Minimize welcome screen and clear only chat messages
+            if (welcomeScreen) {
+                welcomeScreen.classList.add('minimized');
             }
             
-            // Clear history on new upload (confirmed by user or empty start)
-            chatHistory.innerHTML = ''; 
+            // Remove all chat messages but keep the welcome screen if it exists
+            const messages = chatHistory.querySelectorAll('.chat-message');
+            messages.forEach(msg => msg.remove());
 
             fetch('/upload', {
                 method: 'POST',
@@ -519,5 +563,4 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    checkWelcomeScreen();
 });
