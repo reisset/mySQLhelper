@@ -1,5 +1,14 @@
 CHANGELOG
 
+### v1.6 - Interactive Tables, Annotations & Shortcuts
+- **Feature:** Added **Smart Data Tables** (via Grid.js) for SQL results, featuring sortable columns, search/filter, and pagination.
+- **Feature:** Added **Forensic Annotations** allowing analysts to attach persistent notes to any assistant response. Notes are preserved in chat exports.
+- **Feature:** Added **Frequent Queries** sidebar menu with one-click shortcuts for common investigative tasks (e.g., "List Tables", "Find Users").
+- **UX:** Implemented **Syntax Highlighting** for SQL code blocks in chat responses.
+- **UX:** Significant UI polish including dark-themed interactive elements and improved visibility for inputs/pagination.
+- **Tech:** Replaced simple HTML tables with interactive Grid.js components.
+- **Tech:** Added `uuid` based message tracking to support persistent annotations.
+
 ### v1.5 - UI/UX Overhaul & Drag-and-Drop
 - **Feature:** Implemented a dedicated drag-and-drop zone for database uploads, replacing the basic file input.
 - **UX:** Added a persistent, minimized welcome screen that stays at the top of the chat history for better branding and visual continuity.

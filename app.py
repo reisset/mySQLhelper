@@ -6,6 +6,7 @@ import logging
 import re
 import json
 import csv
+import uuid
 from datetime import datetime
 
 # Third-party
@@ -406,7 +407,11 @@ def chat_stream():
             return jsonify({'error': f"Database access error: {e}"}), 500
 
     # Append ONLY user message (schema is now in system prompt)
-    chat_history.append({"role": "user", "content": user_message})
+    chat_history.append({
+        "role": "user", 
+        "content": user_message,
+        "id": str(uuid.uuid4())
+    })
 
     # Dynamic System Prompt with Schema
     system_prompt = f"""
@@ -495,7 +500,12 @@ def save_assistant_message():
     chat_history = session.get('chat_history', [])
 
     # Build assistant message with optional token usage
-    assistant_message = {"role": "assistant", "content": content}
+    msg_id = str(uuid.uuid4())
+    assistant_message = {
+        "role": "assistant", 
+        "content": content,
+        "id": msg_id
+    }
     if token_usage:
         assistant_message['token_usage'] = token_usage
 
@@ -503,7 +513,7 @@ def save_assistant_message():
     session['chat_history'] = chat_history
     session.modified = True  # Critical: Force session update
 
-    return jsonify({'status': 'success'})
+    return jsonify({'status': 'success', 'message_id': msg_id})
 
 @app.route('/execute_sql', methods=['POST'])
 def execute_sql():
@@ -561,6 +571,33 @@ def execute_sql():
         logger.error(f"SQL Execution Error: {e} | Query: {sql_query}")
         return jsonify({'error': f"SQL Error: {e}"}), 500
 
+@app.route('/add_note', methods=['POST'])
+def add_note():
+    data = request.json
+    message_id = data.get('message_id')
+    note_content = data.get('note_content')
+    
+    if not message_id or note_content is None:
+        return jsonify({'error': 'Missing message_id or note_content'}), 400
+        
+    chat_history = session.get('chat_history', [])
+    
+    # Find message by ID
+    msg_found = False
+    for msg in chat_history:
+        if msg.get('id') == message_id:
+            msg['note'] = note_content
+            msg_found = True
+            break
+            
+    if not msg_found:
+        return jsonify({'error': 'Message not found'}), 404
+        
+    session['chat_history'] = chat_history
+    session.modified = True
+    
+    return jsonify({'status': 'success'})
+
 def _get_css_content():
     css_path = os.path.join(app.root_path, 'static', 'style.css')
     try:
@@ -606,6 +643,10 @@ def _generate_chat_html(chat_history):
                     table += "<tr>" + "".join(f"<td>{row[h]}</td>" for h in headers) + "</tr>"
                 table += "</tbody></table>"
                 parts.append(f'<div class="results-table-container">{table}</div>')
+
+            if entry.get("note"):
+                note_text = entry["note"].replace("<", "&lt;").replace(">", "&gt;") # Basic escaping
+                parts.append(f'<div class="forensic-note" style="margin-top: 10px; padding: 10px; background: #332b00; border-left: 3px solid #ffcc00; font-style: italic; color: #fff;"><strong>Analyst Note:</strong> {note_text}</div>')
 
             # Wrap in content-container with token counter
             content_html = f'<div class="content-container">{token_html}{"".join(parts)}</div>'

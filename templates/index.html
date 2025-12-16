@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mySQLhelper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="{{ url_for('static', filename='lib/marked.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/mermaid.min.css') }}">
 </head>
 <body>
     <div class="app-container">
@@ -35,6 +35,7 @@
                 <div class="sidebar-section">
                     <h3 class="section-label">Actions</h3>
                     <button id="export-chat-button" class="sidebar-button">Export Chat</button>
+                    <button id="shortcuts-button" class="sidebar-button" style="margin-top: 5px;">Freq. Queries</button>
                 </div>
 
                 <!-- Schema Section -->
@@ -74,6 +75,10 @@
             </div>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='script.js') }}?v=1.4" defer></script>
+    <script src="{{ url_for('static', filename='lib/marked.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=1.5" defer></script>
 </body>
 </html>
