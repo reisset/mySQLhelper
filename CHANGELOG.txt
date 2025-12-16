@@ -1,5 +1,11 @@
 CHANGELOG
 
+### v1.3 - Sidebar UI Polish & Export Fix
+- **UI:** Redesigned sidebar with organized sections: "Database Source", "Actions", and "Schema".
+- **Polish:** Removed floating header, added uppercase section labels with subtle borders for cleaner organization.
+- **Fix:** Resolved token counter text overlap in exported HTML files by adding proper padding.
+- **Export:** Token counters now render cleanly in exported chat sessions without covering text.
+
 ### v1.2 - Token Usage Tracking
 - **Feature:** Display token usage in top-right of LLM chat bubbles showing per-message and cumulative totals.
 - **Details:** Hover over token counter to see prompt/completion breakdown.

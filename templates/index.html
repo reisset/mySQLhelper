@@ -11,23 +11,34 @@
 <body>
     <div class="app-container">
         <div class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <h2>mySQLhelper</h2>
-            </div>
             <div class="sidebar-content">
-                <div class="file-upload">
-                    <form id="upload-form" enctype="multipart/form-data">
-                        <div class="file-upload-buttons">
-                            <label for="database-file" class="custom-file-upload">Choose File</label>
-                            <input type="file" id="database-file" name="database_file" accept=".db, .sqlite, .sqlite3, .sql, .csv">
-                            <input type="submit" value="Upload & Load">
-                        </div>
-                    </form>
-                    <span id="file-name-display">No file chosen</span>
+                <!-- Database Source Section -->
+                <div class="sidebar-section">
+                    <h3 class="section-label">Database Source</h3>
+                    <div class="file-upload">
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="file-upload-buttons">
+                                <label for="database-file" class="custom-file-upload">Choose File</label>
+                                <input type="file" id="database-file" name="database_file" accept=".db, .sqlite, .sqlite3, .sql, .csv">
+                                <input type="submit" value="Upload & Load">
+                            </div>
+                        </form>
+                        <span id="file-name-display">No file chosen</span>
+                    </div>
                 </div>
-            <button id="export-chat-button" class="sidebar-button">Export Chat</button>
-                <div id="schema-display" class="schema-display">
-                    <!-- Schema will be displayed here -->
+
+                <!-- Actions Section -->
+                <div class="sidebar-section">
+                    <h3 class="section-label">Actions</h3>
+                    <button id="export-chat-button" class="sidebar-button">Export Chat</button>
+                </div>
+
+                <!-- Schema Section -->
+                <div class="sidebar-section">
+                    <h3 class="section-label">Schema</h3>
+                    <div id="schema-display" class="schema-display">
+                        <!-- Schema will be displayed here -->
+                    </div>
                 </div>
             </div>
         </div>

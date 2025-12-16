@@ -8,7 +8,7 @@ https://github.com/user-attachments/assets/cf6117b7-8e14-4a5b-8088-cd7da465706c
 
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.1-blue)
+![Version](https://img.shields.io/badge/version-1.3-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/flask-3.x-green)
 
@@ -97,6 +97,16 @@ flask run
 ### Step 6: Use It!
 Open your web browser (Chrome, Firefox, Edge) and go to:
 [http://127.0.0.1:5000](http://127.0.0.1:5000)
+
+## Forensic Analyst Notes
+
+This tool is designed with digital forensics workflows in mind.
+
+*   **Non-Destructive:** The application works on a **copy** of your database uploaded to the `uploads/` directory. The original evidence file is never accessed or modified.
+*   **Read-Only Enforcement:** The backend strictly enforces `SELECT`-only queries via regex validation. `DROP`, `INSERT`, `UPDATE`, and other modification commands are blocked at the application level.
+*   **Chain of Custody:** The "Export Chat" feature provides a timestamped HTML report of the entire analysis session, including the exact SQL queries generated and executed, suitable for case documentation.
+*   **Air-Gapped Safe:** The tool has zero telemetry and requires no internet connection (when used with a local LLM), ensuring sensitive case data never leaves the forensic workstation.
+*   **Limitation (WAL Files):** Currently, the tool uploads a single `.db` or `.sqlite` file. If your target database has active Write-Ahead Logging (WAL) files (`.db-wal`, `.db-shm`), you must merge them (checkpoint) or export the database before uploading, otherwise recent transactions may be missing.
 
 ## Architecture
 
