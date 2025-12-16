@@ -1,0 +1,471 @@
+2025-12-16 06:07:44,581 - INFO - ============================================================
+2025-12-16 06:07:44,581 - INFO - mySQLhelper Forensic Analysis Tool Started
+2025-12-16 06:07:44,581 - INFO - Upload directory: /home/king/Projects/WebApp/mysqlhelper/uploads
+2025-12-16 06:07:44,581 - INFO - ============================================================
+2025-12-16 06:07:44,590 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-12-16 06:07:44,590 - INFO - [33mPress CTRL+C to quit[0m
+2025-12-16 06:08:39,347 - INFO - ============================================================
+2025-12-16 06:08:39,347 - INFO - mySQLhelper Forensic Analysis Tool Started
+2025-12-16 06:08:39,347 - INFO - Upload directory: /home/king/Projects/WebApp/mysqlhelper/uploads
+2025-12-16 06:08:39,347 - INFO - ============================================================
+2025-12-16 06:08:39,352 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-12-16 06:08:39,352 - INFO - [33mPress CTRL+C to quit[0m
+2025-12-16 06:08:43,946 - INFO - 127.0.0.1 - - [16/Dec/2025 06:08:43] "GET / HTTP/1.1" 200 -
+2025-12-16 06:08:43,963 - INFO - 127.0.0.1 - - [16/Dec/2025 06:08:43] "[36mGET /static/lib/purify.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:08:43,964 - INFO - 127.0.0.1 - - [16/Dec/2025 06:08:43] "[36mGET /static/lib/marked.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:08:43,964 - INFO - 127.0.0.1 - - [16/Dec/2025 06:08:43] "[36mGET /static/style.css HTTP/1.1[0m" 304 -
+2025-12-16 06:08:43,969 - INFO - 127.0.0.1 - - [16/Dec/2025 06:08:43] "[36mGET /static/script.js HTTP/1.1[0m" 304 -
+2025-12-16 06:08:43,983 - WARNING - 404 Error: http://127.0.0.1:5000/favicon.ico
+2025-12-16 06:08:43,983 - INFO - 127.0.0.1 - - [16/Dec/2025 06:08:43] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-12-16 06:14:45,473 - INFO - --- Chat Request Start ---
+2025-12-16 06:14:45,476 - ERROR - LLM Health Check Failed: LM Studio not reachable
+2025-12-16 06:14:45,476 - INFO - 127.0.0.1 - - [16/Dec/2025 06:14:45] "[35m[1mPOST /chat_stream HTTP/1.1[0m" 503 -
+2025-12-16 06:15:24,571 - INFO - File validation passed: chinook.db (0.84MB)
+2025-12-16 06:15:24,571 - INFO - File saved: chinook.db (0.84MB)
+2025-12-16 06:15:24,572 - INFO - SHA256: d6c11e2ccda2a36883af57f031f76fbd55e247f3be1710c4c8aaa72ec06a18cb
+2025-12-16 06:15:24,578 - INFO - SQLite validated: 13 tables found
+2025-12-16 06:15:24,578 - INFO - Database loaded successfully: chinook.db
+2025-12-16 06:15:24,578 - INFO - Final path: uploads/chinook.db
+2025-12-16 06:15:24,578 - INFO - Schema: 13 tables
+2025-12-16 06:15:24,578 - INFO - 127.0.0.1 - - [16/Dec/2025 06:15:24] "POST /upload HTTP/1.1" 200 -
+2025-12-16 06:15:27,940 - INFO - --- Chat Request Start ---
+2025-12-16 06:15:27,941 - ERROR - LLM Health Check Failed: LM Studio not reachable
+2025-12-16 06:15:27,941 - INFO - 127.0.0.1 - - [16/Dec/2025 06:15:27] "[35m[1mPOST /chat_stream HTTP/1.1[0m" 503 -
+2025-12-16 06:19:03,314 - INFO - --- Chat Request Start ---
+2025-12-16 06:19:03,319 - INFO - Messages to send count: 2
+2025-12-16 06:19:03,762 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:03] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:19:04,509 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 358, 'completion_tokens': 51, 'total_tokens': 409}
+2025-12-16 06:19:04,511 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:04] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:19:09,067 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:09] "GET / HTTP/1.1" 200 -
+2025-12-16 06:19:09,076 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:09] "[36mGET /static/style.css HTTP/1.1[0m" 304 -
+2025-12-16 06:19:09,077 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:09] "[36mGET /static/lib/marked.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:19:09,077 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:09] "[36mGET /static/lib/purify.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:19:09,079 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:09] "[36mGET /static/script.js HTTP/1.1[0m" 304 -
+2025-12-16 06:19:13,239 - INFO - File validation passed: chinook.db (0.84MB)
+2025-12-16 06:19:13,239 - INFO - File saved: chinook.db (0.84MB)
+2025-12-16 06:19:13,239 - INFO - SHA256: d6c11e2ccda2a36883af57f031f76fbd55e247f3be1710c4c8aaa72ec06a18cb
+2025-12-16 06:19:13,245 - INFO - SQLite validated: 13 tables found
+2025-12-16 06:19:13,245 - INFO - Database loaded successfully: chinook.db
+2025-12-16 06:19:13,245 - INFO - Final path: uploads/chinook.db
+2025-12-16 06:19:13,245 - INFO - Schema: 13 tables
+2025-12-16 06:19:13,246 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:13] "POST /upload HTTP/1.1" 200 -
+2025-12-16 06:19:22,787 - INFO - --- Chat Request Start ---
+2025-12-16 06:19:22,789 - INFO - Messages to send count: 2
+2025-12-16 06:19:22,873 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:22] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:19:27,467 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 356, 'completion_tokens': 293, 'total_tokens': 649}
+2025-12-16 06:19:27,470 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:27] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:19:38,695 - INFO - --- Chat Request Start ---
+2025-12-16 06:19:38,697 - INFO - Messages to send count: 4
+2025-12-16 06:19:38,856 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:38] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:19:39,397 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 661, 'completion_tokens': 39, 'total_tokens': 700}
+2025-12-16 06:19:39,400 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:39] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:19:39,401 - INFO - SQL Execution Attempt: SELECT CustomerId, SUM(Total) AS TotalSpent
+FROM invoices
+GROUP BY CustomerId
+ORDER BY TotalSpent DESC
+LIMIT 1;
+2025-12-16 06:19:39,402 - INFO - SQL Executed Successfully. Rows returned: 1
+2025-12-16 06:19:39,402 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:39] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:19:46,132 - INFO - --- Chat Request Start ---
+2025-12-16 06:19:46,134 - INFO - Messages to send count: 6
+2025-12-16 06:19:46,240 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:46] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:19:48,016 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 706, 'completion_tokens': 116, 'total_tokens': 822}
+2025-12-16 06:19:48,018 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:48] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:19:48,020 - INFO - SQL Execution Attempt: SELECT c.CustomerId, CONCAT(c.FirstName, ' ', c.LastName) AS CustomerName, SUM(i.Total) AS TotalSpent
+FROM customers c
+JOIN invoices i ON c.CustomerId = i.CustomerId
+GROUP BY c.CustomerId, c.FirstName, c.LastName
+ORDER BY TotalSpent DESC
+LIMIT 1;
+2025-12-16 06:19:48,020 - INFO - SQL Executed Successfully. Rows returned: 1
+2025-12-16 06:19:48,021 - INFO - 127.0.0.1 - - [16/Dec/2025 06:19:48] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:20:02,910 - INFO - --- Chat Request Start ---
+2025-12-16 06:20:02,913 - INFO - Messages to send count: 8
+2025-12-16 06:20:03,085 - INFO - 127.0.0.1 - - [16/Dec/2025 06:20:03] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:20:04,261 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 835, 'completion_tokens': 79, 'total_tokens': 914}
+2025-12-16 06:20:04,263 - INFO - 127.0.0.1 - - [16/Dec/2025 06:20:04] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:20:04,266 - INFO - SQL Execution Attempt: SELECT c.CustomerId, CONCAT(c.FirstName, ' ', c.LastName) AS CustomerName, SUM(i.Total) AS TotalSpent
+FROM customers c
+JOIN invoices i ON c.CustomerId = i.CustomerId
+GROUP BY c.CustomerId, c.FirstName, c.LastName
+ORDER BY TotalSpent DESC
+LIMIT 5;
+2025-12-16 06:20:04,266 - INFO - SQL Executed Successfully. Rows returned: 5
+2025-12-16 06:20:04,267 - INFO - 127.0.0.1 - - [16/Dec/2025 06:20:04] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:20:14,918 - INFO - --- Chat Request Start ---
+2025-12-16 06:20:14,922 - INFO - Messages to send count: 10
+2025-12-16 06:20:15,086 - INFO - 127.0.0.1 - - [16/Dec/2025 06:20:15] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:20:16,266 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 926, 'completion_tokens': 79, 'total_tokens': 1005}
+2025-12-16 06:20:16,269 - INFO - 127.0.0.1 - - [16/Dec/2025 06:20:16] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:20:16,271 - INFO - SQL Execution Attempt: SELECT c.CustomerId, CONCAT(c.FirstName, ' ', c.LastName) AS CustomerName, SUM(i.Total) AS TotalSpent
+FROM customers c
+JOIN invoices i ON c.CustomerId = i.CustomerId
+GROUP BY c.CustomerId, c.FirstName, c.LastName
+ORDER BY TotalSpent ASC
+LIMIT 5;
+2025-12-16 06:20:16,271 - INFO - SQL Executed Successfully. Rows returned: 5
+2025-12-16 06:20:16,272 - INFO - 127.0.0.1 - - [16/Dec/2025 06:20:16] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:21:09,999 - INFO - --- Chat Request Start ---
+2025-12-16 06:21:10,001 - INFO - Messages to send count: 12
+2025-12-16 06:21:10,166 - INFO - 127.0.0.1 - - [16/Dec/2025 06:21:10] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:21:11,077 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1015, 'completion_tokens': 62, 'total_tokens': 1077}
+2025-12-16 06:21:11,080 - INFO - 127.0.0.1 - - [16/Dec/2025 06:21:11] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:21:11,081 - INFO - SQL Execution Attempt: SELECT * FROM tracks;
+2025-12-16 06:21:11,085 - INFO - SQL Executed Successfully. Rows returned: 2000
+2025-12-16 06:21:11,088 - INFO - 127.0.0.1 - - [16/Dec/2025 06:21:11] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:21:28,929 - INFO - --- Chat Request Start ---
+2025-12-16 06:21:28,931 - INFO - Messages to send count: 14
+2025-12-16 06:21:29,097 - INFO - 127.0.0.1 - - [16/Dec/2025 06:21:29] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:21:29,243 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1087, 'completion_tokens': 14, 'total_tokens': 1101}
+2025-12-16 06:21:29,245 - INFO - 127.0.0.1 - - [16/Dec/2025 06:21:29] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:21:29,247 - INFO - SQL Execution Attempt: SELECT * FROM tracks ORDER BY Name ASC;
+2025-12-16 06:21:29,256 - INFO - SQL Executed Successfully. Rows returned: 2000
+2025-12-16 06:21:29,259 - INFO - 127.0.0.1 - - [16/Dec/2025 06:21:29] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:22:24,006 - INFO - --- Chat Request Start ---
+2025-12-16 06:22:24,008 - INFO - Messages to send count: 16
+2025-12-16 06:22:24,128 - INFO - 127.0.0.1 - - [16/Dec/2025 06:22:24] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:22:25,838 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1121, 'completion_tokens': 110, 'total_tokens': 1231}
+2025-12-16 06:22:25,841 - INFO - 127.0.0.1 - - [16/Dec/2025 06:22:25] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:22:25,844 - INFO - SQL Execution Attempt: SELECT g.Name AS Genre, COUNT(t.TrackId) AS TrackCount
+FROM genres g
+JOIN tracks t ON g.GenreId = t.GenreId
+GROUP BY g.Name
+ORDER BY TrackCount DESC
+LIMIT 1;
+2025-12-16 06:22:25,844 - INFO - SQL Executed Successfully. Rows returned: 1
+2025-12-16 06:22:25,845 - INFO - 127.0.0.1 - - [16/Dec/2025 06:22:25] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:36:27,793 - INFO - ============================================================
+2025-12-16 06:36:27,793 - INFO - mySQLhelper Forensic Analysis Tool Started
+2025-12-16 06:36:27,793 - INFO - Upload directory: /home/king/Projects/WebApp/mysqlhelper/uploads
+2025-12-16 06:36:27,793 - INFO - ============================================================
+2025-12-16 06:36:27,800 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-12-16 06:36:27,800 - INFO - [33mPress CTRL+C to quit[0m
+2025-12-16 06:36:43,692 - INFO - ============================================================
+2025-12-16 06:36:43,692 - INFO - mySQLhelper Forensic Analysis Tool Started
+2025-12-16 06:36:43,693 - INFO - Upload directory: /home/king/Projects/WebApp/mysqlhelper/uploads
+2025-12-16 06:36:43,693 - INFO - ============================================================
+2025-12-16 06:36:43,697 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-12-16 06:36:43,697 - INFO - [33mPress CTRL+C to quit[0m
+2025-12-16 06:36:47,202 - INFO - 127.0.0.1 - - [16/Dec/2025 06:36:47] "GET / HTTP/1.1" 200 -
+2025-12-16 06:36:47,219 - INFO - 127.0.0.1 - - [16/Dec/2025 06:36:47] "[36mGET /static/style.css HTTP/1.1[0m" 304 -
+2025-12-16 06:36:47,219 - INFO - 127.0.0.1 - - [16/Dec/2025 06:36:47] "[36mGET /static/lib/purify.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:36:47,219 - INFO - 127.0.0.1 - - [16/Dec/2025 06:36:47] "[36mGET /static/lib/marked.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:36:47,222 - INFO - 127.0.0.1 - - [16/Dec/2025 06:36:47] "GET /static/script.js HTTP/1.1" 200 -
+2025-12-16 06:36:51,763 - INFO - File validation passed: chinook.db (0.84MB)
+2025-12-16 06:36:51,763 - INFO - File saved: chinook.db (0.84MB)
+2025-12-16 06:36:51,763 - INFO - SHA256: d6c11e2ccda2a36883af57f031f76fbd55e247f3be1710c4c8aaa72ec06a18cb
+2025-12-16 06:36:51,769 - INFO - SQLite validated: 13 tables found
+2025-12-16 06:36:51,770 - INFO - Database loaded successfully: chinook.db
+2025-12-16 06:36:51,770 - INFO - Final path: uploads/chinook.db
+2025-12-16 06:36:51,770 - INFO - Schema: 13 tables
+2025-12-16 06:36:51,770 - INFO - 127.0.0.1 - - [16/Dec/2025 06:36:51] "POST /upload HTTP/1.1" 200 -
+2025-12-16 06:37:02,475 - INFO - --- Chat Request Start ---
+2025-12-16 06:37:02,479 - INFO - Messages to send count: 2
+2025-12-16 06:37:03,016 - INFO - 127.0.0.1 - - [16/Dec/2025 06:37:03] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:37:08,120 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 461, 'completion_tokens': 331, 'total_tokens': 792}
+2025-12-16 06:37:08,123 - INFO - 127.0.0.1 - - [16/Dec/2025 06:37:08] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:37:14,857 - INFO - --- Chat Request Start ---
+2025-12-16 06:37:14,859 - INFO - Messages to send count: 4
+2025-12-16 06:37:14,986 - INFO - 127.0.0.1 - - [16/Dec/2025 06:37:14] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:37:15,899 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 800, 'completion_tokens': 61, 'total_tokens': 861}
+2025-12-16 06:37:15,902 - INFO - 127.0.0.1 - - [16/Dec/2025 06:37:15] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:37:15,903 - INFO - SQL Execution Attempt: SELECT * FROM employees;
+2025-12-16 06:37:15,904 - INFO - SQL Executed Successfully. Rows returned: 8
+2025-12-16 06:37:15,904 - INFO - 127.0.0.1 - - [16/Dec/2025 06:37:15] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:37:50,697 - INFO - --- Chat Request Start ---
+2025-12-16 06:37:50,699 - INFO - Messages to send count: 6
+2025-12-16 06:37:50,847 - INFO - 127.0.0.1 - - [16/Dec/2025 06:37:50] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:37:55,383 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 875, 'completion_tokens': 293, 'total_tokens': 1168}
+2025-12-16 06:37:55,387 - INFO - 127.0.0.1 - - [16/Dec/2025 06:37:55] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:37:55,388 - INFO - SQL Execution Attempt: SELECT
+    c.CustomerId,
+    CONCAT(c.FirstName, ' ', c.LastName) AS CustomerName,
+    i.InvoiceDate,
+    i.Total,
+    COUNT(ii.InvoiceLineId) AS ItemsPurchased
+FROM
+    invoices i
+JOIN
+    customers c ON i.CustomerId = c.CustomerId
+LEFT JOIN
+    invoice_items ii ON i.InvoiceId = ii.InvoiceId
+GROUP BY
+    i.InvoiceId, c.CustomerId, CustomerName, i.InvoiceDate, i.Total
+ORDER BY
+    i.Total DESC;
+2025-12-16 06:37:55,389 - INFO - SQL Executed Successfully. Rows returned: 412
+2025-12-16 06:37:55,390 - INFO - 127.0.0.1 - - [16/Dec/2025 06:37:55] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:38:41,116 - INFO - --- Chat Request Start ---
+2025-12-16 06:38:41,118 - INFO - Messages to send count: 8
+2025-12-16 06:38:41,277 - INFO - 127.0.0.1 - - [16/Dec/2025 06:38:41] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:38:43,646 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1183, 'completion_tokens': 155, 'total_tokens': 1338}
+2025-12-16 06:38:43,649 - INFO - 127.0.0.1 - - [16/Dec/2025 06:38:43] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:38:43,651 - INFO - SQL Execution Attempt: SELECT
+    c.CustomerId,
+    CONCAT(c.FirstName, ' ', c.LastName) AS CustomerName,
+    SUM(i.Total) AS TotalSpent
+FROM
+    customers c
+JOIN
+    invoices i ON c.CustomerId = i.CustomerId
+GROUP BY
+    c.CustomerId, CustomerName
+ORDER BY
+    TotalSpent ASC
+LIMIT 5;
+2025-12-16 06:38:43,651 - INFO - SQL Executed Successfully. Rows returned: 5
+2025-12-16 06:38:43,652 - INFO - 127.0.0.1 - - [16/Dec/2025 06:38:43] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:39:38,206 - INFO - --- Chat Request Start ---
+2025-12-16 06:39:38,209 - INFO - Messages to send count: 10
+2025-12-16 06:39:38,371 - INFO - 127.0.0.1 - - [16/Dec/2025 06:39:38] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:39:45,214 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1350, 'completion_tokens': 436, 'total_tokens': 1786}
+2025-12-16 06:39:45,217 - INFO - 127.0.0.1 - - [16/Dec/2025 06:39:45] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:39:45,218 - INFO - SQL Execution Attempt: SELECT
+    ii.InvoiceLineId,
+    i.InvoiceId,
+    t.Name AS TrackName,
+    a.Title AS AlbumTitle,
+    ii.UnitPrice,
+    ii.Quantity,
+    (ii.UnitPrice * ii.Quantity) AS LineTotal
+FROM
+    invoice_items ii
+JOIN
+    tracks t ON ii.TrackId = t.TrackId
+JOIN
+    invoices i ON ii.InvoiceId = i.InvoiceId
+LEFT JOIN
+    albums a ON t.AlbumId = a.AlbumId;
+2025-12-16 06:39:45,222 - INFO - SQL Executed Successfully. Rows returned: 2000
+2025-12-16 06:39:45,224 - INFO - 127.0.0.1 - - [16/Dec/2025 06:39:45] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:41:24,033 - INFO - --- Chat Request Start ---
+2025-12-16 06:41:24,035 - INFO - Messages to send count: 12
+2025-12-16 06:41:24,155 - INFO - 127.0.0.1 - - [16/Dec/2025 06:41:24] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:41:25,166 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1793, 'completion_tokens': 60, 'total_tokens': 1853}
+2025-12-16 06:41:25,169 - INFO - 127.0.0.1 - - [16/Dec/2025 06:41:25] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:41:44,231 - INFO - --- Chat Request Start ---
+2025-12-16 06:41:44,231 - ERROR - LLM Health Check Failed: LM Studio not reachable
+2025-12-16 06:41:44,232 - INFO - 127.0.0.1 - - [16/Dec/2025 06:41:44] "[35m[1mPOST /chat_stream HTTP/1.1[0m" 503 -
+2025-12-16 06:43:28,139 - INFO - --- Chat Request Start ---
+2025-12-16 06:43:28,139 - ERROR - LLM Health Check Failed: LM Studio not reachable
+2025-12-16 06:43:28,139 - INFO - 127.0.0.1 - - [16/Dec/2025 06:43:28] "[35m[1mPOST /chat_stream HTTP/1.1[0m" 503 -
+2025-12-16 06:46:40,513 - INFO - ============================================================
+2025-12-16 06:46:40,514 - INFO - mySQLhelper Forensic Analysis Tool Started
+2025-12-16 06:46:40,514 - INFO - Upload directory: /home/king/Projects/WebApp/mysqlhelper/uploads
+2025-12-16 06:46:40,514 - INFO - ============================================================
+2025-12-16 06:46:40,518 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-12-16 06:46:40,518 - INFO - [33mPress CTRL+C to quit[0m
+2025-12-16 06:46:44,650 - INFO - 127.0.0.1 - - [16/Dec/2025 06:46:44] "GET / HTTP/1.1" 200 -
+2025-12-16 06:46:44,662 - INFO - 127.0.0.1 - - [16/Dec/2025 06:46:44] "[36mGET /static/lib/purify.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:46:44,662 - INFO - 127.0.0.1 - - [16/Dec/2025 06:46:44] "[36mGET /static/style.css HTTP/1.1[0m" 304 -
+2025-12-16 06:46:44,663 - INFO - 127.0.0.1 - - [16/Dec/2025 06:46:44] "[36mGET /static/lib/marked.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:46:44,665 - INFO - 127.0.0.1 - - [16/Dec/2025 06:46:44] "GET /static/script.js?v=1.4 HTTP/1.1" 200 -
+2025-12-16 06:46:56,200 - INFO - File validation passed: chinook.db (0.84MB)
+2025-12-16 06:46:56,200 - INFO - File saved: chinook.db (0.84MB)
+2025-12-16 06:46:56,201 - INFO - SHA256: d6c11e2ccda2a36883af57f031f76fbd55e247f3be1710c4c8aaa72ec06a18cb
+2025-12-16 06:46:56,207 - INFO - SQLite validated: 13 tables found
+2025-12-16 06:46:56,207 - INFO - Database loaded successfully: chinook.db
+2025-12-16 06:46:56,207 - INFO - Final path: uploads/chinook.db
+2025-12-16 06:46:56,207 - INFO - Schema: 13 tables
+2025-12-16 06:46:56,207 - INFO - 127.0.0.1 - - [16/Dec/2025 06:46:56] "POST /upload HTTP/1.1" 200 -
+2025-12-16 06:47:03,101 - INFO - --- Chat Request Start ---
+2025-12-16 06:47:03,102 - ERROR - LLM Health Check Failed: LM Studio not reachable
+2025-12-16 06:47:03,102 - INFO - 127.0.0.1 - - [16/Dec/2025 06:47:03] "[35m[1mPOST /chat_stream HTTP/1.1[0m" 503 -
+2025-12-16 06:48:44,565 - INFO - --- Chat Request Start ---
+2025-12-16 06:48:44,566 - ERROR - LLM Health Check Failed: LM Studio not reachable
+2025-12-16 06:48:44,566 - INFO - 127.0.0.1 - - [16/Dec/2025 06:48:44] "[35m[1mPOST /chat_stream HTTP/1.1[0m" 503 -
+2025-12-16 06:53:35,655 - INFO - ============================================================
+2025-12-16 06:53:35,655 - INFO - mySQLhelper Forensic Analysis Tool Started
+2025-12-16 06:53:35,655 - INFO - Upload directory: /home/king/Projects/WebApp/mysqlhelper/uploads
+2025-12-16 06:53:35,655 - INFO - ============================================================
+2025-12-16 06:53:35,660 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-12-16 06:53:35,660 - INFO - [33mPress CTRL+C to quit[0m
+2025-12-16 06:54:01,673 - INFO - ============================================================
+2025-12-16 06:54:01,674 - INFO - mySQLhelper Forensic Analysis Tool Started
+2025-12-16 06:54:01,683 - INFO - Upload directory: /home/king/Projects/WebApp/mysqlhelper/uploads
+2025-12-16 06:54:01,683 - INFO - ============================================================
+2025-12-16 06:54:01,688 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-12-16 06:54:01,688 - INFO - [33mPress CTRL+C to quit[0m
+2025-12-16 06:54:06,707 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:06] "GET / HTTP/1.1" 200 -
+2025-12-16 06:54:06,724 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:06] "[36mGET /static/lib/purify.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:54:06,724 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:06] "[36mGET /static/style.css HTTP/1.1[0m" 304 -
+2025-12-16 06:54:06,724 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:06] "[36mGET /static/lib/marked.min.js HTTP/1.1[0m" 304 -
+2025-12-16 06:54:06,726 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:06] "GET /static/script.js?v=1.4 HTTP/1.1" 200 -
+2025-12-16 06:54:10,630 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:10] "GET / HTTP/1.1" 200 -
+2025-12-16 06:54:10,638 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:10] "GET /static/style.css HTTP/1.1" 200 -
+2025-12-16 06:54:10,638 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:10] "GET /static/lib/marked.min.js HTTP/1.1" 200 -
+2025-12-16 06:54:10,638 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:10] "GET /static/lib/purify.min.js HTTP/1.1" 200 -
+2025-12-16 06:54:10,640 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:10] "GET /static/script.js?v=1.4 HTTP/1.1" 200 -
+2025-12-16 06:54:10,646 - WARNING - 404 Error: http://127.0.0.1:5000/favicon.ico
+2025-12-16 06:54:10,646 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:10] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-12-16 06:54:11,321 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:11] "GET / HTTP/1.1" 200 -
+2025-12-16 06:54:11,329 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:11] "GET /static/style.css HTTP/1.1" 200 -
+2025-12-16 06:54:11,329 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:11] "GET /static/lib/marked.min.js HTTP/1.1" 200 -
+2025-12-16 06:54:11,329 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:11] "GET /static/lib/purify.min.js HTTP/1.1" 200 -
+2025-12-16 06:54:11,332 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:11] "GET /static/script.js?v=1.4 HTTP/1.1" 200 -
+2025-12-16 06:54:11,337 - WARNING - 404 Error: http://127.0.0.1:5000/favicon.ico
+2025-12-16 06:54:11,337 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:11] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-12-16 06:54:14,529 - INFO - File validation passed: chinook.db (0.84MB)
+2025-12-16 06:54:14,530 - INFO - File saved: chinook.db (0.84MB)
+2025-12-16 06:54:14,530 - INFO - SHA256: d6c11e2ccda2a36883af57f031f76fbd55e247f3be1710c4c8aaa72ec06a18cb
+2025-12-16 06:54:14,536 - INFO - SQLite validated: 13 tables found
+2025-12-16 06:54:14,536 - INFO - Database loaded successfully: chinook.db
+2025-12-16 06:54:14,536 - INFO - Final path: uploads/chinook.db
+2025-12-16 06:54:14,536 - INFO - Schema: 13 tables
+2025-12-16 06:54:14,537 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:14] "POST /upload HTTP/1.1" 200 -
+2025-12-16 06:54:17,295 - INFO - --- Chat Request Start ---
+2025-12-16 06:54:17,296 - ERROR - LLM Health Check Failed: LM Studio not reachable
+2025-12-16 06:54:17,296 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:17] "[35m[1mPOST /chat_stream HTTP/1.1[0m" 503 -
+2025-12-16 06:54:38,861 - INFO - --- Chat Request Start ---
+2025-12-16 06:54:38,863 - INFO - Messages to send count: 2
+2025-12-16 06:54:39,003 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:39] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:54:40,330 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 459, 'completion_tokens': 89, 'total_tokens': 548}
+2025-12-16 06:54:40,332 - INFO - 127.0.0.1 - - [16/Dec/2025 06:54:40] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:54:59,953 - INFO - --- Chat Request Start ---
+2025-12-16 06:54:59,955 - INFO - Messages to send count: 4
+2025-12-16 06:55:00,091 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:00] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:55:02,528 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 564, 'completion_tokens': 158, 'total_tokens': 722}
+2025-12-16 06:55:02,532 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:02] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:55:02,533 - INFO - SQL Execution Attempt: SELECT
+    c.CustomerId,
+    CONCAT(c.FirstName, ' ', c.LastName) AS CustomerName,
+    SUM(i.Total) AS TotalSpent
+FROM
+    customers c
+JOIN
+    invoices i ON c.CustomerId = i.CustomerId
+GROUP BY
+    c.CustomerId, c.FirstName, c.LastName
+ORDER BY
+    TotalSpent DESC
+LIMIT 5;
+2025-12-16 06:55:02,534 - INFO - SQL Executed Successfully. Rows returned: 5
+2025-12-16 06:55:02,535 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:02] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:55:11,336 - INFO - --- Chat Request Start ---
+2025-12-16 06:55:11,338 - INFO - Messages to send count: 6
+2025-12-16 06:55:11,488 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:11] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:55:14,773 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 733, 'completion_tokens': 211, 'total_tokens': 944}
+2025-12-16 06:55:14,776 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:14] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:55:14,777 - INFO - SQL Execution Attempt: SELECT
+    c.CustomerId,
+    CONCAT(c.FirstName, ' ', c.LastName) AS CustomerName,
+    SUM(i.Total) AS TotalSpent
+FROM
+    customers c
+LEFT JOIN
+    invoices i ON c.CustomerId = i.CustomerId
+GROUP BY
+    c.CustomerId, c.FirstName, c.LastName
+ORDER BY
+    TotalSpent ASC
+LIMIT 5;
+2025-12-16 06:55:14,778 - INFO - SQL Executed Successfully. Rows returned: 5
+2025-12-16 06:55:14,778 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:14] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:55:34,322 - INFO - --- Chat Request Start ---
+2025-12-16 06:55:34,323 - INFO - Messages to send count: 8
+2025-12-16 06:55:34,486 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:34] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:55:38,517 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 957, 'completion_tokens': 258, 'total_tokens': 1215}
+2025-12-16 06:55:38,520 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:38] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:55:50,875 - INFO - --- Chat Request Start ---
+2025-12-16 06:55:50,877 - INFO - Messages to send count: 10
+2025-12-16 06:55:50,976 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:50] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:55:54,032 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1222, 'completion_tokens': 194, 'total_tokens': 1416}
+2025-12-16 06:55:54,036 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:54] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:55:54,038 - INFO - SQL Execution Attempt: SELECT
+    c.CustomerId,
+    CONCAT(c.FirstName, ' ', c.LastName) AS CustomerName,
+    c.Email,
+    c.Phone
+FROM
+    customers c
+LEFT JOIN
+    invoices i ON c.CustomerId = i.CustomerId
+WHERE
+    i.InvoiceId IS NULL;
+2025-12-16 06:55:54,038 - INFO - SQL Executed Successfully. Rows returned: 0
+2025-12-16 06:55:54,038 - INFO - 127.0.0.1 - - [16/Dec/2025 06:55:54] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:56:09,074 - INFO - --- Chat Request Start ---
+2025-12-16 06:56:09,076 - INFO - Messages to send count: 12
+2025-12-16 06:56:09,227 - INFO - 127.0.0.1 - - [16/Dec/2025 06:56:09] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:56:11,788 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1430, 'completion_tokens': 163, 'total_tokens': 1593}
+2025-12-16 06:56:11,791 - INFO - 127.0.0.1 - - [16/Dec/2025 06:56:11] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:56:11,793 - INFO - SQL Execution Attempt: SELECT COUNT(*) AS TotalCustomers FROM customers;
+2025-12-16 06:56:11,793 - INFO - SQL Executed Successfully. Rows returned: 1
+2025-12-16 06:56:11,796 - INFO - 127.0.0.1 - - [16/Dec/2025 06:56:11] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:56:47,622 - INFO - --- Chat Request Start ---
+2025-12-16 06:56:47,624 - INFO - Messages to send count: 14
+2025-12-16 06:56:47,805 - INFO - 127.0.0.1 - - [16/Dec/2025 06:56:47] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:56:52,836 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1609, 'completion_tokens': 314, 'total_tokens': 1923}
+2025-12-16 06:56:52,841 - INFO - 127.0.0.1 - - [16/Dec/2025 06:56:52] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:56:52,843 - INFO - SQL Execution Attempt: SELECT
+    c.CustomerId,
+    CONCAT(c.FirstName, ' ', c.LastName) AS CustomerName,
+    c.Email,
+    c.Phone
+FROM
+    customers c
+LEFT JOIN
+    invoices i ON c.CustomerId = i.CustomerId
+WHERE
+    i.Total IS NULL OR i.Total = 0;
+2025-12-16 06:56:52,843 - INFO - SQL Executed Successfully. Rows returned: 0
+2025-12-16 06:56:52,844 - INFO - 127.0.0.1 - - [16/Dec/2025 06:56:52] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:57:37,943 - INFO - --- Chat Request Start ---
+2025-12-16 06:57:37,945 - INFO - Messages to send count: 16
+2025-12-16 06:57:38,077 - INFO - 127.0.0.1 - - [16/Dec/2025 06:57:38] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:57:43,948 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 1930, 'completion_tokens': 364, 'total_tokens': 2294}
+2025-12-16 06:57:43,952 - INFO - 127.0.0.1 - - [16/Dec/2025 06:57:43] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:57:43,953 - INFO - SQL Execution Attempt: SELECT
+    t.TrackId,
+    t.Name AS TrackName,
+    a.Title AS AlbumTitle,
+    g.Name AS Genre,
+    SUM(ii.Quantity * ii.UnitPrice) AS TotalRevenue
+FROM
+    tracks t
+JOIN
+    albums a ON t.AlbumId = a.AlbumId
+JOIN
+    genres g ON t.GenreId = g.GenreId
+LEFT JOIN
+    invoice_items ii ON t.TrackId = ii.TrackId
+GROUP BY
+    t.TrackId, t.Name, a.Title, g.Name
+ORDER BY
+    TotalRevenue DESC
+LIMIT 5;
+2025-12-16 06:57:43,955 - INFO - SQL Executed Successfully. Rows returned: 5
+2025-12-16 06:57:43,955 - INFO - 127.0.0.1 - - [16/Dec/2025 06:57:43] "POST /execute_sql HTTP/1.1" 200 -
+2025-12-16 06:58:09,904 - INFO - --- Chat Request Start ---
+2025-12-16 06:58:09,906 - INFO - Messages to send count: 18
+2025-12-16 06:58:10,070 - INFO - 127.0.0.1 - - [16/Dec/2025 06:58:10] "POST /chat_stream HTTP/1.1" 200 -
+2025-12-16 06:58:14,376 - INFO - LLM Response Complete. Tokens: {'prompt_tokens': 2305, 'completion_tokens': 266, 'total_tokens': 2571}
+2025-12-16 06:58:14,379 - INFO - 127.0.0.1 - - [16/Dec/2025 06:58:14] "POST /save_assistant_message HTTP/1.1" 200 -
+2025-12-16 06:58:14,381 - INFO - SQL Execution Attempt: SELECT
+    t.TrackId,
+    t.Name AS TrackName,
+    a.Title AS AlbumTitle,
+    g.Name AS Genre,
+    COUNT(pt.PlaylistId) AS PlayCount
+FROM
+    tracks t
+JOIN
+    albums a ON t.AlbumId = a.AlbumId
+JOIN
+    genres g ON t.GenreId = g.GenreId
+LEFT JOIN
+    playlist_track pt ON t.TrackId = pt.TrackId
+GROUP BY
+    t.TrackId, t.Name, a.Title, g.Name
+ORDER BY
+    PlayCount DESC
+LIMIT 5;
+2025-12-16 06:58:14,384 - INFO - SQL Executed Successfully. Rows returned: 5
+2025-12-16 06:58:14,384 - INFO - 127.0.0.1 - - [16/Dec/2025 06:58:14] "POST /execute_sql HTTP/1.1" 200 -

@@ -1,10 +1,17 @@
 CHANGELOG
 
-### v1.3 - Sidebar UI Polish & Export Fix
-- **UI:** Redesigned sidebar with organized sections: "Database Source", "Actions", and "Schema".
-- **Polish:** Removed floating header, added uppercase section labels with subtle borders for cleaner organization.
-- **Fix:** Resolved token counter text overlap in exported HTML files by adding proper padding.
-- **Export:** Token counters now render cleanly in exported chat sessions without covering text.
+### v1.4 - Forensic Hardening & Security
+- **Feature:** Added SHA256 hashing for all uploaded evidence files.
+- **Feature:** Implemented comprehensive audit logging (`logs/`) with daily rotation.
+- **Feature:** Enhanced "Export Chat" with professional forensic report header (Hash, timestamps, analyst info).
+- **Feature:** Added support for importing `.csv` (auto-converted to SQLite) and `.sql` dump files.
+- **AI Persona:** Refined LLM system prompt to act as a "Forensics Assistant" with Chain-of-Thought reasoning.
+- **AI Stability:** Fixed context drift by pinning schema to system prompt.
+- **Robustness:** Added backend timeouts (60s) and frontend watchdog (15s) to prevent "infinite spinner" hangs.
+- **Security:** Added strict file validation (extension, magic bytes, size limits).
+- **Security:** Implemented global error handling for 404/500 events.
+- **UX:** Added client-side file size warnings (>100MB) and blocking (>1GB).
+- **UX:** Added smart troubleshooting guide for LLM connection failures.
 
 ### v1.2 - Token Usage Tracking
 - **Feature:** Display token usage in top-right of LLM chat bubbles showing per-message and cumulative totals.

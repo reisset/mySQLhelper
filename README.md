@@ -105,6 +105,7 @@ This tool is designed with digital forensics workflows in mind.
 *   **Non-Destructive:** The application works on a **copy** of your database uploaded to the `uploads/` directory. The original evidence file is never accessed or modified.
 *   **Read-Only Enforcement:** The backend strictly enforces `SELECT`-only queries via regex validation. `DROP`, `INSERT`, `UPDATE`, and other modification commands are blocked at the application level.
 *   **Chain of Custody:** The "Export Chat" feature provides a timestamped HTML report of the entire analysis session, including the exact SQL queries generated and executed, suitable for case documentation.
+*   **Audit Logging:** Comprehensive activity logs are generated in the `logs/` directory with daily rotation, capturing file uploads (with SHA256 hashes), SQL execution attempts, and system errors for post-analysis review.
 *   **Air-Gapped Safe:** The tool has zero telemetry and requires no internet connection (when used with a local LLM), ensuring sensitive case data never leaves the forensic workstation.
 *   **Limitation (WAL Files):** Currently, the tool uploads a single `.db` or `.sqlite` file. If your target database has active Write-Ahead Logging (WAL) files (`.db-wal`, `.db-shm`), you must merge them (checkpoint) or export the database before uploading, otherwise recent transactions may be missing.
 

@@ -103,14 +103,19 @@ document.addEventListener('DOMContentLoaded', function() {
         pText.textContent = 'Thinking...';
         contentContainer.appendChild(pText);
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s watchdog
+
         try {
             const response = await fetch('/chat_stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: message }),
+                signal: controller.signal
             });
 
             if (!response.ok) {
+                clearTimeout(timeoutId); // Clear timeout on error response
                 const errData = await response.json();
                 throw new Error(errData.error || `HTTP Error: ${response.status}`);
             }
@@ -121,12 +126,14 @@ document.addEventListener('DOMContentLoaded', function() {
             let fullResponse = '';
             let tokenUsage = null;  // Track token usage
             let firstChunk = true;
+            let streamComplete = false;
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
                 if (firstChunk) {
+                    clearTimeout(timeoutId); // Success! Data received.
                     spinner.remove();
                     pText.textContent = '';
                     firstChunk = false;
@@ -137,6 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const tokenToken = '<|TOKEN_USAGE|>';
 
                 if (chunk.includes(endToken)) {
+                    streamComplete = true;
                     const parts = chunk.split(endToken);
                     accumulatedText += parts[0];
 
@@ -164,6 +172,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 chatHistory.scrollTop = chatHistory.scrollHeight;
             }
 
+            if (!streamComplete) {
+                throw new Error("Connection to LLM timed out or was interrupted.");
+            }
+
             // Final render
             renderText(pText, accumulatedText);
 
@@ -187,10 +199,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
         } catch (error) {
             console.error('Chat Error:', error);
-            if (firstChunk) spinner.remove();
-            pText.textContent = `Error: ${error.message}`;
+            // Spinner removal is now handled in finally block for safety
+            
+            let errorMessage = error.message;
+            let errorDetails = "";
+
+            if (error.name === 'AbortError') {
+                errorMessage = "<strong>Error: Request Timed Out.</strong>";
+                errorDetails = '<div style="font-size: 0.85em; margin-top: 5px; color: #ccc;">The local LLM did not respond within 15 seconds.</div>';
+            } else if (errorMessage.includes("503") || errorMessage.includes("Failed to fetch") || errorMessage.includes("LM Studio")) {
+                errorMessage = "<strong>Error: Unable to connect to Local LLM.</strong>";
+                errorDetails = `
+                    <div style="font-size: 0.85em; margin-top: 10px; color: #ccc;">
+                        Please check <strong>LM Studio</strong>:
+                        <ol style="padding-left: 20px; margin-top: 5px;">
+                            <li>Is the server running? (Green bar at top)</li>
+                            <li>Is the port set to <code>1234</code>?</li>
+                            <li>Is a model loaded?</li>
+                        </ol>
+                    </div>
+                `;
+            }
+
+            pText.innerHTML = `${errorMessage}${errorDetails}`;
             pText.style.color = '#ff5555';
         } finally {
+            clearTimeout(timeoutId); // Ensure cleanup
+            if (spinner && spinner.isConnected) spinner.remove(); // Force remove spinner if still present
             userInput.disabled = false;
             sendButton.disabled = false;
             userInput.focus();
@@ -410,6 +445,20 @@ document.addEventListener('DOMContentLoaded', function() {
     function uploadFile() {
         const file = databaseFile.files[0];
         if (file) {
+            // --- File Size Validation ---
+            const fileSizeMB = file.size / (1024 * 1024);
+            
+            if (fileSizeMB > 1024) { // > 1GB
+                alert("File is too large (over 1GB). Please use a smaller subset for analysis.");
+                return;
+            }
+            
+            if (fileSizeMB > 100) { // > 100MB warning
+                if (!confirm(`This file is large (${fileSizeMB.toFixed(1)} MB). Uploading and processing might take a moment. Continue?`)) {
+                    return;
+                }
+            }
+
             // Check for existing chat history (excluding welcome screen)
             const welcomeScreenEl = document.getElementById('welcome-screen');
             const hasHistory = chatHistory.children.length > 0;
