@@ -8,16 +8,18 @@ https://github.com/user-attachments/assets/cf6117b7-8e14-4a5b-8088-cd7da465706c
 
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.3-blue)
+![Version](https://img.shields.io/badge/version-1.7-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/flask-3.x-green)
 
 ## Features
 
 *   **🔒 100% Offline:** No data leaves your network. Works with local LLMs (via LM Studio).
+*   **🔐 Defense-in-Depth Security:** Two-layer read-only enforcement (validation + SQLite database mode).
 *   **📂 Visual Drag-and-Drop:** dedicated drop zone for uploading `.db` or `.sqlite` files instantly with visual feedback.
 *   **💬 Natural Language Chat:** Ask "Who are the top 5 customers?" and get results.
 *   **🧠 Transparent AI:** See the exact SQL generated before it runs.
+*   **🔍 Advanced Analytics:** Support for CTEs (WITH clauses), EXPLAIN queries, and PRAGMA commands for deep database analysis.
 *   **📊 Rich Visualization:** Interactive tables and Markdown explanations.
 *   **✨ Polished UI/UX:** Responsive dark theme with optimized scrolling for large datasets.
 *   **🛡️ Safe Mode:** Confirmation dialogs prevent accidental data loss when switching databases.

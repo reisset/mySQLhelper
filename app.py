@@ -62,24 +62,48 @@ LLM_API_URL = os.environ.get('LLM_API_URL', "http://localhost:1234/v1/chat/compl
 
 def validate_sql(sql):
     """
-    Strictly validates that the SQL query is a read-only SELECT statement.
+    Validates that SQL queries are read-only and safe for forensic analysis.
+
+    Allowed: SELECT, WITH (CTEs), EXPLAIN, read-only PRAGMAs
+    Blocked: Any data modification commands
     """
-    sql_upper = sql.strip().upper()
-    if not sql_upper.startswith("SELECT"):
-        return False, "Only SELECT queries are allowed."
-    
-    # Check for multiple statements (semicolon followed by non-whitespace)
+    sql_stripped = sql.strip()
+    sql_upper = sql_stripped.upper()
+
+    # Rule 1: Allow read-only query patterns
+    allowed_starts = ["SELECT", "WITH", "EXPLAIN", "PRAGMA"]
+    if not any(sql_upper.startswith(start) for start in allowed_starts):
+        return False, f"Query must start with: {', '.join(allowed_starts)}"
+
+    # Rule 2: No multiple statements (semicolon followed by non-whitespace)
     if re.search(r';\s*\S', sql):
         return False, "Security Warning: Multiple SQL statements are not allowed."
-    
-    # Basic keyword blocklist for extra safety
-    forbidden_keywords = ["DROP", "DELETE", "INSERT", "UPDATE", "ALTER", "TRUNCATE", "EXEC", "grant", "revoke"]
+
+    # Rule 3: Strict blocklist of modification keywords
+    forbidden_keywords = [
+        "DROP", "DELETE", "INSERT", "UPDATE", "ALTER",
+        "TRUNCATE", "EXEC", "GRANT", "REVOKE", "CREATE",
+        "ATTACH", "DETACH", "REPLACE", "VACUUM"
+    ]
     for keyword in forbidden_keywords:
-        # Check for keyword surrounded by word boundaries
         if re.search(r'\b' + keyword + r'\b', sql_upper):
             return False, f"Security Warning: Query contains forbidden keyword '{keyword}'."
-    
-    
+
+    # Rule 4: Validate CTEs contain SELECT
+    if sql_upper.startswith("WITH"):
+        if "SELECT" not in sql_upper:
+            return False, "CTE (WITH clause) must contain a SELECT statement."
+
+    # Rule 5: PRAGMA safety check - block write-capable PRAGMAs
+    if sql_upper.startswith("PRAGMA"):
+        write_pragmas = [
+            "PRAGMA JOURNAL_MODE", "PRAGMA LOCKING_MODE", "PRAGMA WRITABLE_SCHEMA",
+            "PRAGMA AUTO_VACUUM", "PRAGMA INCREMENTAL_VACUUM"
+        ]
+        for write_pragma in write_pragmas:
+            if write_pragma in sql_upper:
+                return False, f"Security Warning: {write_pragma} is not allowed (can modify database)."
+
     return True, None
 
 def calculate_file_hash(filepath):
@@ -417,16 +441,22 @@ def chat_stream():
     system_prompt = f"""
 You are a SQL expert assisting a digital forensics analyst.
 
-1. **Reasoning & Execution:** If the user asks for data, first explain your logic briefly in plain text, then output the valid SQL query inside a markdown code block.
+1. **Reasoning & Execution:** When the user asks for data, briefly explain your approach in 1-2 sentences, then output the SQL query in a markdown code block.
+
    Example:
-   "To find the top users, I will join the users table with logs and sort by count."
+   User: "pull customers"
+   Response: "I'll retrieve all rows from the customers table."
    ```sql
-   SELECT ...
+   SELECT * FROM customers;
    ```
 
-2. **Conversation:** If the user chats, asks about the schema, or the request is ambiguous, reply in plain text. You are encouraged to ask clarifying questions if the user's intent is unclear.
+   For simple requests like "pull [table]" or "show me [data]", execute immediately without asking for confirmation.
 
-3. **Safety First:** NEVER modify data. You are running in a READ-ONLY environment. Do not output INSERT, UPDATE, DELETE, or DROP commands.
+2. **Conversation:** If the user chats about the schema or asks general questions, reply in plain text.
+
+3. **Ambiguity Handling:** Only ask clarifying questions when the request is genuinely ambiguous (e.g., "show me the data" without specifying which table, or "top customers" without defining "top").
+
+4. **Safety First:** NEVER modify data. You are running in a READ-ONLY environment. Do not output INSERT, UPDATE, DELETE, or DROP commands.
 
 {schema_context}
 """
@@ -536,9 +566,13 @@ def execute_sql():
         return jsonify({'error': error_msg}), 403
 
     try:
-        conn = sqlite3.connect(db_filepath)
+        # Open in read-only mode for defense-in-depth
+        # Even if validation is bypassed, SQLite will reject writes
+        conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
+        conn.execute("PRAGMA query_only = ON")  # Extra safety layer
+
         # Use a row factory to get dict-like access if needed, but list of dicts is fine
-        conn.row_factory = sqlite3.Row 
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(sql_query)
         results = cursor.fetchall() 

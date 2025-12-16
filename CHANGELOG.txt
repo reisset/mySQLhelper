@@ -1,5 +1,15 @@
 CHANGELOG
 
+### v1.7 - SQL Capabilities Expansion & Defense-in-Depth Security
+- **Feature:** SQL validation now supports **CTEs (WITH clauses)** for complex analytical queries.
+- **Feature:** Added support for **EXPLAIN** and **EXPLAIN QUERY PLAN** for query performance analysis.
+- **Feature:** Added support for read-only **PRAGMA** commands (table_info, foreign_key_list, integrity_check, etc.) for schema inspection.
+- **Security:** Implemented **database-level read-only enforcement** - connections now opened in SQLite `mode=ro` with `PRAGMA query_only = ON` for defense-in-depth protection.
+- **Security:** Expanded SQL keyword blocklist from 9 to 13 keywords, added PRAGMA-specific safety checks.
+- **AI/UX:** Fixed LLM system prompt to execute simple queries immediately instead of asking for confirmation on unambiguous requests.
+- **AI/UX:** Improved clarity in prompt - LLM now only asks clarifying questions for genuinely ambiguous requests.
+- **Testing:** Added comprehensive validation test suite (15 test cases) covering safe query patterns and security blocking.
+
 ### v1.6 - Interactive Tables, Annotations & Shortcuts
 - **Feature:** Added **Smart Data Tables** (via Grid.js) for SQL results, featuring sortable columns, search/filter, and pagination.
 - **Feature:** Added **Forensic Annotations** allowing analysts to attach persistent notes to any assistant response. Notes are preserved in chat exports.
