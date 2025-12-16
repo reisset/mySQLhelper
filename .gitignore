@@ -5,6 +5,7 @@ __pycache__/
 venv/
 env/
 .env
+logs/
 
 # Flask
 instance/
@@ -31,3 +32,4 @@ Thumbs.db
 # Exports
 asciiart.txt
 chat_export.html
+logs/
