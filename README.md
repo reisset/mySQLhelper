@@ -41,10 +41,10 @@ This application relies on a local AI model to function.
 
 1.  **Download & Install:** Get **[LM Studio](https://lmstudio.ai/)** (or any OpenAI-compatible local server).
 2.  **Get a Model:** Search for and download a model of your choice.
-    *   *Recommendations:* `RNJ1`, `Qwen 2.5 Coder`, `Mistral (devstral)`, or `Gemma`.
+    *   *Recommendations:* `RNJ1`, `Qwen3-Coder-30b `, or `Mistral (devstral-small-2) and ministral3-14b-reasoning`.
     *   *Tip:* Pick a model size (quantization) that fits your computer's RAM/VRAM.
 3.  **Enable Server Mode:**
-    *   Click the **Developer** tab (the `<>` icon) on the left sidebar.
+    *   Click the **Developer** tab (the `>_` icon) on the left sidebar.
     *   Toggle **"Start Local Server"** to ON.
     *   Ensure the port is set to `1234` (default).
 4.  **Load the Model:**
