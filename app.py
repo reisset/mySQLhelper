@@ -214,7 +214,7 @@ def execute_sql_file(sql_filepath, db_filepath):
             sql_content = f.read()
 
         # Security check: block destructive operations
-        forbidden = ['DROP DATABASE', 'DROP SCHEMA', 'TRUNCATE DATABASE', '--', '/*']
+        forbidden = ['DROP DATABASE', 'DROP SCHEMA', 'TRUNCATE DATABASE']
         sql_upper = sql_content.upper()
         for keyword in forbidden:
             if keyword in sql_upper:
