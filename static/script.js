@@ -9,20 +9,8 @@ const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const fileNameDisplay = document.getElementById('file-name-display');
 const welcomeScreen = document.getElementById('welcome-screen');
-const shortcutsButton = document.getElementById('shortcuts-button');
-
-const SHORTCUTS = [
-    { label: "List Tables", prompt: "List all tables in the database and their columns." },
-    { label: "Row Counts", prompt: "Count the number of rows in each table." },
-    { label: "Sample Data", prompt: "Show me 5 random rows from the first table found." },
-    { label: "Find Users", prompt: "Find users created in the last 30 days." },
-    { label: "Error Logs", prompt: "Show me the top 10 most frequent error messages." }
-];
 
 // --- Event Listeners ---
-if (shortcutsButton) {
-    shortcutsButton.addEventListener('click', toggleShortcutsMenu);
-}
 
 if (sendButton) sendButton.addEventListener('click', sendMessage);
 if (userInput) {
@@ -739,42 +727,4 @@ function renderNote(container, text, messageId) {
     }
     
     container.insertBefore(noteDiv, container.lastChild); 
-}
-
-function toggleShortcutsMenu() {
-    let menu = document.getElementById('shortcuts-menu');
-    
-    if (!menu) {
-        // Create menu if it doesn't exist
-        menu = document.createElement('div');
-        menu.id = 'shortcuts-menu';
-        menu.className = 'shortcuts-menu';
-        
-        const title = document.createElement('h4');
-        title.textContent = 'Frequent Queries';
-        menu.appendChild(title);
-        
-        SHORTCUTS.forEach(shortcut => {
-            const item = document.createElement('div');
-            item.className = 'shortcut-item';
-            item.textContent = shortcut.label;
-            item.onclick = () => {
-                userInput.value = shortcut.prompt;
-                sendMessage();
-                menu.remove(); // Close menu after selection
-            };
-            menu.appendChild(item);
-        });
-
-        // Close button
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'close-menu-btn';
-        closeBtn.textContent = 'Close';
-        closeBtn.onclick = () => menu.remove();
-        menu.appendChild(closeBtn);
-
-        document.body.appendChild(menu);
-    } else {
-        menu.remove();
-    }
 }
