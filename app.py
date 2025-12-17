@@ -566,6 +566,9 @@ def execute_sql():
         return jsonify({'error': error_msg}), 403
 
     try:
+        # Strip trailing semicolon to prevent "multiple statement" errors
+        cleaned_query = sql_query.rstrip(';').strip()
+
         # Open in read-only mode for defense-in-depth
         # Even if validation is bypassed, SQLite will reject writes
         conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
@@ -574,14 +577,16 @@ def execute_sql():
         # Use a row factory to get dict-like access if needed, but list of dicts is fine
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute(sql_query)
-        results = cursor.fetchall() 
-        
-        # Limit results for performance
-        results_limit = results[:2000] 
-        
+
+        # Execute query directly
+        cursor.execute(cleaned_query)
+        results = cursor.fetchall()
+
+        # Limit results for performance (hardcoded 2000 limit)
+        results_limit = results[:2000]
+
         results_dict = [dict(row) for row in results_limit]
-        
+
         conn.close()
 
         logger.info(f"SQL Executed Successfully. Rows returned: {len(results_dict)}")

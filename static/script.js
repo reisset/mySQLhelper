@@ -353,7 +353,7 @@ async function executeSqlAndRender(fullText, contentContainer) {
 
         // Render Result Table
         if (data.query_results && data.query_results.length > 0) {
-                appendResultsTable(data.query_results, contentContainer);
+            appendResultsTable(data.query_results, contentContainer);
         } else {
             const resultMsg = document.createElement('div');
             resultMsg.className = 'sql-result-message';
@@ -392,18 +392,18 @@ function appendResultsTable(queryResults, container) {
         search: true,
         sort: true,
         resizable: true,
-        style: { 
-            table: { 
+        style: {
+            table: {
                 'white-space': 'nowrap',
                 'font-size': '0.85rem'
             },
-            th: { 
-                'background-color': '#222', 
+            th: {
+                'background-color': '#222',
                 'color': '#fff',
                 'border': '1px solid #333'
             },
-            td: { 
-                'background-color': '#1d1d1d', 
+            td: {
+                'background-color': '#1d1d1d',
                 'color': '#ddd',
                 'border': '1px solid #333'
             },
