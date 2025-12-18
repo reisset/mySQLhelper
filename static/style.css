@@ -576,3 +576,37 @@ input.gridjs-search-input::placeholder {
     cursor: default !important; /* Non-clickable */
     pointer-events: none; /* Prevent clicks */
 }
+
+/* Export Toolbar */
+.export-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+}
+
+.export-label {
+    font-size: 0.85rem;
+    color: #888;
+}
+
+.export-csv {
+    padding: 6px 16px;
+    background: #4a4522;
+    border: 1px solid #6b6530;
+    border-radius: 4px;
+    color: #e8d44d;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.export-csv:hover {
+    background: #5a5528;
+    border-color: #8b8540;
+}

@@ -366,7 +366,7 @@ async function executeSqlAndRender(fullText, contentContainer) {
 
         // Render Result Table
         if (data.query_results && data.query_results.length > 0) {
-            appendResultsTable(data.query_results, contentContainer);
+            appendResultsTable(data.query_results, contentContainer, sqlQuery);
         } else {
             const resultMsg = document.createElement('div');
             resultMsg.className = 'sql-result-message';
@@ -385,11 +385,25 @@ async function executeSqlAndRender(fullText, contentContainer) {
     }
 }
 
-function appendResultsTable(queryResults, container) {
+function appendResultsTable(queryResults, container, sqlQuery = '') {
     if (typeof gridjs === 'undefined') {
         console.error("Grid.js not loaded");
         return;
     }
+
+    // Create export toolbar
+    const exportBar = document.createElement('div');
+    exportBar.className = 'export-toolbar';
+    exportBar.innerHTML = `
+        <span class="export-label">${queryResults.length} rows</span>
+        <button class="export-btn export-csv" title="Export as CSV">Export CSV</button>
+    `;
+    container.appendChild(exportBar);
+
+    // Add export button handler
+    exportBar.querySelector('.export-csv').addEventListener('click', () => {
+        exportResultsCSV(queryResults, sqlQuery);
+    });
 
     const tableWrapper = document.createElement('div');
     tableWrapper.className = 'results-table-container';
@@ -430,6 +444,46 @@ function appendResultsTable(queryResults, container) {
             td: 'custom-grid-td'
         }
     }).render(tableWrapper);
+}
+
+// Export query results as CSV with metadata header
+function exportResultsCSV(data, sqlQuery) {
+    const timestamp = new Date().toISOString();
+    const headers = Object.keys(data[0]);
+
+    // Build CSV with metadata header
+    const metaHeader = [
+        '# Query Export',
+        `# Generated: ${timestamp}`,
+        `# Rows: ${data.length}`,
+        `# SQL: ${sqlQuery}`,
+        ''
+    ];
+
+    const csvRows = [headers.join(',')];
+    data.forEach(row => {
+        const values = headers.map(h => {
+            const val = row[h];
+            if (val === null) return '';
+            const str = String(val);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        });
+        csvRows.push(values.join(','));
+    });
+
+    const content = metaHeader.join('\n') + csvRows.join('\n');
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `query_export_${timestamp.slice(0, 19).replace(/[:-]/g, '')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 function addTokenCounter(containerElement, tokenUsage) {
