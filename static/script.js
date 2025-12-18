@@ -115,6 +115,137 @@ if (exportChatButton) {
     });
 }
 
+// --- Search All Tables ---
+const searchAllTablesButton = document.getElementById('search-all-tables-button');
+if (searchAllTablesButton) {
+    searchAllTablesButton.addEventListener('click', showSearchModal);
+}
+
+function showSearchModal() {
+    // Remove existing modal if any
+    const existing = document.getElementById('search-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'search-modal';
+    modal.className = 'search-modal-overlay';
+    modal.innerHTML = `
+        <div class="search-modal">
+            <div class="search-modal-header">
+                <h3>Search All Tables</h3>
+                <button class="search-modal-close">&times;</button>
+            </div>
+            <div class="search-modal-body">
+                <div class="search-input-row">
+                    <input type="text" id="search-term-input" placeholder="Enter search term..." autofocus>
+                    <button id="execute-search-btn">Search</button>
+                </div>
+                <div class="search-options-row">
+                    <label class="match-case-toggle">
+                        <input type="checkbox" id="match-case-checkbox">
+                        <span class="toggle-box"></span>
+                        Match case
+                    </label>
+                </div>
+                <div id="search-results-container"></div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Event listeners
+    modal.querySelector('.search-modal-close').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+
+    const searchInput = modal.querySelector('#search-term-input');
+    const searchBtn = modal.querySelector('#execute-search-btn');
+    const caseSensitive = modal.querySelector('#match-case-checkbox');
+
+    searchBtn.addEventListener('click', () => executeTableSearch(searchInput.value, caseSensitive.checked));
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') executeTableSearch(searchInput.value, caseSensitive.checked);
+    });
+
+    searchInput.focus();
+}
+
+async function executeTableSearch(searchTerm, caseSensitive = false) {
+    if (!searchTerm.trim()) {
+        alert('Please enter a search term');
+        return;
+    }
+
+    const resultsContainer = document.getElementById('search-results-container');
+    resultsContainer.innerHTML = '<div class="search-loading">Searching...</div>';
+
+    try {
+        const response = await fetch('/search_all_tables', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ search_term: searchTerm, case_sensitive: caseSensitive })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Search failed');
+        }
+
+        const data = await response.json();
+        renderSearchResults(data, searchTerm, resultsContainer, caseSensitive);
+
+    } catch (error) {
+        console.error('Search error:', error);
+        resultsContainer.innerHTML = `<div class="search-error">Error: ${error.message}</div>`;
+    }
+}
+
+function renderSearchResults(data, searchTerm, container, caseSensitive = false) {
+    if (data.total_matches === 0) {
+        container.innerHTML = `<div class="search-no-results">No matches found for "${searchTerm}"</div>`;
+        return;
+    }
+
+    let html = `<div class="search-summary">Found ${data.total_matches} matches in ${data.tables_with_matches} table(s)</div>`;
+
+    for (const [tableName, tableData] of Object.entries(data.results)) {
+        const moreCount = tableData.total_matches > 3 ? tableData.total_matches - 3 : 0;
+
+        html += `<div class="search-table-card">`;
+        html += `<div class="search-table-title">📋 ${tableName}</div>`;
+
+        // Build column entries
+        let displayedCount = 0;
+        for (const [colName, values] of Object.entries(tableData.columns)) {
+            // Highlight search term in values
+            const highlightedValues = values.map(val => {
+                const regex = caseSensitive
+                    ? new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
+                    : new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                return val.replace(regex, match => `<mark>${match}</mark>`);
+            });
+
+            html += `<div class="search-column-entry">`;
+            html += `<span class="search-col-name">${colName}:</span> `;
+            html += `<span class="search-col-values">${highlightedValues.join(', ')}</span>`;
+            html += `</div>`;
+
+            displayedCount += values.length;
+        }
+
+        // Show "and X more" if there are more matches
+        if (moreCount > 0) {
+            html += `<div class="search-more-indicator">...and ${moreCount} more matches</div>`;
+        }
+
+        html += `</div>`;
+    }
+
+    container.innerHTML = html;
+}
+
 // Warn user before reloading/closing if chat session is active
 window.addEventListener('beforeunload', (e) => {
     // Check if there's an active chat session (chat messages exist)

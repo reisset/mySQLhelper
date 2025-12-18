@@ -610,6 +610,100 @@ def execute_sql():
         logger.error(f"SQL Execution Error: {e} | Query: {sql_query}")
         return jsonify({'error': f"SQL Error: {e}"}), 500
 
+@app.route('/search_all_tables', methods=['POST'])
+def search_all_tables():
+    """
+    Search for a term across all text columns in all tables.
+    Returns compact format: table -> column -> matched values.
+    """
+    search_term = request.json.get('search_term', '').strip()
+    case_sensitive = request.json.get('case_sensitive', False)
+    db_filepath = session.get('db_filepath')
+
+    if not search_term:
+        return jsonify({'error': 'Search term is required'}), 400
+    if not db_filepath:
+        return jsonify({'error': 'No database loaded'}), 400
+
+    logger.info(f"Search All Tables: '{search_term}' (case_sensitive={case_sensitive})")
+
+    try:
+        conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
+        cursor = conn.cursor()
+
+        # Get all tables (skip internal SQLite tables)
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        tables = [row[0] for row in cursor.fetchall()]
+
+        results = {}
+
+        for table in tables:
+            # Get column info for this table
+            cursor.execute(f"PRAGMA table_info({table})")
+            columns = cursor.fetchall()
+
+            # Get all column names (SQLite is dynamically typed, search everything)
+            all_columns = [col[1] for col in columns]
+
+            if not all_columns:
+                continue
+
+            table_matches = {'total_matches': 0, 'columns': {}}
+
+            for col in all_columns:
+                try:
+                    # Build query based on case sensitivity
+                    if case_sensitive:
+                        query = f'SELECT DISTINCT "{col}" FROM "{table}" WHERE "{col}" LIKE ? AND "{col}" GLOB ?'
+                        # GLOB is case-sensitive, LIKE finds candidates
+                        params = [f'%{search_term}%', f'*{search_term}*']
+                    else:
+                        query = f'SELECT DISTINCT "{col}" FROM "{table}" WHERE "{col}" LIKE ?'
+                        params = [f'%{search_term}%']
+
+                    cursor.execute(query, params)
+                    rows = cursor.fetchall()
+
+                    # Filter and collect matched values
+                    matched_values = []
+                    for row in rows:
+                        val = row[0]
+                        if val is not None:
+                            val_str = str(val)
+                            if case_sensitive:
+                                if search_term in val_str:
+                                    matched_values.append(val_str)
+                            else:
+                                if search_term.lower() in val_str.lower():
+                                    matched_values.append(val_str)
+
+                    if matched_values:
+                        # Store first 3 unique values for display, plus total count
+                        table_matches['columns'][col] = matched_values[:3]
+                        table_matches['total_matches'] += len(matched_values)
+
+                except sqlite3.Error as e:
+                    logger.warning(f"Search error in {table}.{col}: {e}")
+                    continue
+
+            if table_matches['total_matches'] > 0:
+                results[table] = table_matches
+
+        conn.close()
+
+        total = sum(t['total_matches'] for t in results.values())
+        logger.info(f"Search complete: {total} matches in {len(results)} tables")
+
+        return jsonify({
+            'results': results,
+            'total_matches': total,
+            'tables_with_matches': len(results)
+        })
+
+    except sqlite3.Error as e:
+        logger.error(f"Search All Tables Error: {e}")
+        return jsonify({'error': f'Database error: {e}'}), 500
+
 @app.route('/add_note', methods=['POST'])
 def add_note():
     data = request.json
