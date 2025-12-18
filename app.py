@@ -7,7 +7,8 @@ import re
 import json
 import csv
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+import base64
 
 # Third-party
 import requests
@@ -68,11 +69,22 @@ def validate_sql(sql):
     Blocked: Any data modification commands
     """
     sql_stripped = sql.strip()
+
+    # Skip leading SQL comments (-- style) to find the actual query start
+    lines = sql_stripped.split('\n')
+    first_code_line = ''
+    for line in lines:
+        stripped_line = line.strip()
+        if stripped_line and not stripped_line.startswith('--'):
+            first_code_line = stripped_line
+            break
+
     sql_upper = sql_stripped.upper()
+    first_code_upper = first_code_line.upper()
 
     # Rule 1: Allow read-only query patterns
     allowed_starts = ["SELECT", "WITH", "EXPLAIN", "PRAGMA"]
-    if not any(sql_upper.startswith(start) for start in allowed_starts):
+    if not any(first_code_upper.startswith(start) for start in allowed_starts):
         return False, f"Query must start with: {', '.join(allowed_starts)}"
 
     # Rule 2: No multiple statements (semicolon followed by non-whitespace)
@@ -105,6 +117,142 @@ def validate_sql(sql):
                 return False, f"Security Warning: {write_pragma} is not allowed (can modify database)."
 
     return True, None
+
+# === Custom SQL Functions (UDFs) for Forensic Analysis ===
+
+def unix_to_datetime(timestamp):
+    """Convert Unix timestamp (seconds since 1970-01-01) to ISO datetime."""
+    if timestamp is None:
+        return None
+    try:
+        return datetime.utcfromtimestamp(float(timestamp)).isoformat()
+    except:
+        return None
+
+def webkit_to_datetime(timestamp):
+    """Convert WebKit timestamp (microseconds since 1601-01-01) to ISO datetime."""
+    if timestamp is None:
+        return None
+    try:
+        webkit_epoch = datetime(1601, 1, 1)
+        return (webkit_epoch + timedelta(microseconds=float(timestamp))).isoformat()
+    except:
+        return None
+
+def ios_to_datetime(timestamp):
+    """Convert iOS/Mac Core Data timestamp (seconds since 2001-01-01) to ISO datetime."""
+    if timestamp is None:
+        return None
+    try:
+        ios_epoch = datetime(2001, 1, 1)
+        return (ios_epoch + timedelta(seconds=float(timestamp))).isoformat()
+    except:
+        return None
+
+def filetime_to_datetime(timestamp):
+    """Convert Windows FILETIME (100ns intervals since 1601-01-01) to ISO datetime."""
+    if timestamp is None:
+        return None
+    try:
+        filetime_epoch = datetime(1601, 1, 1)
+        return (filetime_epoch + timedelta(microseconds=float(timestamp) / 10)).isoformat()
+    except:
+        return None
+
+def decode_base64(text):
+    """Decode base64 encoded string to UTF-8 text."""
+    if text is None:
+        return None
+    try:
+        return base64.b64decode(text).decode('utf-8', errors='replace')
+    except:
+        return None
+
+def encode_base64(text):
+    """Encode text to base64 string."""
+    if text is None:
+        return None
+    try:
+        return base64.b64encode(str(text).encode('utf-8')).decode('ascii')
+    except:
+        return None
+
+def decode_hex(hex_string):
+    """Decode hex string to UTF-8 text."""
+    if hex_string is None:
+        return None
+    try:
+        return bytes.fromhex(hex_string).decode('utf-8', errors='replace')
+    except:
+        return None
+
+def to_hex(text):
+    """Convert text to hexadecimal representation."""
+    if text is None:
+        return None
+    try:
+        return str(text).encode('utf-8').hex()
+    except:
+        return None
+
+def extract_email(text):
+    """Extract first email address from text."""
+    if text is None:
+        return None
+    try:
+        match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', str(text))
+        return match.group(0) if match else None
+    except:
+        return None
+
+def extract_ip(text):
+    """Extract first IPv4 address from text."""
+    if text is None:
+        return None
+    try:
+        match = re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', str(text))
+        return match.group(0) if match else None
+    except:
+        return None
+
+def extract_url(text):
+    """Extract first URL from text."""
+    if text is None:
+        return None
+    try:
+        match = re.search(r'https?://[^\s<>"\']+', str(text))
+        return match.group(0) if match else None
+    except:
+        return None
+
+def extract_phone(text):
+    """Extract first phone number (US format) from text."""
+    if text is None:
+        return None
+    try:
+        # Matches: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890
+        match = re.search(r'(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}', str(text))
+        return match.group(0) if match else None
+    except:
+        return None
+
+def register_custom_functions(conn):
+    """Register all custom SQL functions with the SQLite connection."""
+    # Timestamp converters
+    conn.create_function('unix_to_datetime', 1, unix_to_datetime)
+    conn.create_function('webkit_to_datetime', 1, webkit_to_datetime)
+    conn.create_function('ios_to_datetime', 1, ios_to_datetime)
+    conn.create_function('filetime_to_datetime', 1, filetime_to_datetime)
+    # Encode/decode functions
+    conn.create_function('decode_base64', 1, decode_base64)
+    conn.create_function('encode_base64', 1, encode_base64)
+    conn.create_function('decode_hex', 1, decode_hex)
+    conn.create_function('to_hex', 1, to_hex)
+    # String extractors
+    conn.create_function('extract_email', 1, extract_email)
+    conn.create_function('extract_ip', 1, extract_ip)
+    conn.create_function('extract_url', 1, extract_url)
+    conn.create_function('extract_phone', 1, extract_phone)
 
 def calculate_file_hash(filepath):
     """
@@ -456,7 +604,16 @@ You are a SQL expert assisting a digital forensics analyst.
 
 3. **Ambiguity Handling:** Only ask clarifying questions when the request is genuinely ambiguous (e.g., "show me the data" without specifying which table, or "top customers" without defining "top").
 
-4. **Safety First:** NEVER modify data. You are running in a READ-ONLY environment. Do not output INSERT, UPDATE, DELETE, or DROP commands.
+4. **Safety First:** NEVER modify data. You are running in a READ-ONLY environment. Do not output INSERT, UPDATE, DELETE, or DROP commands. Only output ONE query at a time - if you need to query multiple tables, use UNION ALL with consistent column aliases:
+   ```sql
+   SELECT col AS result FROM table1 UNION ALL SELECT col AS result FROM table2
+   ```
+
+5. **Custom SQL Functions:** You have access to these forensic utility functions:
+   - Timestamp converters: `unix_to_datetime(ts)`, `webkit_to_datetime(ts)`, `ios_to_datetime(ts)`, `filetime_to_datetime(ts)`
+   - Encode/decode: `encode_base64(text)`, `decode_base64(text)`, `to_hex(text)`, `decode_hex(hex)`
+   - String extractors: `extract_email(text)`, `extract_ip(text)`, `extract_url(text)`, `extract_phone(text)`
+   IMPORTANT: Always verify column names exist in the schema before using them. Each table has different columns.
 
 {schema_context}
 """
@@ -573,6 +730,7 @@ def execute_sql():
         # Even if validation is bypassed, SQLite will reject writes
         conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
         conn.execute("PRAGMA query_only = ON")  # Extra safety layer
+        register_custom_functions(conn)  # Register forensic UDFs
 
         # Use a row factory to get dict-like access if needed, but list of dicts is fine
         conn.row_factory = sqlite3.Row
