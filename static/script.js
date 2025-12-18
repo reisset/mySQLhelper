@@ -115,6 +115,19 @@ if (exportChatButton) {
     });
 }
 
+// Warn user before reloading/closing if chat session is active
+window.addEventListener('beforeunload', (e) => {
+    // Check if there's an active chat session (chat messages exist)
+    const chatMessages = document.querySelectorAll('.chat-message').length;
+
+    if (chatMessages > 0) {
+        // Standard way to trigger browser's confirmation dialog
+        e.preventDefault();
+        e.returnValue = ''; // Chrome requires returnValue to be set
+        return ''; // Some browsers use the return value
+    }
+});
+
 // --- Core Functions ---
 
 async function sendMessage() {
