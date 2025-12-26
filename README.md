@@ -2,7 +2,9 @@
 
 Chat with your SQLite databases using a local LLM. Ask questions in plain English, get SQL queries and results. Everything runs offline on your machine.
 
-https://github.com/user-attachments/assets/22dd82a3-7108-41c8-8a25-b71f4dae7147
+
+https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
+
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-2.2-blue)
