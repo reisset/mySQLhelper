@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/22dd82a3-7108-41c8-8a25-b71f4dae7147
 
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.7-blue)
+![Version](https://img.shields.io/badge/version-2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/flask-3.x-green)
 
@@ -24,9 +24,13 @@ https://github.com/user-attachments/assets/22dd82a3-7108-41c8-8a25-b71f4dae7147
 *   **💬 Natural Language Chat:** Ask "Who are the top 5 customers?" and get results.
 *   **🧠 Transparent AI:** See the exact SQL generated before it runs.
 *   **🔍 Advanced Analytics:** Support for CTEs (WITH clauses), EXPLAIN queries, and PRAGMA commands for deep database analysis.
-*   **📊 Rich Visualization:** Interactive tables and Markdown explanations.
-*   **✨ Polished UI/UX:** Responsive dark theme with optimized scrolling for large datasets.
-*   **🛡️ Safe Mode:** Confirmation dialogs prevent accidental data loss when switching databases.
+*   **🔎 Search All Tables:** Full-text search across all tables with compact grouped results and case sensitivity toggle.
+*   **🧮 Forensic SQL Functions:** Built-in functions for timestamp conversion (Unix, WebKit, iOS, Windows FILETIME), Base64/Hex encoding, and pattern extraction (emails, IPs, URLs, phones).
+*   **📊 Rich Visualization:** Interactive tables with multi-column sorting, regex filtering, and quick pattern buttons.
+*   **🌓 Dark/Light Theme:** Toggle between dark and light modes with persistent preference.
+*   **📤 CSV Export:** Export query results with metadata headers for documentation.
+*   **✨ Polished UI/UX:** Responsive theme with optimized scrolling for large datasets.
+*   **🛡️ Safe Mode:** Confirmation dialogs and browser warnings prevent accidental data loss.
 *   **💾 Exportable:** Save your entire analysis session as an HTML file with high-fidelity layout.
 
 

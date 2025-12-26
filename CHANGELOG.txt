@@ -1,5 +1,20 @@
 CHANGELOG
 
+### v2.0 - Forensic Toolkit & UI Enhancements
+- **Feature:** Added **Dark/Light Theme Toggle** with localStorage persistence. Click the moon/sun icon to switch themes.
+- **Feature:** Added **Regex Search in Results** - filter query results using regex patterns with quick-pattern buttons for Email, IP, URL, and Phone.
+- **Feature:** Added **Multi-Column Sorting** - hold Shift while clicking column headers to sort by multiple columns.
+- **Feature:** Added **Search All Tables** - full-text search across all database tables with case sensitivity toggle and compact grouped output.
+- **Feature:** Added **CSV Export** for query results with metadata headers (timestamp, row count, SQL query).
+- **Feature:** Added **12 Custom SQL Functions** for forensic analysis:
+  - Timestamp converters: `unix_to_datetime()`, `webkit_to_datetime()`, `ios_to_datetime()`, `filetime_to_datetime()`
+  - Encode/decode: `encode_base64()`, `decode_base64()`, `to_hex()`, `decode_hex()`
+  - Pattern extractors: `extract_email()`, `extract_ip()`, `extract_url()`, `extract_phone()`
+- **Feature:** Added **Browser Warning** when leaving page with active chat session to prevent accidental data loss.
+- **UX:** Grid.js tables now respect theme colors (dark/light mode aware).
+- **Security:** SQL validation now allows queries with leading comments (-- style).
+- **AI:** Updated LLM system prompt to document custom SQL functions and guide proper UNION ALL usage.
+
 ### v1.7 - SQL Capabilities Expansion & Defense-in-Depth Security
 - **Feature:** SQL validation now supports **CTEs (WITH clauses)** for complex analytical queries.
 - **Feature:** Added support for **EXPLAIN** and **EXPLAIN QUERY PLAN** for query performance analysis.

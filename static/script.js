@@ -9,6 +9,35 @@ const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const fileNameDisplay = document.getElementById('file-name-display');
 const welcomeScreen = document.getElementById('welcome-screen');
+const themeToggle = document.getElementById('theme-toggle');
+
+// --- Theme Toggle ---
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function updateThemeIcon(theme) {
+    if (themeToggle) {
+        themeToggle.textContent = theme === 'light' ? '☀️' : '🌙';
+    }
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+}
+
+// Initialize theme on load
+initTheme();
+
+if (themeToggle) {
+    themeToggle.addEventListener('click', toggleTheme);
+}
 
 // --- Event Listeners ---
 
@@ -522,59 +551,101 @@ function appendResultsTable(queryResults, container, sqlQuery = '') {
         return;
     }
 
-    // Create export toolbar
-    const exportBar = document.createElement('div');
-    exportBar.className = 'export-toolbar';
-    exportBar.innerHTML = `
-        <span class="export-label">${queryResults.length} rows</span>
-        <button class="export-btn export-csv" title="Export as CSV">Export CSV</button>
-    `;
-    container.appendChild(exportBar);
+    const originalData = queryResults;
+    let currentGrid = null;
 
-    // Add export button handler
-    exportBar.querySelector('.export-csv').addEventListener('click', () => {
-        exportResultsCSV(queryResults, sqlQuery);
-    });
+    // Create toolbar with export and regex filter
+    const toolbar = document.createElement('div');
+    toolbar.className = 'results-toolbar';
+    toolbar.innerHTML = `
+        <div class="toolbar-row">
+            <span class="export-label">${queryResults.length} rows</span>
+            <button class="export-btn export-csv" title="Export as CSV">Export CSV</button>
+        </div>
+        <div class="toolbar-row regex-filter-row">
+            <input type="text" class="regex-input" placeholder="Regex filter (e.g., ^john|@gmail)">
+            <button class="pattern-btn" data-pattern="[\\w.-]+@[\\w.-]+\\.\\w+" title="Filter emails">📧</button>
+            <button class="pattern-btn" data-pattern="\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b" title="Filter IPs">🌐</button>
+            <button class="pattern-btn" data-pattern="https?://[^\\s]+" title="Filter URLs">🔗</button>
+            <button class="pattern-btn" data-pattern="\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}" title="Filter phones">📞</button>
+            <button class="clear-filter-btn" title="Clear filter">✕</button>
+        </div>
+    `;
+    container.appendChild(toolbar);
 
     const tableWrapper = document.createElement('div');
     tableWrapper.className = 'results-table-container';
     container.appendChild(tableWrapper);
 
-    new gridjs.Grid({
-        columns: Object.keys(queryResults[0]),
-        data: queryResults.map(row => Object.values(row)),
-        pagination: {
-            limit: 10,
-            summary: true
-        },
-        search: true,
-        sort: true,
-        resizable: true,
-        style: {
-            table: {
-                'white-space': 'nowrap',
-                'font-size': '0.85rem'
-            },
-            th: {
-                'background-color': '#222',
-                'color': '#fff',
-                'border': '1px solid #333'
-            },
-            td: {
-                'background-color': '#1d1d1d',
-                'color': '#ddd',
-                'border': '1px solid #333'
-            },
-            footer: {
-                'background-color': '#181818'
-            }
-        },
-        className: {
-            table: 'custom-grid-table',
-            th: 'custom-grid-th',
-            td: 'custom-grid-td'
+    // Grid.js rendering function
+    function renderGrid(data) {
+        tableWrapper.innerHTML = '';
+        if (data.length === 0) {
+            tableWrapper.innerHTML = '<p style="color: var(--foreground-dark); padding: 10px;">No matches found</p>';
+            return;
         }
-    }).render(tableWrapper);
+        currentGrid = new gridjs.Grid({
+            columns: Object.keys(data[0]),
+            data: data.map(row => Object.values(row)),
+            pagination: { limit: 10, summary: true },
+            search: true,
+            sort: { multiColumn: true },
+            resizable: true,
+            style: {
+                table: { 'white-space': 'nowrap', 'font-size': '0.85rem' },
+                th: { 'background-color': 'var(--background-lighter)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
+                td: { 'background-color': 'var(--background-light)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
+                footer: { 'background-color': 'var(--card)' }
+            },
+            className: { table: 'custom-grid-table', th: 'custom-grid-th', td: 'custom-grid-td' }
+        }).render(tableWrapper);
+    }
+
+    // Filter function
+    function applyRegexFilter(pattern) {
+        if (!pattern) {
+            toolbar.querySelector('.export-label').textContent = `${originalData.length} rows`;
+            renderGrid(originalData);
+            return;
+        }
+        try {
+            const regex = new RegExp(pattern, 'i');
+            const filtered = originalData.filter(row =>
+                Object.values(row).some(val => val !== null && regex.test(String(val)))
+            );
+            toolbar.querySelector('.export-label').textContent = `${filtered.length} of ${originalData.length} rows`;
+            renderGrid(filtered);
+        } catch (e) {
+            // Invalid regex, ignore
+        }
+    }
+
+    // Event handlers
+    toolbar.querySelector('.export-csv').addEventListener('click', () => {
+        exportResultsCSV(originalData, sqlQuery);
+    });
+
+    const regexInput = toolbar.querySelector('.regex-input');
+    let filterTimeout;
+    regexInput.addEventListener('input', () => {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(() => applyRegexFilter(regexInput.value), 300);
+    });
+
+    toolbar.querySelectorAll('.pattern-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            regexInput.value = btn.dataset.pattern;
+            applyRegexFilter(btn.dataset.pattern);
+        });
+    });
+
+    toolbar.querySelector('.clear-filter-btn').addEventListener('click', () => {
+        regexInput.value = '';
+        applyRegexFilter('');
+    });
+
+    // Initial render
+    renderGrid(originalData);
 }
 
 // Export query results as CSV with metadata header
