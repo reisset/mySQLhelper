@@ -551,142 +551,34 @@ function appendResultsTable(queryResults, container, sqlQuery = '') {
         return;
     }
 
-    const originalData = queryResults;
-    let currentGrid = null;
-
-    // Create toolbar with export and regex filter
-    const toolbar = document.createElement('div');
-    toolbar.className = 'results-toolbar';
-    toolbar.innerHTML = `
-        <div class="toolbar-row">
-            <span class="export-label">${queryResults.length} rows</span>
-            <button class="export-btn export-csv" title="Export as CSV">Export CSV</button>
-        </div>
-        <div class="toolbar-row regex-filter-row">
-            <input type="text" class="regex-input" placeholder="Regex filter (e.g., ^john|@gmail)">
-            <button class="pattern-btn" data-pattern="[\\w.-]+@[\\w.-]+\\.\\w+" title="Filter emails">📧</button>
-            <button class="pattern-btn" data-pattern="\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b" title="Filter IPs">🌐</button>
-            <button class="pattern-btn" data-pattern="https?://[^\\s]+" title="Filter URLs">🔗</button>
-            <button class="pattern-btn" data-pattern="\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}" title="Filter phones">📞</button>
-            <button class="clear-filter-btn" title="Clear filter">✕</button>
-        </div>
-    `;
-    container.appendChild(toolbar);
+    // Row count label
+    const rowCountLabel = document.createElement('div');
+    rowCountLabel.className = 'results-row-count';
+    rowCountLabel.textContent = `${queryResults.length} rows returned`;
+    container.appendChild(rowCountLabel);
 
     const tableWrapper = document.createElement('div');
     tableWrapper.className = 'results-table-container';
     container.appendChild(tableWrapper);
 
-    // Grid.js rendering function
-    function renderGrid(data) {
-        tableWrapper.innerHTML = '';
-        if (data.length === 0) {
-            tableWrapper.innerHTML = '<p style="color: var(--foreground-dark); padding: 10px;">No matches found</p>';
-            return;
-        }
-        currentGrid = new gridjs.Grid({
-            columns: Object.keys(data[0]),
-            data: data.map(row => Object.values(row)),
-            pagination: { limit: 10, summary: true },
-            search: true,
-            sort: { multiColumn: true },
-            resizable: true,
-            style: {
-                table: { 'white-space': 'nowrap', 'font-size': '0.85rem' },
-                th: { 'background-color': 'var(--background-lighter)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
-                td: { 'background-color': 'var(--background-light)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
-                footer: { 'background-color': 'var(--card)' }
-            },
-            className: { table: 'custom-grid-table', th: 'custom-grid-th', td: 'custom-grid-td' }
-        }).render(tableWrapper);
-    }
-
-    // Filter function
-    function applyRegexFilter(pattern) {
-        if (!pattern) {
-            toolbar.querySelector('.export-label').textContent = `${originalData.length} rows`;
-            renderGrid(originalData);
-            return;
-        }
-        try {
-            const regex = new RegExp(pattern, 'i');
-            const filtered = originalData.filter(row =>
-                Object.values(row).some(val => val !== null && regex.test(String(val)))
-            );
-            toolbar.querySelector('.export-label').textContent = `${filtered.length} of ${originalData.length} rows`;
-            renderGrid(filtered);
-        } catch (e) {
-            // Invalid regex, ignore
-        }
-    }
-
-    // Event handlers
-    toolbar.querySelector('.export-csv').addEventListener('click', () => {
-        exportResultsCSV(originalData, sqlQuery);
-    });
-
-    const regexInput = toolbar.querySelector('.regex-input');
-    let filterTimeout;
-    regexInput.addEventListener('input', () => {
-        clearTimeout(filterTimeout);
-        filterTimeout = setTimeout(() => applyRegexFilter(regexInput.value), 300);
-    });
-
-    toolbar.querySelectorAll('.pattern-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            regexInput.value = btn.dataset.pattern;
-            applyRegexFilter(btn.dataset.pattern);
-        });
-    });
-
-    toolbar.querySelector('.clear-filter-btn').addEventListener('click', () => {
-        regexInput.value = '';
-        applyRegexFilter('');
-    });
-
-    // Initial render
-    renderGrid(originalData);
+    // Render Grid.js with built-in search
+    new gridjs.Grid({
+        columns: Object.keys(queryResults[0]),
+        data: queryResults.map(row => Object.values(row)),
+        pagination: { limit: 10, summary: true },
+        search: { placeholder: 'Filter results...' },
+        sort: { multiColumn: true },
+        resizable: true,
+        style: {
+            table: { 'white-space': 'nowrap', 'font-size': '0.85rem' },
+            th: { 'background-color': 'var(--background-lighter)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
+            td: { 'background-color': 'var(--background-light)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
+            footer: { 'background-color': 'var(--card)' }
+        },
+        className: { table: 'custom-grid-table', th: 'custom-grid-th', td: 'custom-grid-td' }
+    }).render(tableWrapper);
 }
 
-// Export query results as CSV with metadata header
-function exportResultsCSV(data, sqlQuery) {
-    const timestamp = new Date().toISOString();
-    const headers = Object.keys(data[0]);
-
-    // Build CSV with metadata header
-    const metaHeader = [
-        '# Query Export',
-        `# Generated: ${timestamp}`,
-        `# Rows: ${data.length}`,
-        `# SQL: ${sqlQuery}`,
-        ''
-    ];
-
-    const csvRows = [headers.join(',')];
-    data.forEach(row => {
-        const values = headers.map(h => {
-            const val = row[h];
-            if (val === null) return '';
-            const str = String(val);
-            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                return '"' + str.replace(/"/g, '""') + '"';
-            }
-            return str;
-        });
-        csvRows.push(values.join(','));
-    });
-
-    const content = metaHeader.join('\n') + csvRows.join('\n');
-    const blob = new Blob([content], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `query_export_${timestamp.slice(0, 19).replace(/[:-]/g, '')}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
 
 function addTokenCounter(containerElement, tokenUsage) {
     // Remove existing token counter if present (for updates)

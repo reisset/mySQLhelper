@@ -473,14 +473,25 @@ body {
     color: var(--foreground);
 }
 
+/* Results Row Count */
+.results-row-count {
+    font-size: 0.85rem;
+    color: var(--foreground-dark);
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+}
+
 /* Table Styles */
 .bot-message .results-table-container {
-    overflow: auto; /* Handles both x and y scroll */
-    max-height: 400px;
-    max-width: 100%; /* Ensure it's not trying to grow beyond 100% of its parent */
-    margin-top: 1rem;
+    margin-top: 0.5rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
+}
+
+/* Grid.js wrapper handles scrolling */
+.bot-message .results-table-container .gridjs-wrapper {
+    max-height: 300px;
+    overflow: auto;
 }
 
 .bot-message table {
@@ -614,97 +625,6 @@ input.gridjs-search-input::placeholder {
     color: var(--foreground-dark);
     cursor: default !important; /* Non-clickable */
     pointer-events: none; /* Prevent clicks */
-}
-
-/* Export Toolbar */
-.results-toolbar {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
-    background: var(--background-light);
-    border: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: 6px 6px 0 0;
-}
-
-.toolbar-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.toolbar-row:first-child {
-    justify-content: space-between;
-}
-
-.export-label {
-    font-size: 0.85rem;
-    color: var(--foreground-dark);
-}
-
-.regex-filter-row {
-    flex-wrap: wrap;
-}
-
-.regex-input {
-    flex: 1;
-    min-width: 150px;
-    padding: 6px 10px;
-    background: var(--background);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--foreground);
-    font-size: 0.85rem;
-}
-
-.regex-input::placeholder {
-    color: var(--foreground-dark);
-}
-
-.pattern-btn {
-    padding: 5px 8px;
-    background: var(--background-lighter);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 1rem;
-}
-
-.pattern-btn:hover {
-    background: var(--primary);
-}
-
-.clear-filter-btn {
-    padding: 5px 10px;
-    background: var(--background-lighter);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--foreground-dark);
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.clear-filter-btn:hover {
-    background: #ff5555;
-    color: #fff;
-}
-
-.export-csv {
-    padding: 6px 16px;
-    background: #4a4522;
-    border: 1px solid #6b6530;
-    border-radius: 4px;
-    color: #e8d44d;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 500;
-    transition: background 0.2s, border-color 0.2s;
-}
-
-.export-csv:hover {
-    background: #5a5528;
-    border-color: #8b8540;
 }
 
 /* Search All Tables Modal */
