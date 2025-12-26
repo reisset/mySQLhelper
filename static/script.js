@@ -100,6 +100,8 @@ function handleDrop(e) {
 function handleFiles(files) {
     if (files.length > 0) {
         fileNameDisplay.textContent = files[0].name;
+        // Auto-upload on file selection
+        uploadFile();
     } else {
         fileNameDisplay.textContent = 'No file chosen';
     }

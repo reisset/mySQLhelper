@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mySQLhelper</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.3">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/mermaid.min.css') }}">
 </head>
@@ -25,7 +25,6 @@
                                     <input type="file" id="database-file" name="database_file" accept=".db, .sqlite, .sqlite3, .sql, .csv">
                                 </div>
                             </div>
-                            <input type="submit" value="Upload & Load" class="upload-submit-btn">
                         </form>
                         <span id="file-name-display">No file chosen</span>
                     </div>
@@ -80,6 +79,6 @@
     <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=2.1" defer></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=2.2" defer></script>
 </body>
 </html>

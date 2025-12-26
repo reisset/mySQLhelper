@@ -5,7 +5,7 @@ Chat with your SQLite databases using a local LLM. Ask questions in plain Englis
 https://github.com/user-attachments/assets/22dd82a3-7108-41c8-8a25-b71f4dae7147
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-2.1-blue)
+![Version](https://img.shields.io/badge/version-2.2-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/flask-3.x-green)
 

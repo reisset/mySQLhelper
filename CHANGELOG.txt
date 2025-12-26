@@ -1,5 +1,14 @@
 CHANGELOG
 
+### v2.2 - Digital Forensics Terminal Theme
+- **UI Overhaul:** Complete visual redesign with "Digital Forensics Terminal" aesthetic.
+- **Typography:** Replaced generic Inter/Roboto with JetBrains Mono + IBM Plex Sans via Google Fonts.
+- **Colors:** New amber (#f0a030) primary + cyan (#40d0d0) accent palette, deeper blacks.
+- **Effects:** Subtle scan-line overlay, glow effects on buttons/inputs, animated ASCII logo gradient.
+- **Animations:** Chat messages slide-in, modal backdrop blur, smooth hover transitions.
+- **UX:** Simplified file upload - auto-uploads on file selection (removed "Upload & Load" button).
+- **Export:** Compact forensic report header with inline layout and truncated hash (full on hover).
+
 ### v2.1 - Final Polish & Cleanup
 - **Removed:** CSV Export button (redundant - use Copy button on SQL blocks instead).
 - **Removed:** Regex filter toolbar (redundant - Grid.js built-in search already filters all columns).
