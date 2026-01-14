@@ -11,6 +11,84 @@ const fileNameDisplay = document.getElementById('file-name-display');
 const welcomeScreen = document.getElementById('welcome-screen');
 const themeToggle = document.getElementById('theme-toggle');
 
+// --- Custom Confirmation Modal ---
+function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', cancelText = 'Cancel') {
+    const existing = document.getElementById('confirm-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'confirm-modal';
+    modal.className = 'confirm-modal-overlay';
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'confirm-modal';
+
+    const header = document.createElement('div');
+    header.className = 'confirm-modal-header';
+    const h3 = document.createElement('h3');
+    h3.textContent = title;
+    header.appendChild(h3);
+
+    const body = document.createElement('div');
+    body.className = 'confirm-modal-body';
+    const p = document.createElement('p');
+    p.textContent = message;
+    body.appendChild(p);
+
+    const footer = document.createElement('div');
+    footer.className = 'confirm-modal-footer';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'confirm-modal-cancel';
+    cancelBtn.textContent = cancelText;
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'confirm-modal-confirm';
+    confirmBtn.textContent = confirmText;
+
+    footer.appendChild(cancelBtn);
+    footer.appendChild(confirmBtn);
+
+    modalContent.appendChild(header);
+    modalContent.appendChild(body);
+    modalContent.appendChild(footer);
+    modal.appendChild(modalContent);
+
+    document.body.appendChild(modal);
+
+    const closeModal = () => modal.remove();
+
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    confirmBtn.addEventListener('click', () => {
+        closeModal();
+        if (onConfirm) onConfirm();
+    });
+
+    // Escape key closes modal
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    // Focus trap and initial focus
+    confirmBtn.focus();
+}
+
+// --- Custom Alert Modal ---
+function showAlertModal(title, message) {
+    showConfirmModal(title, message, null, 'OK', '');
+    // Hide cancel button for alerts
+    const cancelBtn = document.querySelector('.confirm-modal-cancel');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+}
+
 // --- Theme Toggle ---
 function initTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -20,7 +98,11 @@ function initTheme() {
 
 function updateThemeIcon(theme) {
     if (themeToggle) {
-        themeToggle.textContent = theme === 'light' ? '☀️' : '🌙';
+        // SVG icons for consistent rendering across platforms
+        const moonIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+        const sunIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+        themeToggle.innerHTML = theme === 'light' ? sunIcon : moonIcon;
+        themeToggle.setAttribute('aria-label', theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
     }
 }
 
@@ -45,6 +127,13 @@ if (sendButton) sendButton.addEventListener('click', sendMessage);
 if (userInput) {
     userInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+    // Ctrl+Enter also sends message
+    userInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
             sendMessage();
         }
     });
@@ -117,6 +206,8 @@ if (uploadForm) {
 if (sidebarToggle) {
     sidebarToggle.addEventListener('click', () => {
         sidebar.classList.toggle('collapsed');
+        const isExpanded = !sidebar.classList.contains('collapsed');
+        sidebarToggle.setAttribute('aria-expanded', isExpanded);
     });
 }
 
@@ -141,7 +232,7 @@ if (exportChatButton) {
             })
             .catch(error => {
                 console.error('Error exporting chat:', error);
-                alert('Error exporting chat. Please try again.');
+                showAlertModal('Export Error', 'Error exporting chat. Please try again.');
             });
     });
 }
@@ -185,11 +276,22 @@ function showSearchModal() {
 
     document.body.appendChild(modal);
 
+    const closeModal = () => modal.remove();
+
     // Event listeners
-    modal.querySelector('.search-modal-close').addEventListener('click', () => modal.remove());
+    modal.querySelector('.search-modal-close').addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.remove();
+        if (e.target === modal) closeModal();
     });
+
+    // Escape key closes modal
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
 
     const searchInput = modal.querySelector('#search-term-input');
     const searchBtn = modal.querySelector('#execute-search-btn');
@@ -205,7 +307,7 @@ function showSearchModal() {
 
 async function executeTableSearch(searchTerm, caseSensitive = false) {
     if (!searchTerm.trim()) {
-        alert('Please enter a search term');
+        showAlertModal('Search', 'Please enter a search term.');
         return;
     }
 
@@ -302,6 +404,7 @@ async function sendMessage() {
     userInput.value = '';
     userInput.disabled = true;
     sendButton.disabled = true;
+    sendButton.classList.add('sending');
 
     // Create Bot Message Container
     const botMessageElement = appendMessage('', 'bot');
@@ -419,34 +522,57 @@ async function sendMessage() {
     } catch (error) {
         console.error('Chat Error:', error);
         // Spinner removal is now handled in finally block for safety
-        
-        let errorMessage = error.message;
-        let errorDetails = "";
+
+        // Create error container with proper styling
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'chat-error-message';
+
+        const errorIcon = document.createElement('span');
+        errorIcon.className = 'error-icon';
+        errorIcon.textContent = '⚠';
+
+        const errorContent = document.createElement('div');
+        errorContent.className = 'error-content';
+
+        const errorTitle = document.createElement('strong');
+        const errorDetails = document.createElement('div');
+        errorDetails.className = 'error-details';
 
         if (error.name === 'AbortError') {
-            errorMessage = "<strong>Error: Request Timed Out.</strong>";
-            errorDetails = '<div style="font-size: 0.85em; margin-top: 5px; color: #ccc;">The local LLM did not respond within 15 seconds.</div>';
-        } else if (errorMessage.includes("503") || errorMessage.includes("Failed to fetch") || errorMessage.includes("LM Studio")) {
-            errorMessage = "<strong>Error: Unable to connect to Local LLM.</strong>";
-            errorDetails = `
-                <div style="font-size: 0.85em; margin-top: 10px; color: #ccc;">
-                    Please check <strong>LM Studio</strong>:
-                    <ol style="padding-left: 20px; margin-top: 5px;">
-                        <li>Is the server running? (Green bar at top)</li>
-                        <li>Is the port set to <code>1234</code>?</li>
-                        <li>Is a model loaded?</li>
-                    </ol>
-                </div>
-            `;
+            errorTitle.textContent = 'Request Timed Out';
+            errorDetails.textContent = 'The local LLM did not respond within 15 seconds.';
+        } else if (error.message.includes("503") || error.message.includes("Failed to fetch") || error.message.includes("LM Studio")) {
+            errorTitle.textContent = 'Unable to connect to Local LLM';
+
+            const helpList = document.createElement('ol');
+            ['Is the server running? (Green bar at top)', 'Is the port set to 1234?', 'Is a model loaded?'].forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item;
+                helpList.appendChild(li);
+            });
+
+            const helpText = document.createElement('span');
+            helpText.textContent = 'Please check LM Studio:';
+            errorDetails.appendChild(helpText);
+            errorDetails.appendChild(helpList);
+        } else {
+            errorTitle.textContent = 'Error';
+            errorDetails.textContent = error.message;
         }
 
-        pText.innerHTML = `${errorMessage}${errorDetails}`;
-        pText.style.color = '#ff5555';
+        errorContent.appendChild(errorTitle);
+        errorContent.appendChild(errorDetails);
+        errorDiv.appendChild(errorIcon);
+        errorDiv.appendChild(errorContent);
+
+        pText.textContent = '';
+        pText.appendChild(errorDiv);
     } finally {
         clearTimeout(timeoutId); // Ensure cleanup
         if (spinner && spinner.isConnected) spinner.remove(); // Force remove spinner if still present
         userInput.disabled = false;
         sendButton.disabled = false;
+        sendButton.classList.remove('sending');
         userInput.focus();
         chatHistory.scrollTop = chatHistory.scrollHeight;
     }
@@ -527,19 +653,35 @@ async function executeSqlAndRender(fullText, contentContainer) {
         if (data.query_results && data.query_results.length > 0) {
             appendResultsTable(data.query_results, contentContainer, sqlQuery);
         } else {
-            const resultMsg = document.createElement('div');
-            resultMsg.className = 'sql-result-message';
-            resultMsg.textContent = "Query executed successfully. No results returned.";
-            resultMsg.style.padding = "10px";
-            resultMsg.style.fontStyle = "italic";
-            contentContainer.appendChild(resultMsg);
+            const emptyState = document.createElement('div');
+            emptyState.className = 'sql-empty-state';
+
+            const icon = document.createElement('span');
+            icon.className = 'empty-icon';
+            icon.textContent = '∅';
+
+            const text = document.createElement('span');
+            text.textContent = 'Query executed successfully. No results returned.';
+
+            emptyState.appendChild(icon);
+            emptyState.appendChild(text);
+            contentContainer.appendChild(emptyState);
         }
 
     } catch (error) {
         console.error('SQL Error:', error);
         const errorDiv = document.createElement('div');
-        errorDiv.style.color = '#ff5555';
-        errorDiv.textContent = `SQL Execution Error: ${error.message}`;
+        errorDiv.className = 'sql-error-message';
+
+        const icon = document.createElement('span');
+        icon.className = 'error-icon';
+        icon.textContent = '⚠';
+
+        const text = document.createElement('span');
+        text.textContent = `SQL Execution Error: ${error.message}`;
+
+        errorDiv.appendChild(icon);
+        errorDiv.appendChild(text);
         contentContainer.appendChild(errorDiv);
     }
 }
@@ -644,30 +786,23 @@ function appendMessage(message, sender) {
 
 function uploadFile() {
     const file = databaseFile.files[0];
-    if (file) {
-        // --- File Size Validation ---
-        const fileSizeMB = file.size / (1024 * 1024);
-        
-        if (fileSizeMB > 1024) { // > 1GB
-            alert("File is too large (over 1GB). Please use a smaller subset for analysis.");
-            return;
-        }
-        
-        if (fileSizeMB > 100) { // > 100MB warning
-            if (!confirm(`This file is large (${fileSizeMB.toFixed(1)} MB). Uploading and processing might take a moment. Continue?`)) {
-                return;
-            }
-        }
+    if (!file) {
+        showAlertModal('No File Selected', 'Please select a database file first.');
+        return;
+    }
 
-        // Check for existing chat history (excluding welcome screen)
-        const hasHistory = chatHistory.querySelectorAll('.chat-message').length > 0;
-        
-        if (hasHistory) {
-            if (!confirm("A database is already loaded. Uploading a new one will clear the chat history. Continue?")) {
-                return; // User cancelled
-            }
-        }
+    // --- File Size Validation ---
+    const fileSizeMB = file.size / (1024 * 1024);
 
+    if (fileSizeMB > 1024) { // > 1GB
+        showAlertModal('File Too Large', 'File is over 1GB. Please use a smaller subset for analysis.');
+        return;
+    }
+
+    // Check for existing chat history (excluding welcome screen)
+    const hasHistory = chatHistory.querySelectorAll('.chat-message').length > 0;
+
+    const doUpload = () => {
         const formData = new FormData();
         formData.append('database_file', file);
 
@@ -675,7 +810,7 @@ function uploadFile() {
         if (welcomeScreen) {
             welcomeScreen.classList.add('minimized');
         }
-        
+
         // Remove all chat messages but keep the welcome screen if it exists
         const messages = chatHistory.querySelectorAll('.chat-message');
         messages.forEach(msg => msg.remove());
@@ -683,11 +818,11 @@ function uploadFile() {
         fetch('/upload', {
             method: 'POST',
             body: formData,
-            })
+        })
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert(data.error);
+                showAlertModal('Upload Error', data.error);
             } else {
                 appendMessage('Database loaded successfully. You can now ask questions about it.', 'bot');
                 renderSchema(data.schema);
@@ -695,10 +830,35 @@ function uploadFile() {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred during file upload.');
+            showAlertModal('Upload Error', 'An error occurred during file upload.');
         });
+    };
+
+    // Chain confirmations as needed
+    if (fileSizeMB > 100) {
+        showConfirmModal(
+            'Large File Warning',
+            `This file is ${fileSizeMB.toFixed(1)} MB. Uploading and processing might take a moment.`,
+            () => {
+                if (hasHistory) {
+                    showConfirmModal(
+                        'Replace Database',
+                        'A database is already loaded. Uploading a new one will clear the chat history.',
+                        doUpload
+                    );
+                } else {
+                    doUpload();
+                }
+            }
+        );
+    } else if (hasHistory) {
+        showConfirmModal(
+            'Replace Database',
+            'A database is already loaded. Uploading a new one will clear the chat history.',
+            doUpload
+        );
     } else {
-        alert("Please select a database file first.");
+        doUpload();
     }
 }
 
@@ -817,14 +977,14 @@ function showNoteEditor(container, messageId, initialText = '') {
                 // Render the static note, passing messageId back for future edits
                 renderNote(container, noteContent, messageId); 
             } else {
-                alert('Error saving note: ' + (data.error || 'Unknown error'));
+                showAlertModal('Save Error', 'Error saving note: ' + (data.error || 'Unknown error'));
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Save Note';
             }
         })
         .catch(err => {
             console.error(err);
-            alert('Network error saving note');
+            showAlertModal('Network Error', 'Failed to save note. Please try again.');
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save Note';
         });

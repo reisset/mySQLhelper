@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mySQLhelper</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.3">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.4">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
 </head>
 <body>
@@ -46,8 +46,8 @@
             </div>
         </div>
         <div class="main-chat" id="main-chat">
-            <button id="sidebar-toggle" title="Toggle Sidebar">☰</button>
-            <button id="theme-toggle" title="Toggle Theme">🌙</button>
+            <button id="sidebar-toggle" title="Toggle Sidebar" aria-label="Toggle sidebar" aria-expanded="true" aria-controls="sidebar">☰</button>
+            <button id="theme-toggle" title="Toggle Theme" aria-label="Switch theme"></button>
             <div class="chat-container">
                 <div class="chat-history" id="chat-history">
                     <div id="welcome-screen">
@@ -68,8 +68,9 @@
                     </div>
                 </div>
                 <div class="chat-input">
-                    <input type="text" id="user-input" placeholder="Ask a question about your database...">
-                    <button id="send-button">Send</button>
+                    <label for="user-input" class="visually-hidden">Ask a question about your database</label>
+                    <input type="text" id="user-input" placeholder="Ask a question about your database..." aria-label="Ask a question about your database">
+                    <button id="send-button" aria-label="Send message">Send</button>
                 </div>
             </div>
         </div>
@@ -78,6 +79,6 @@
     <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=2.2" defer></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=2.4" defer></script>
 </body>
 </html>

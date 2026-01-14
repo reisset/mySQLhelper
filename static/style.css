@@ -97,6 +97,19 @@
     box-sizing: border-box;
 }
 
+/* Accessibility: Visually hidden but accessible to screen readers */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 body {
     font-family: var(--font-sans);
     background-color: var(--background);
@@ -323,8 +336,9 @@ body::before {
 .sidebar-button:hover,
 #export-chat-button:hover {
     background-color: var(--background-elevated);
-    border-color: var(--border-bright);
+    border-color: var(--primary);
     color: var(--primary);
+    box-shadow: 0 0 15px var(--primary-glow);
 }
 
 #file-name-display {
@@ -435,6 +449,14 @@ body::before {
     background: var(--background-lighter);
     border-radius: var(--radius);
     border-left: 2px solid var(--primary);
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.schema-display h4:hover {
+    background: var(--background-elevated);
+    border-left-color: var(--accent);
+    box-shadow: 0 0 10px var(--primary-glow);
 }
 
 .schema-display ul {
@@ -670,6 +692,12 @@ body::before {
     font-size: 0.85rem;
     line-height: 1.5;
     overflow-x: auto;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bot-message pre:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
 }
 
 /* SQL syntax label */
@@ -855,7 +883,7 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--border-bright);
+    background: var(--primary-dark);
 }
 
 /* ==========================================================================
@@ -1341,6 +1369,31 @@ input.gridjs-search-input::placeholder {
     border-left: 3px solid var(--accent);
 }
 
+/* Empty State for Query Results */
+.sql-empty-state {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--background);
+    border-radius: var(--radius);
+    border-left: 3px solid var(--accent);
+    margin-top: 0.75rem;
+}
+
+.sql-empty-state .empty-icon {
+    font-size: 1.25rem;
+    color: var(--accent);
+    font-weight: 300;
+}
+
+.sql-empty-state span:last-child {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--foreground-muted);
+    font-style: italic;
+}
+
 /* ==========================================================================
    Error States
    ========================================================================== */
@@ -1350,13 +1403,205 @@ input.gridjs-search-input::placeholder {
     font-family: var(--font-mono);
 }
 
-/* LLM Connection Error Styling */
-.bot-message .content-container p[style*="color: rgb(255, 85, 85)"],
-.bot-message .content-container p[style*="color:#ff5555"] {
-    background: rgba(224, 64, 64, 0.1);
+/* Chat Error Message */
+.chat-error-message {
+    display: flex;
+    gap: 0.75rem;
     padding: 1rem;
+    background: rgba(224, 64, 64, 0.1);
     border-radius: var(--radius);
     border-left: 3px solid var(--error);
+    color: var(--foreground);
+}
+
+.chat-error-message .error-icon {
+    color: var(--error);
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.chat-error-message .error-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.chat-error-message strong {
+    color: var(--error);
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+}
+
+.chat-error-message .error-details {
+    font-size: 0.85rem;
+    color: var(--foreground-dark);
+}
+
+.chat-error-message .error-details ol {
+    margin: 0.5rem 0 0 0;
+    padding-left: 1.25rem;
+}
+
+.chat-error-message .error-details li {
+    margin: 0.25rem 0;
+}
+
+/* SQL Error Message */
+.sql-error-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: rgba(224, 64, 64, 0.1);
+    border-radius: var(--radius);
+    border-left: 3px solid var(--error);
+    color: var(--error);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+}
+
+.sql-error-message .error-icon {
+    font-size: 1rem;
+}
+
+/* ==========================================================================
+   Confirmation Modal
+   ========================================================================== */
+
+.confirm-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    animation: fadeIn 0.2s ease;
+}
+
+.confirm-modal {
+    background: var(--background-light);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 420px;
+    box-shadow: var(--shadow-md), 0 0 40px var(--primary-glow);
+    animation: slideUp 0.3s ease;
+}
+
+.confirm-modal-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.confirm-modal-header h3 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.confirm-modal-header h3::before {
+    content: '//';
+    opacity: 0.5;
+}
+
+.confirm-modal-body {
+    padding: 1.25rem;
+}
+
+.confirm-modal-body p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--foreground);
+    line-height: 1.6;
+}
+
+.confirm-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+    background: var(--background);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.confirm-modal-cancel {
+    padding: 0.65rem 1.25rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--foreground-muted);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.confirm-modal-cancel:hover {
+    background: var(--background-lighter);
+    border-color: var(--border-bright);
+    color: var(--foreground);
+}
+
+.confirm-modal-confirm {
+    padding: 0.65rem 1.25rem;
+    background: var(--gradient-primary);
+    border: none;
+    border-radius: var(--radius);
+    color: #0a0a0c;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 15px var(--primary-glow);
+}
+
+.confirm-modal-confirm:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md), 0 0 25px var(--primary-glow-strong);
+}
+
+.confirm-modal-confirm:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--primary-glow), 0 0 25px var(--primary-glow-strong);
+}
+
+/* ==========================================================================
+   Send Button Loading State
+   ========================================================================== */
+
+.chat-input button.sending {
+    background: var(--background-lighter);
+    color: var(--foreground-muted);
+    cursor: wait;
+    box-shadow: none;
+    animation: sendingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sendingPulse {
+    0%, 100% {
+        box-shadow: 0 0 10px var(--primary-glow);
+    }
+    50% {
+        box-shadow: 0 0 25px var(--primary-glow-strong);
+    }
 }
 
 /* ==========================================================================
