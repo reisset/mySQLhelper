@@ -248,7 +248,6 @@ function renderSearchResults(data, searchTerm, container, caseSensitive = false)
         html += `<div class="search-table-title">📋 ${tableName}</div>`;
 
         // Build column entries
-        let displayedCount = 0;
         for (const [colName, values] of Object.entries(tableData.columns)) {
             // Highlight search term in values
             const highlightedValues = values.map(val => {
@@ -262,8 +261,6 @@ function renderSearchResults(data, searchTerm, container, caseSensitive = false)
             html += `<span class="search-col-name">${colName}:</span> `;
             html += `<span class="search-col-values">${highlightedValues.join(', ')}</span>`;
             html += `</div>`;
-
-            displayedCount += values.length;
         }
 
         // Show "and X more" if there are more matches
@@ -616,19 +613,6 @@ function addTokenCounter(containerElement, tokenUsage) {
     containerElement.insertBefore(tokenCounter, containerElement.firstChild);
 }
 
-function updateAllTokenCounters() {
-    let runningTotal = 0;
-    document.querySelectorAll('.bot-message .token-counter').forEach(counter => {
-        const messageTokens = parseInt(counter.getAttribute('data-tokens')) || 0;
-        runningTotal += messageTokens;
-        const span = counter.querySelector('span');
-        if (span) {
-            const title = span.title; // Preserve tooltip
-            span.textContent = `${messageTokens} tokens (${runningTotal} total)`;
-            span.title = title;
-        }
-    });
-}
 
 function appendMessage(message, sender) {
     const div = document.createElement('div');

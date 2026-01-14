@@ -1,5 +1,16 @@
 CHANGELOG
 
+### v2.3 - Bloat Removal (Jan 14, 2026)
+
+#### Removed
+- Deleted unused `import csv` from app.py (pandas handles CSV)
+- Deleted dead `updateAllTokenCounters()` function from script.js (never called)
+- Deleted unused `displayedCount` variable from script.js
+- Deleted `mermaid.min.css` library file (never used)
+- Deleted `asciiart.txt` (redundant - art hardcoded in index.html)
+- Deleted `GEMINI.md` (alternative AI instructions - unused)
+- Deleted `initial-prompt.md` (historical artifact)
+
 ### v2.2 - Digital Forensics Terminal Theme
 - **UI Overhaul:** Complete visual redesign with "Digital Forensics Terminal" aesthetic.
 - **Typography:** Replaced generic Inter/Roboto with JetBrains Mono + IBM Plex Sans via Google Fonts.
