@@ -10,6 +10,10 @@ const sidebarToggle = document.getElementById('sidebar-toggle');
 const fileNameDisplay = document.getElementById('file-name-display');
 const welcomeScreen = document.getElementById('welcome-screen');
 const themeToggle = document.getElementById('theme-toggle');
+const dbStatusChip = document.getElementById('db-status-chip');
+
+// Database state
+let databaseLoaded = false;
 
 // LLM Provider Elements
 const providerSelect = document.getElementById('llm-provider-select');
@@ -145,42 +149,43 @@ if (themeToggle) {
 
 // --- LLM Provider Management ---
 
-async function checkOllamaStatus() {
+async function checkProviderStatus() {
     try {
-        const response = await fetch('/api/ollama/status');
+        const response = await fetch(`/api/provider/status?provider=${currentProvider}`);
         const data = await response.json();
 
-        ollamaAvailable = data.available;
-        ollamaModels = data.models || [];
-        selectedOllamaModel = data.selected_model;
+        if (currentProvider === 'ollama') {
+            ollamaAvailable = data.available;
+            ollamaModels = data.models || [];
+            selectedOllamaModel = data.selected_model;
+        }
 
-        updateOllamaStatusUI(data.available, ollamaModels);
+        updateProviderStatusUI(data.available, data.models || []);
 
     } catch (error) {
-        console.error('Failed to check Ollama status:', error);
-        updateOllamaStatusUI(false, []);
+        console.error('Failed to check provider status:', error);
+        updateProviderStatusUI(false, []);
     }
 }
 
-function updateOllamaStatusUI(available, models) {
+// Legacy alias for backward compatibility
+async function checkOllamaStatus() {
+    return checkProviderStatus();
+}
+
+function updateProviderStatusUI(available, models) {
     if (!ollamaStatus || !statusIndicator || !statusText) return;
 
-    if (currentProvider !== 'ollama') {
-        // LM Studio mode - hide Ollama-specific UI
-        ollamaStatus.style.display = 'none';
-        if (modelSelector) modelSelector.style.display = 'none';
-        return;
-    }
-
+    // Always show status for both providers
     ollamaStatus.style.display = 'flex';
 
     if (available) {
         statusIndicator.classList.remove('offline');
         statusIndicator.classList.add('online');
-        statusText.textContent = 'Ollama Connected';
+        statusText.textContent = currentProvider === 'ollama' ? 'Ollama Connected' : 'LM Studio Connected';
 
-        // Populate model dropdown
-        if (modelSelector && modelSelect) {
+        // Populate model dropdown for Ollama only
+        if (currentProvider === 'ollama' && modelSelector && modelSelect) {
             modelSelector.style.display = 'block';
             modelSelect.disabled = false;
             modelSelect.innerHTML = '<option value="">Select model...</option>';
@@ -201,14 +206,22 @@ function updateOllamaStatusUI(available, models) {
                 selectedOllamaModel = models[0];
                 setOllamaModel(models[0]);
             }
+        } else {
+            // LM Studio - hide model selector
+            if (modelSelector) modelSelector.style.display = 'none';
         }
     } else {
         statusIndicator.classList.remove('online');
         statusIndicator.classList.add('offline');
-        statusText.textContent = 'Ollama Offline';
+        statusText.textContent = currentProvider === 'ollama' ? 'Ollama Offline' : 'LM Studio Offline';
         if (modelSelector) modelSelector.style.display = 'none';
         if (modelSelect) modelSelect.disabled = true;
     }
+}
+
+// Legacy alias for backward compatibility
+function updateOllamaStatusUI(available, models) {
+    return updateProviderStatusUI(available, models);
 }
 
 async function setOllamaModel(model) {
@@ -232,24 +245,18 @@ async function setOllamaModel(model) {
 function initProviderSelector() {
     if (!providerSelect) return;
 
+    // Check status on page load for default provider
+    checkProviderStatus();
+
+    // Start polling for status
+    if (!statusCheckInterval) {
+        statusCheckInterval = setInterval(checkProviderStatus, 30000);
+    }
+
     providerSelect.addEventListener('change', async (e) => {
         currentProvider = e.target.value;
-
-        if (currentProvider === 'ollama') {
-            await checkOllamaStatus();
-            // Start polling for Ollama status
-            if (!statusCheckInterval) {
-                statusCheckInterval = setInterval(checkOllamaStatus, 30000);
-            }
-        } else {
-            // Stop polling when using LM Studio
-            if (statusCheckInterval) {
-                clearInterval(statusCheckInterval);
-                statusCheckInterval = null;
-            }
-            if (ollamaStatus) ollamaStatus.style.display = 'none';
-            if (modelSelector) modelSelector.style.display = 'none';
-        }
+        // Immediately check status for new provider
+        await checkProviderStatus();
     });
 }
 
@@ -266,6 +273,30 @@ function initModelSelector() {
 // Initialize provider management
 initProviderSelector();
 initModelSelector();
+
+// --- Database Status Management ---
+function updateDatabaseStatus(filename = null) {
+    if (!dbStatusChip) return;
+
+    const statusDot = dbStatusChip.querySelector('.db-status-dot');
+    const statusText = dbStatusChip.querySelector('.db-status-text');
+
+    if (filename) {
+        databaseLoaded = true;
+        dbStatusChip.classList.add('loaded');
+        statusText.textContent = filename;
+        userInput.disabled = false;
+        userInput.placeholder = 'Ask a question about your database...';
+        sendButton.disabled = false;
+    } else {
+        databaseLoaded = false;
+        dbStatusChip.classList.remove('loaded');
+        statusText.textContent = 'No database loaded';
+        userInput.disabled = true;
+        userInput.placeholder = 'Load a database to start chatting...';
+        sendButton.disabled = true;
+    }
+}
 
 // --- Event Listeners ---
 
@@ -975,20 +1006,36 @@ function uploadFile() {
         const messages = chatHistory.querySelectorAll('.chat-message');
         messages.forEach(msg => msg.remove());
 
+        // Show upload progress indicator
+        if (dropZone) {
+            dropZone.classList.add('uploading');
+            fileNameDisplay.textContent = `Uploading ${file.name}...`;
+        }
+
         fetch('/upload', {
             method: 'POST',
             body: formData,
         })
         .then(response => response.json())
         .then(data => {
+            // Hide upload progress
+            if (dropZone) dropZone.classList.remove('uploading');
+
             if (data.error) {
+                fileNameDisplay.textContent = file.name;
                 showAlertModal('Upload Error', data.error);
             } else {
                 appendMessage('Database loaded successfully. You can now ask questions about it.', 'bot');
                 renderSchema(data.schema);
+                updateDatabaseStatus(file.name);
+                fileNameDisplay.textContent = file.name;
             }
         })
         .catch(error => {
+            // Hide upload progress
+            if (dropZone) dropZone.classList.remove('uploading');
+            fileNameDisplay.textContent = file.name;
+
             console.error('Error:', error);
             showAlertModal('Upload Error', 'An error occurred during file upload.');
         });
@@ -1023,16 +1070,29 @@ function uploadFile() {
 }
 
 function renderSchema(schema) {
-    schemaDisplay.innerHTML = '<h3>Database Schema</h3>';
+    const tableCount = Object.keys(schema).length;
+    schemaDisplay.innerHTML = `<h3>Database Schema <span class="schema-table-count">(${tableCount} tables)</span></h3>`;
+
     for (const table in schema) {
         const tableElement = document.createElement('div');
-        tableElement.innerHTML = `<h4>${table}</h4>`;
+        tableElement.className = 'schema-table';
+
+        const tableHeader = document.createElement('h4');
+        tableHeader.className = 'schema-table-header';
+        tableHeader.innerHTML = `<span class="schema-toggle-icon">▶</span> ${escapeHtml(table)} <span class="schema-column-count">${schema[table].length}</span>`;
+        tableHeader.addEventListener('click', () => {
+            tableElement.classList.toggle('expanded');
+        });
+
         const columnsList = document.createElement('ul');
+        columnsList.className = 'schema-columns';
         schema[table].forEach(column => {
             const columnItem = document.createElement('li');
             columnItem.textContent = column;
             columnsList.appendChild(columnItem);
         });
+
+        tableElement.appendChild(tableHeader);
         tableElement.appendChild(columnsList);
         schemaDisplay.appendChild(tableElement);
     }
@@ -1041,23 +1101,10 @@ function renderSchema(schema) {
 function enableAnnotation(container, messageId) {
     const controlsDiv = document.createElement('div');
     controlsDiv.className = 'message-controls';
-    controlsDiv.style.marginTop = '10px';
-    controlsDiv.style.borderTop = '1px solid #333';
-    controlsDiv.style.paddingTop = '5px';
-    controlsDiv.style.display = 'flex';
-    controlsDiv.style.justifyContent = 'flex-end';
 
     const addNoteBtn = document.createElement('button');
     addNoteBtn.className = 'add-note-btn';
     addNoteBtn.textContent = '+ Add Note';
-    addNoteBtn.style.background = 'none';
-    addNoteBtn.style.border = 'none';
-    addNoteBtn.style.color = '#888';
-    addNoteBtn.style.fontSize = '0.8rem';
-    addNoteBtn.style.cursor = 'pointer';
-    
-    addNoteBtn.onmouseover = () => addNoteBtn.style.color = '#ccc';
-    addNoteBtn.onmouseout = () => addNoteBtn.style.color = '#888';
 
     addNoteBtn.onclick = () => {
         addNoteBtn.style.display = 'none';
@@ -1071,47 +1118,22 @@ function enableAnnotation(container, messageId) {
 function showNoteEditor(container, messageId, initialText = '') {
     const editorDiv = document.createElement('div');
     editorDiv.className = 'note-editor';
-    editorDiv.style.display = 'flex';
-    editorDiv.style.flexDirection = 'column';
-    editorDiv.style.gap = '5px';
-    editorDiv.style.marginTop = '5px';
 
     const textarea = document.createElement('textarea');
+    textarea.className = 'note-editor-textarea';
     textarea.placeholder = "Enter forensic note...";
-    textarea.value = initialText; // Pre-fill text
-    textarea.style.width = '100%';
-    textarea.style.minHeight = '60px';
-    textarea.style.background = '#222';
-    textarea.style.color = '#ddd';
-    textarea.style.border = '1px solid #444';
-    textarea.style.padding = '5px';
-    textarea.style.borderRadius = '4px';
-    textarea.style.fontFamily = 'sans-serif';
+    textarea.value = initialText;
 
     const buttonsDiv = document.createElement('div');
-    buttonsDiv.style.display = 'flex';
-    buttonsDiv.style.gap = '5px';
-    buttonsDiv.style.justifyContent = 'flex-end';
+    buttonsDiv.className = 'note-editor-buttons';
 
     const saveBtn = document.createElement('button');
+    saveBtn.className = 'note-editor-save';
     saveBtn.textContent = 'Save Note';
-    saveBtn.style.background = '#22c55e'; // Green
-    saveBtn.style.color = '#fff';
-    saveBtn.style.border = 'none';
-    saveBtn.style.padding = '4px 8px';
-    saveBtn.style.borderRadius = '4px';
-    saveBtn.style.cursor = 'pointer';
-    saveBtn.style.fontSize = '0.8rem';
 
     const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'note-editor-cancel';
     cancelBtn.textContent = 'Cancel';
-    cancelBtn.style.background = 'transparent';
-    cancelBtn.style.color = '#888';
-    cancelBtn.style.border = '1px solid #444';
-    cancelBtn.style.padding = '4px 8px';
-    cancelBtn.style.borderRadius = '4px';
-    cancelBtn.style.cursor = 'pointer';
-    cancelBtn.style.fontSize = '0.8rem';
 
     cancelBtn.onclick = () => {
         editorDiv.remove();
@@ -1134,8 +1156,7 @@ function showNoteEditor(container, messageId, initialText = '') {
         .then(data => {
             if (data.status === 'success') {
                 editorDiv.remove();
-                // Render the static note, passing messageId back for future edits
-                renderNote(container, noteContent, messageId); 
+                renderNote(container, noteContent, messageId);
             } else {
                 showAlertModal('Save Error', 'Error saving note: ' + (data.error || 'Unknown error'));
                 saveBtn.disabled = false;
@@ -1158,24 +1179,17 @@ function showNoteEditor(container, messageId, initialText = '') {
 }
 
 function renderNote(container, text, messageId) {
-    // Remove existing note if any (though currently we support one)
+    // Remove existing note if any
     const existing = container.parentNode.querySelector('.forensic-note');
     if (existing) existing.remove();
 
     const noteDiv = document.createElement('div');
     noteDiv.className = 'forensic-note';
-    noteDiv.style.marginTop = '10px';
-    noteDiv.style.padding = '8px 12px';
-    noteDiv.style.background = '#332b00'; // Dark yellow/brown
-    noteDiv.style.borderLeft = '3px solid #ffcc00';
-    noteDiv.style.color = '#fff';
-    noteDiv.style.fontSize = '0.9rem';
-    noteDiv.style.fontStyle = 'italic';
-    
+
     const label = document.createElement('strong');
     label.textContent = 'Analyst Note: ';
     noteDiv.appendChild(label);
-    
+
     const textNode = document.createTextNode(text);
     noteDiv.appendChild(textNode);
 
@@ -1184,14 +1198,12 @@ function renderNote(container, text, messageId) {
     if (controls) {
         controls.textContent = 'Edit Note';
         controls.style.display = 'inline-block';
-        
-        // Update onclick to support editing existing text
+
         controls.onclick = () => {
             controls.style.display = 'none';
-            // Pass existing text and messageId
-            showNoteEditor(container, messageId, text); 
+            showNoteEditor(container, messageId, text);
         };
     }
-    
-    container.insertBefore(noteDiv, container.lastChild); 
+
+    container.insertBefore(noteDiv, container.lastChild);
 }

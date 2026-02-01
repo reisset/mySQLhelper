@@ -1,5 +1,21 @@
 CHANGELOG
 
+### v2.7 - UX/UI Polish & Improvements (Feb 1, 2026)
+
+#### UX Improvements
+- **Database Loading State:** Added status chip above chat input showing "No database loaded" vs filename. Chat input disabled until database loaded.
+- **Unified LLM Status:** Both LM Studio and Ollama now show connection status on page load (was Ollama only). Health check runs every 30 seconds.
+- **Better Onboarding:** Added file type hints (.db .sqlite .csv .sql) below drop zone. Added example queries on welcome screen.
+- **Collapsible Schema:** Tables are now collapsible (click to expand/collapse columns). Shows table count badge and column count per table.
+- **Upload Progress:** Shows spinner on drop zone during file upload with "Uploading filename..." text.
+
+#### UI Polish
+- **Light Theme Contrast:** Darkened `--primary` (#d08010 → #b06800) and `--foreground-muted` (#8a8a9a → #5a5a6a) for WCAG AA compliance.
+- **CSS Cleanup:** Moved inline styles from note editor JS to CSS classes. Enables proper theme support for notes.
+- **Animation Optimization:** Sidebar now uses GPU-accelerated `transform: translateX()` instead of `margin-left`.
+- **Tablet Breakpoint:** Added 1024px breakpoint with adjusted sidebar width (260px) for better tablet experience.
+- **Token Counter Layout:** Changed from absolute positioning to `float: right` for consistent layout across messages.
+
 ### v2.6 - UI/UX Fixes & SQL Validation Improvements (Feb 1, 2026)
 
 #### UI Fixes

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mySQLhelper</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.5">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.7">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
 </head>
 <body>
@@ -26,6 +26,7 @@
                             </div>
                         </form>
                         <span id="file-name-display">No file chosen</span>
+                        <span class="file-types-hint">.db .sqlite .csv .sql</span>
                     </div>
                 </div>
 
@@ -85,16 +86,26 @@
  █████░███ █████ ░░███████ ░░█████████  ░░░██████░██ ███████████ ████ █████░░██████  █████ ░███████ ░░██████  █████    
 ░░░░░ ░░░ ░░░░░   ░░░░░███  ░░░░░░░░░     ░░░░░░ ░░ ░░░░░░░░░░░ ░░░░ ░░░░░  ░░░░░░  ░░░░░  ░███░░░   ░░░░░░  ░░░░░     
                   ███ ░███                                                                 ░███                        
-                 ░░██████                                                                  █████                       
-                  ░░░░░░                                                                  ░░░░░                        
+                 ░░██████                                                                  █████
+                  ░░░░░░                                                                  ░░░░░
                         </pre>
-                        <p>Welcome to mySQLhelper! Please upload a database file using the panel on the left to get started.</p>
+                        <p>Welcome to mySQLhelper! Upload a database file to start analyzing.</p>
+                        <div class="example-queries">
+                            <span class="example-label">Try asking:</span>
+                            <span class="example-query">"Show me all tables"</span>
+                            <span class="example-query">"What are the most recent 10 entries?"</span>
+                            <span class="example-query">"Find all records containing 'error'"</span>
+                        </div>
                     </div>
                 </div>
                 <div class="chat-input">
+                    <div class="db-status-chip" id="db-status-chip">
+                        <span class="db-status-dot"></span>
+                        <span class="db-status-text">No database loaded</span>
+                    </div>
                     <label for="user-input" class="visually-hidden">Ask a question about your database</label>
-                    <input type="text" id="user-input" placeholder="Ask a question about your database..." aria-label="Ask a question about your database">
-                    <button id="send-button" aria-label="Send message">Send</button>
+                    <input type="text" id="user-input" placeholder="Load a database to start chatting..." disabled aria-label="Ask a question about your database">
+                    <button id="send-button" aria-label="Send message" disabled>Send</button>
                 </div>
             </div>
         </div>
@@ -103,6 +114,6 @@
     <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=2.5" defer></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=2.7" defer></script>
 </body>
 </html>
