@@ -10,8 +10,6 @@ const sidebarToggle = document.getElementById('sidebar-toggle');
 const fileNameDisplay = document.getElementById('file-name-display');
 const welcomeScreen = document.getElementById('welcome-screen');
 const themeToggle = document.getElementById('theme-toggle');
-const dbStatusChip = document.getElementById('db-status-chip');
-
 // Database state
 let databaseLoaded = false;
 
@@ -276,22 +274,13 @@ initModelSelector();
 
 // --- Database Status Management ---
 function updateDatabaseStatus(filename = null) {
-    if (!dbStatusChip) return;
-
-    const statusDot = dbStatusChip.querySelector('.db-status-dot');
-    const statusText = dbStatusChip.querySelector('.db-status-text');
-
     if (filename) {
         databaseLoaded = true;
-        dbStatusChip.classList.add('loaded');
-        statusText.textContent = filename;
         userInput.disabled = false;
         userInput.placeholder = 'Ask a question about your database...';
         sendButton.disabled = false;
     } else {
         databaseLoaded = false;
-        dbStatusChip.classList.remove('loaded');
-        statusText.textContent = 'No database loaded';
         userInput.disabled = true;
         userInput.placeholder = 'Load a database to start chatting...';
         sendButton.disabled = true;

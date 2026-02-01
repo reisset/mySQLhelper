@@ -1056,53 +1056,6 @@ body::before {
     position: relative;
 }
 
-/* Database Status Chip */
-.db-status-chip {
-    position: absolute;
-    top: -28px;
-    left: 2rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 0.75rem;
-    background: var(--background-light);
-    border: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: var(--radius) var(--radius) 0 0;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--foreground-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    transition: all 0.2s ease;
-}
-
-.db-status-chip.loaded {
-    color: var(--success);
-    border-color: var(--success);
-    background: rgba(64, 192, 96, 0.1);
-}
-
-.db-status-chip.loaded .db-status-dot {
-    background: var(--success);
-    box-shadow: 0 0 8px var(--success);
-}
-
-.db-status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--foreground-muted);
-    transition: all 0.2s ease;
-}
-
-.db-status-text {
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .chat-input input[type="text"] {
     flex-grow: 1;
     padding: 0.9rem 1.15rem;
