@@ -166,11 +166,6 @@ async function checkProviderStatus() {
     }
 }
 
-// Legacy alias for backward compatibility
-async function checkOllamaStatus() {
-    return checkProviderStatus();
-}
-
 function updateProviderStatusUI(available, models) {
     if (!ollamaStatus || !statusIndicator || !statusText) return;
 
@@ -215,11 +210,6 @@ function updateProviderStatusUI(available, models) {
         if (modelSelector) modelSelector.style.display = 'none';
         if (modelSelect) modelSelect.disabled = true;
     }
-}
-
-// Legacy alias for backward compatibility
-function updateOllamaStatusUI(available, models) {
-    return updateProviderStatusUI(available, models);
 }
 
 async function setOllamaModel(model) {

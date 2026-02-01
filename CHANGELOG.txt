@@ -1,10 +1,17 @@
 CHANGELOG
 
-### v2.9 - ASCII Art Fix (Feb 1, 2026)
+### v2.9 - ASCII Art Fix & Bloat Removal (Feb 1, 2026)
 
 #### Fixes
 - **ASCII Art Rendering:** Fixed garbled ASCII logo display by loading art from `ascii.txt` file instead of hardcoded HTML. Preserves exact spacing and alignment.
 - **Venv Path Fix:** Updated virtual environment activate script paths after project rebrand from `mysqlhelper` to `yourSQLfriend`.
+- **Version Sync:** Updated all version references to v2.9 (templates, export footer).
+
+#### Removed
+- Deleted legacy `checkOllamaStatus()` function from script.js (unused backward-compat wrapper)
+- Deleted legacy `updateOllamaStatusUI()` function from script.js (unused backward-compat wrapper)
+- Deleted orphaned `.db-status-chip` CSS rule from style.css (feature removed in v2.8)
+- Removed `SQLAlchemy` from requirements.txt (never imported - project uses raw sqlite3)
 
 ### v2.7 - UX/UI Polish & Improvements (Feb 1, 2026)
 

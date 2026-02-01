@@ -1203,7 +1203,7 @@ def export_chat():
             <span>Host: {hostname}</span>
         </div>
         <div style="margin-top: 8px; font-size: 0.7rem; color: #5a5a6a;">
-            yourSQLfriend v2.8 | READ-ONLY mode | <span title="{db_hash}" style="cursor: help; text-decoration: underline dotted;">Full hash on hover</span>
+            yourSQLfriend v2.9 | READ-ONLY mode | <span title="{db_hash}" style="cursor: help; text-decoration: underline dotted;">Full hash on hover</span>
         </div>
     </div>
     """
