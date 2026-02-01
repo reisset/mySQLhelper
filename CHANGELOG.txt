@@ -1,5 +1,11 @@
 CHANGELOG
 
+### v2.9 - ASCII Art Fix (Feb 1, 2026)
+
+#### Fixes
+- **ASCII Art Rendering:** Fixed garbled ASCII logo display by loading art from `ascii.txt` file instead of hardcoded HTML. Preserves exact spacing and alignment.
+- **Venv Path Fix:** Updated virtual environment activate script paths after project rebrand from `mysqlhelper` to `yourSQLfriend`.
+
 ### v2.7 - UX/UI Polish & Improvements (Feb 1, 2026)
 
 #### UX Improvements

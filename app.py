@@ -548,7 +548,13 @@ def get_provider_status():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # Load ASCII art from file
+    ascii_art = ''
+    ascii_path = os.path.join(os.path.dirname(__file__), 'ascii.txt')
+    if os.path.exists(ascii_path):
+        with open(ascii_path, 'r', encoding='utf-8') as f:
+            ascii_art = f.read()
+    return render_template('index.html', ascii_art=ascii_art)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
