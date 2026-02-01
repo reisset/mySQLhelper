@@ -1,5 +1,23 @@
 CHANGELOG
 
+### v2.6 - UI/UX Fixes & SQL Validation Improvements (Feb 1, 2026)
+
+#### UI Fixes
+- **Scrollbar Visibility:** Changed default scrollbar color from dark gray to orange theme color (`--primary-dark`). Hover state now shows brighter orange (`--primary`).
+- **Firefox Scrollbar Support:** Added `scrollbar-color` property for Firefox compatibility.
+- **Table Column Alignment:** Fixed sticky header desync during horizontal scroll. Reduced `min-width` from 120px to 80px, added `max-width: 400px` with text truncation.
+- **Header z-index:** Increased from 1 to 10 to prevent overlap issues.
+
+#### Grid.js Changes
+- Disabled column resizing (was causing alignment issues).
+- Enabled `fixedHeader` for better scroll behavior.
+- Added `thead` sticky positioning for full-row header fix.
+
+#### SQL Validation
+- **Smarter Multi-Statement Detection:** Added `strip_strings_and_comments()` helper that removes string literals and comments before checking for multiple statements.
+- **False Positive Fixes:** Queries with semicolons inside strings (`SELECT 'a;b'`) or trailing comments (`SELECT * FROM t; -- note`) now pass validation.
+- **Security Preserved:** Actual multi-statement attacks still blocked; forbidden keywords check unchanged.
+
 ### v2.5 - Ollama Integration & Security Hardening (Feb 1, 2026)
 
 #### Features

@@ -65,6 +65,66 @@ LLM_API_URL = os.environ.get('LLM_API_URL', "http://localhost:1234/v1/chat/compl
 OLLAMA_URL = os.environ.get('OLLAMA_URL', "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.2')
 
+def strip_strings_and_comments(sql):
+    """
+    Remove string literals and comments from SQL for security analysis.
+    This prevents false positives from content inside strings/comments.
+    """
+    result = []
+    i = 0
+    in_single_quote = False
+    in_double_quote = False
+
+    while i < len(sql):
+        # Handle single-line comments (-- style)
+        if not in_single_quote and not in_double_quote and sql[i:i+2] == '--':
+            # Skip to end of line
+            while i < len(sql) and sql[i] != '\n':
+                i += 1
+            continue
+
+        # Handle multi-line comments (/* */ style)
+        if not in_single_quote and not in_double_quote and sql[i:i+2] == '/*':
+            i += 2
+            while i < len(sql) - 1 and sql[i:i+2] != '*/':
+                i += 1
+            i += 2  # Skip closing */
+            continue
+
+        # Handle single quotes (with escape handling)
+        if sql[i] == "'" and not in_double_quote:
+            if in_single_quote:
+                # Check for escaped quote ('')
+                if i + 1 < len(sql) and sql[i+1] == "'":
+                    i += 2
+                    continue
+                in_single_quote = False
+            else:
+                in_single_quote = True
+            i += 1
+            continue
+
+        # Handle double quotes
+        if sql[i] == '"' and not in_single_quote:
+            if in_double_quote:
+                if i + 1 < len(sql) and sql[i+1] == '"':
+                    i += 2
+                    continue
+                in_double_quote = False
+            else:
+                in_double_quote = True
+            i += 1
+            continue
+
+        # Only include characters outside of strings
+        if not in_single_quote and not in_double_quote:
+            result.append(sql[i])
+
+        i += 1
+
+    return ''.join(result)
+
+
 def validate_sql(sql):
     """
     Validates that SQL queries are read-only and safe for forensic analysis.
@@ -91,8 +151,11 @@ def validate_sql(sql):
     if not any(first_code_upper.startswith(start) for start in allowed_starts):
         return False, f"Query must start with: {', '.join(allowed_starts)}"
 
-    # Rule 2: No multiple statements (semicolon followed by non-whitespace)
-    if re.search(r';\s*\S', sql):
+    # Rule 2: No multiple statements
+    # Strip strings and comments first to avoid false positives
+    sql_for_analysis = strip_strings_and_comments(sql)
+    sql_trimmed = sql_for_analysis.rstrip().rstrip(';').rstrip()
+    if ';' in sql_trimmed:
         return False, "Security Warning: Multiple SQL statements are not allowed."
 
     # Rule 3: Strict blocklist of modification keywords

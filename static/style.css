@@ -870,7 +870,15 @@ body::before {
 
 .bot-message .results-table-container .gridjs-wrapper {
     max-height: 320px;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+/* Ensure the inner table scrolls together */
+.bot-message .results-table-container .gridjs-wrapper table {
+    table-layout: auto;
+    width: max-content;
+    min-width: 100%;
 }
 
 .bot-message table {
@@ -884,8 +892,11 @@ body::before {
     border: 1px solid var(--border);
     padding: 0.6rem 0.85rem;
     white-space: nowrap;
-    min-width: 120px;
+    min-width: 80px;
+    max-width: 400px;
     font-size: 0.8rem;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 .bot-message th {
@@ -898,7 +909,16 @@ body::before {
     color: var(--accent);
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: 10;
+    box-shadow: inset 0 -1px 0 var(--border);
+}
+
+/* Fix: Ensure header row background covers full width */
+.bot-message thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--background-lighter);
 }
 
 /* ==========================================================================
@@ -979,13 +999,19 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--background-lighter);
+    background: var(--primary-dark);
     border-radius: 4px;
     border: 2px solid var(--background);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-dark);
+    background: var(--primary);
+}
+
+/* Firefox scrollbar support */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-dark) var(--background);
 }
 
 /* ==========================================================================

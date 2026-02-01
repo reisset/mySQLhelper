@@ -868,14 +868,15 @@ function appendResultsTable(queryResults, container, sqlQuery = '') {
         pagination: { limit: 10, summary: true },
         search: { placeholder: 'Filter results...' },
         sort: { multiColumn: true },
-        resizable: true,
+        resizable: false,
+        fixedHeader: true,
         style: {
-            table: { 'white-space': 'nowrap', 'font-size': '0.85rem' },
-            th: { 'background-color': 'var(--background-lighter)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
+            table: { 'white-space': 'nowrap', 'font-size': '0.85rem', 'table-layout': 'auto', 'width': '100%' },
+            th: { 'background-color': 'var(--background-lighter)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)', 'position': 'sticky', 'top': '0' },
             td: { 'background-color': 'var(--background-light)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
             footer: { 'background-color': 'var(--card)' }
         },
-        className: { table: 'custom-grid-table', th: 'custom-grid-th', td: 'custom-grid-td' }
+        className: { table: 'custom-grid-table', th: 'custom-grid-th', td: 'custom-grid-td', container: 'custom-grid-container' }
     }).render(tableWrapper);
 }
 
