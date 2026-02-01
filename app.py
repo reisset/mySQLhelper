@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 # Log application startup
 logger.info("=" * 60)
-logger.info("mySQLhelper Forensic Analysis Tool Started")
+logger.info("yourSQLfriend Forensic Analysis Tool Started")
 logger.info(f"Upload directory: {os.path.abspath(UPLOAD_FOLDER)}")
 logger.info("=" * 60)
 
@@ -1197,7 +1197,7 @@ def export_chat():
             <span>Host: {hostname}</span>
         </div>
         <div style="margin-top: 8px; font-size: 0.7rem; color: #5a5a6a;">
-            mySQLhelper v2.2 | READ-ONLY mode | <span title="{db_hash}" style="cursor: help; text-decoration: underline dotted;">Full hash on hover</span>
+            yourSQLfriend v2.8 | READ-ONLY mode | <span title="{db_hash}" style="cursor: help; text-decoration: underline dotted;">Full hash on hover</span>
         </div>
     </div>
     """

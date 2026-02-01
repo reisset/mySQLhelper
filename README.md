@@ -1,4 +1,4 @@
-# mySQLhelper
+# yourSQLfriend
 
 Chat with your SQLite databases using a local LLM. Ask questions in plain English, get SQL queries and results. Everything runs offline on your machine.
 
@@ -7,7 +7,7 @@ https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-2.2-blue)
+![Version](https://img.shields.io/badge/version-2.8-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/flask-3.x-green)
 
@@ -31,8 +31,8 @@ https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 
 **2. Clone and run:**
 ```bash
-git clone https://github.com/reisset/mysqlhelper.git
-cd mysqlhelper
+git clone https://github.com/reisset/yourSQLfriend.git
+cd yourSQLfriend
 python3 -m venv venv && source venv/bin/activate  # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 flask run
