@@ -8,6 +8,7 @@ import json
 import uuid
 from datetime import datetime, timedelta
 import base64
+from html import escape as html_escape
 
 # Third-party
 import requests
@@ -58,7 +59,11 @@ logger.info("=" * 60)
 # Initialize Server-side Session
 Session(app)
 
+# LLM Provider Configuration
+LLM_PROVIDER = os.environ.get('LLM_PROVIDER', 'lmstudio')  # 'lmstudio' or 'ollama'
 LLM_API_URL = os.environ.get('LLM_API_URL', "http://localhost:1234/v1/chat/completions")
+OLLAMA_URL = os.environ.get('OLLAMA_URL', "http://localhost:11434")
+OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.2')
 
 def validate_sql(sql):
     """
@@ -405,6 +410,79 @@ def check_llm_available():
     except:
         return False
 
+def check_ollama_available():
+    """
+    Check if Ollama is running and return available models.
+
+    Returns:
+        tuple: (available: bool, models: list)
+    """
+    try:
+        response = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
+        if response.status_code == 200:
+            data = response.json()
+            models = [m['name'] for m in data.get('models', [])]
+            return True, models
+    except requests.exceptions.RequestException:
+        pass
+    return False, []
+
+@app.route('/api/ollama/status', methods=['GET'])
+def ollama_status():
+    """
+    Check if Ollama is running and return available models.
+    Returns: { available: bool, models: [string], default_model: string, selected_model: string }
+    """
+    available, models = check_ollama_available()
+    return jsonify({
+        'available': available,
+        'models': models,
+        'default_model': OLLAMA_MODEL,
+        'selected_model': session.get('ollama_model', OLLAMA_MODEL)
+    })
+
+@app.route('/api/ollama/model', methods=['POST'])
+def set_ollama_model():
+    """Set the active Ollama model for this session."""
+    data = request.json
+    if not data:
+        return jsonify({'error': 'Invalid request body'}), 400
+
+    model = data.get('model')
+    if not model:
+        return jsonify({'error': 'Model name required'}), 400
+
+    session['ollama_model'] = model
+    session.modified = True
+    logger.info(f"Ollama model set to: {model}")
+
+    return jsonify({'status': 'success', 'model': model})
+
+@app.route('/api/provider/status', methods=['GET'])
+def get_provider_status():
+    """Return current provider configuration and status."""
+    provider = request.args.get('provider', session.get('llm_provider', LLM_PROVIDER))
+
+    if provider == 'ollama':
+        available, models = check_ollama_available()
+        return jsonify({
+            'provider': 'ollama',
+            'available': available,
+            'models': models,
+            'selected_model': session.get('ollama_model', OLLAMA_MODEL),
+            'url': OLLAMA_URL
+        })
+    else:
+        # LM Studio check
+        available = check_llm_available()
+        return jsonify({
+            'provider': 'lmstudio',
+            'available': available,
+            'models': [],
+            'selected_model': None,
+            'url': LLM_API_URL
+        })
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -538,54 +616,9 @@ def upload_file():
         logger.error(f"Upload failed: {str(e)}", exc_info=True)
         return jsonify({'error': f'Upload processing failed: {str(e)}'}), 500
 
-@app.route('/chat_stream', methods=['POST'])
-def chat_stream():
-    logger.info("--- Chat Request Start ---")
-    
-    # Health Check: Ensure LLM is running
-    if not check_llm_available():
-        logger.error("LLM Health Check Failed: LM Studio not reachable")
-        return jsonify({'error': 'Local LLM (LM Studio) is not running or not reachable at http://localhost:1234.'}), 503
-
-    user_message = request.json.get('message')
-    db_filepath = session.get('db_filepath')
-    chat_history = session.get('chat_history', [])
-    
-    logger.debug(f"Loaded chat_history length: {len(chat_history)}")
-
-    if not user_message:
-        logger.warning("Chat request with empty message")
-        return jsonify({'error': 'Empty message'}), 400
-
-    # Build Schema Context (Dynamic System Prompt)
-    schema_context = ""
-    if db_filepath:
-        try:
-            conn = sqlite3.connect(db_filepath)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-            tables = cursor.fetchall()
-            schema_context = "Database Schema:\n"
-            for table_name in tables:
-                table_name = table_name[0]
-                schema_context += f"Table: {table_name}\nColumns: "
-                cursor.execute(f"PRAGMA table_info({table_name});")
-                columns = cursor.fetchall()
-                schema_context += ", ".join([column[1] for column in columns]) + "\n"
-            conn.close()
-        except sqlite3.Error as e:
-            logger.error(f"Database access error during schema injection: {e}")
-            return jsonify({'error': f"Database access error: {e}"}), 500
-
-    # Append ONLY user message (schema is now in system prompt)
-    chat_history.append({
-        "role": "user", 
-        "content": user_message,
-        "id": str(uuid.uuid4())
-    })
-
-    # Dynamic System Prompt with Schema
-    system_prompt = f"""
+def build_system_prompt(schema_context):
+    """Build the system prompt with schema context."""
+    return f"""
 You are a SQL expert assisting a digital forensics analyst.
 
 1. **Reasoning & Execution:** When the user asks for data, briefly explain your approach in 1-2 sentences, then output the SQL query in a markdown code block.
@@ -616,69 +649,190 @@ You are a SQL expert assisting a digital forensics analyst.
 
 {schema_context}
 """
+
+def stream_lmstudio_response(messages_to_send):
+    """Stream response from LM Studio (OpenAI-compatible API)."""
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "messages": messages_to_send,
+        "mode": "chat",
+        "temperature": 0.1,
+        "stream": True,
+        "stream_options": {"include_usage": True}
+    }
+
+    full_response = ""
+    token_usage = None
+
+    try:
+        with requests.post(LLM_API_URL, headers=headers, json=payload, stream=True, timeout=(3.05, 60)) as r:
+            r.raise_for_status()
+            for line in r.iter_lines():
+                if line:
+                    decoded_line = line.decode('utf-8')
+                    if decoded_line.startswith('data: '):
+                        if decoded_line.strip() == 'data: [DONE]':
+                            continue
+
+                        try:
+                            json_data = json.loads(decoded_line[6:])
+
+                            if 'usage' in json_data:
+                                token_usage = json_data['usage']
+
+                            if 'choices' in json_data and json_data['choices']:
+                                delta = json_data['choices'][0].get('delta', {})
+                                content_chunk = delta.get('content', '')
+                                if content_chunk:
+                                    full_response += content_chunk
+                                    yield content_chunk
+                        except json.JSONDecodeError:
+                            continue
+
+        if token_usage:
+            logger.info(f"LM Studio Response Complete. Tokens: {token_usage}")
+            yield f"<|END_OF_STREAM|>{full_response}<|TOKEN_USAGE|>{json.dumps(token_usage)}"
+        else:
+            logger.info("LM Studio Response Complete (No token usage data)")
+            yield f"<|END_OF_STREAM|>{full_response}"
+
+    except requests.exceptions.Timeout:
+        logger.error("LM Studio request timed out")
+        yield "Error: LM Studio request timed out. Is the server running?"
+    except requests.exceptions.ConnectionError:
+        logger.error("Cannot connect to LM Studio")
+        yield "Error: Cannot connect to LM Studio. Is the server running at http://localhost:1234?"
+    except requests.exceptions.RequestException as e:
+        logger.error(f"LM Studio Stream Error: {str(e)}")
+        yield f"LM Studio Error: {str(e)}"
+
+def stream_ollama_response(messages_to_send, model):
+    """Stream response from Ollama API."""
+    # Convert messages to Ollama format (same structure, just different endpoint)
+    ollama_payload = {
+        "model": model,
+        "messages": messages_to_send,
+        "stream": True,
+        "options": {"temperature": 0.1}
+    }
+
+    full_response = ""
+
+    try:
+        with requests.post(f"{OLLAMA_URL}/api/chat", json=ollama_payload, stream=True, timeout=(3.05, 120)) as r:
+            r.raise_for_status()
+            for line in r.iter_lines():
+                if line:
+                    try:
+                        data = json.loads(line)
+                        content = data.get('message', {}).get('content', '')
+                        if content:
+                            full_response += content
+                            yield content
+
+                        if data.get('done', False):
+                            # Build token usage from Ollama metrics
+                            token_usage = {
+                                'prompt_tokens': data.get('prompt_eval_count', 0),
+                                'completion_tokens': data.get('eval_count', 0),
+                                'total_tokens': data.get('prompt_eval_count', 0) + data.get('eval_count', 0)
+                            }
+                            logger.info(f"Ollama Response Complete. Tokens: {token_usage}")
+                            yield f"<|END_OF_STREAM|>{full_response}<|TOKEN_USAGE|>{json.dumps(token_usage)}"
+                    except json.JSONDecodeError:
+                        continue
+
+    except requests.exceptions.Timeout:
+        logger.error("Ollama request timed out")
+        yield "Error: Ollama request timed out. Is Ollama running?"
+    except requests.exceptions.ConnectionError:
+        logger.error("Cannot connect to Ollama")
+        yield "Error: Cannot connect to Ollama. Is Ollama running? (ollama serve)"
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Ollama Stream Error: {str(e)}")
+        yield f"Ollama Error: {str(e)}"
+
+@app.route('/chat_stream', methods=['POST'])
+def chat_stream():
+    logger.info("--- Chat Request Start ---")
+
+    # Validate request body
+    data = request.json
+    if not data:
+        logger.warning("Chat request with invalid JSON body")
+        return jsonify({'error': 'Invalid request body'}), 400
+
+    user_message = data.get('message')
+    provider = data.get('provider', session.get('llm_provider', LLM_PROVIDER))
+    db_filepath = session.get('db_filepath')
+    chat_history = session.get('chat_history', [])
+
+    logger.info(f"Provider: {provider}")
+    logger.debug(f"Loaded chat_history length: {len(chat_history)}")
+
+    if not user_message:
+        logger.warning("Chat request with empty message")
+        return jsonify({'error': 'Empty message'}), 400
+
+    # Health Check based on provider
+    if provider == 'ollama':
+        available, _ = check_ollama_available()
+        if not available:
+            logger.error("LLM Health Check Failed: Ollama not reachable")
+            return jsonify({'error': f'Ollama is not running or not reachable at {OLLAMA_URL}. Run "ollama serve" to start it.'}), 503
+    else:
+        if not check_llm_available():
+            logger.error("LLM Health Check Failed: LM Studio not reachable")
+            return jsonify({'error': 'LM Studio is not running or not reachable at http://localhost:1234.'}), 503
+
+    # Build Schema Context
+    schema_context = ""
+    if db_filepath:
+        try:
+            conn = sqlite3.connect(db_filepath)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = cursor.fetchall()
+            schema_context = "Database Schema:\n"
+            for table_name in tables:
+                table_name = table_name[0]
+                schema_context += f"Table: {table_name}\nColumns: "
+                cursor.execute(f"PRAGMA table_info({table_name});")
+                columns = cursor.fetchall()
+                schema_context += ", ".join([column[1] for column in columns]) + "\n"
+            conn.close()
+        except sqlite3.Error as e:
+            logger.error(f"Database access error during schema injection: {e}")
+            return jsonify({'error': f"Database access error: {e}"}), 500
+
+    # Append user message to history
+    chat_history.append({
+        "role": "user",
+        "content": user_message,
+        "id": str(uuid.uuid4())
+    })
+
+    # Build messages for LLM
+    system_prompt = build_system_prompt(schema_context)
     messages_to_send = [{"role": "system", "content": system_prompt}] + chat_history
     logger.info(f"Messages to send count: {len(messages_to_send)}")
-    
-    def stream_llm_response():
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "messages": messages_to_send,
-            "mode": "chat",
-            "temperature": 0.1,
-            "stream": True,
-            "stream_options": {"include_usage": True}  # Request token usage data
-        }
 
-        full_response = ""
-        token_usage = None  # Initialize token tracking
-        try:
-            # Added timeout: 3.05s connect, 60s read
-            with requests.post(LLM_API_URL, headers=headers, json=payload, stream=True, timeout=(3.05, 60)) as r:
-                r.raise_for_status()
-                for line in r.iter_lines():
-                    if line:
-                        decoded_line = line.decode('utf-8')
-                        if decoded_line.startswith('data: '):
-                            # Check for [DONE] marker
-                            if decoded_line.strip() == 'data: [DONE]':
-                                continue
-
-                            try:
-                                json_data = json.loads(decoded_line[6:])
-
-                                # Capture token usage if present (appears in final chunk)
-                                if 'usage' in json_data:
-                                    token_usage = json_data['usage']
-
-                                # Stream content chunks as before
-                                if 'choices' in json_data and json_data['choices']:
-                                    delta = json_data['choices'][0].get('delta', {})
-                                    content_chunk = delta.get('content', '')
-                                    if content_chunk:
-                                        full_response += content_chunk
-                                        yield content_chunk
-                            except json.JSONDecodeError:
-                                continue
-
-
-            # Enhanced End Token: Include token usage in metadata
-            if token_usage:
-                logger.info(f"LLM Response Complete. Tokens: {token_usage}")
-                yield f"<|END_OF_STREAM|>{full_response}<|TOKEN_USAGE|>{json.dumps(token_usage)}"
-            else:
-                logger.info("LLM Response Complete (No token usage data)")
-                yield f"<|END_OF_STREAM|>{full_response}"
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"LLM Stream Error: {str(e)}")
-            yield f"LLM Error: {str(e)}"
-
-    return Response(stream_with_context(stream_llm_response()), content_type='text/plain')
+    # Stream based on provider
+    if provider == 'ollama':
+        model = session.get('ollama_model', OLLAMA_MODEL)
+        logger.info(f"Using Ollama model: {model}")
+        return Response(stream_with_context(stream_ollama_response(messages_to_send, model)), content_type='text/plain')
+    else:
+        return Response(stream_with_context(stream_lmstudio_response(messages_to_send)), content_type='text/plain')
 
 @app.route('/save_assistant_message', methods=['POST'])
 def save_assistant_message():
-    content = request.json.get('content')
-    token_usage = request.json.get('token_usage')  # Optional: may be None
+    data = request.json
+    if not data:
+        return jsonify({'error': 'Invalid request body'}), 400
+
+    content = data.get('content')
+    token_usage = data.get('token_usage')  # Optional: may be None
 
     if not content:
         return jsonify({'error': 'No content provided'}), 400
@@ -704,6 +858,10 @@ def save_assistant_message():
 @app.route('/execute_sql', methods=['POST'])
 def execute_sql():
     data = request.json
+    if not data:
+        logger.warning("Execute SQL attempt with invalid JSON body")
+        return jsonify({'error': 'Invalid request body'}), 400
+
     sql_query = data.get('sql_query')
     db_filepath = session.get('db_filepath')
     chat_history = session.get('chat_history', [])
@@ -773,8 +931,12 @@ def search_all_tables():
     Search for a term across all text columns in all tables.
     Returns compact format: table -> column -> matched values.
     """
-    search_term = request.json.get('search_term', '').strip()
-    case_sensitive = request.json.get('case_sensitive', False)
+    data = request.json
+    if not data:
+        return jsonify({'error': 'Invalid request body'}), 400
+
+    search_term = data.get('search_term', '').strip()
+    case_sensitive = data.get('case_sensitive', False)
     db_filepath = session.get('db_filepath')
 
     if not search_term:
@@ -864,9 +1026,12 @@ def search_all_tables():
 @app.route('/add_note', methods=['POST'])
 def add_note():
     data = request.json
+    if not data:
+        return jsonify({'error': 'Invalid request body'}), 400
+
     message_id = data.get('message_id')
     note_content = data.get('note_content')
-    
+
     if not message_id or note_content is None:
         return jsonify({'error': 'Missing message_id or note_content'}), 400
         
@@ -948,13 +1113,13 @@ def _generate_chat_html(chat_history):
 def export_chat():
     chat_history = session.get('chat_history', [])
     
-    # Gather Metadata
-    original_filename = session.get('original_filename', 'Unknown')
+    # Gather Metadata (escape user-provided values for XSS prevention)
+    original_filename = html_escape(session.get('original_filename', 'Unknown'))
     db_hash = session.get('db_hash', 'N/A')
     upload_timestamp = session.get('upload_timestamp', 'N/A')
     file_size_bytes = session.get('file_size_bytes', 0)
     export_timestamp = datetime.now().isoformat()
-    hostname = os.uname().nodename if hasattr(os, 'uname') else 'Localhost'
+    hostname = html_escape(os.uname().nodename if hasattr(os, 'uname') else 'Localhost')
 
     # Forensic Header HTML - Compact version
     file_size_mb = file_size_bytes / (1024*1024)

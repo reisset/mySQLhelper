@@ -11,6 +11,21 @@ const fileNameDisplay = document.getElementById('file-name-display');
 const welcomeScreen = document.getElementById('welcome-screen');
 const themeToggle = document.getElementById('theme-toggle');
 
+// LLM Provider Elements
+const providerSelect = document.getElementById('llm-provider-select');
+const ollamaStatus = document.getElementById('ollama-status');
+const statusIndicator = document.getElementById('status-indicator');
+const statusText = document.getElementById('status-text');
+const modelSelector = document.getElementById('model-selector');
+const modelSelect = document.getElementById('ollama-model-select');
+
+// LLM Provider State
+let currentProvider = 'lmstudio';
+let ollamaAvailable = false;
+let ollamaModels = [];
+let selectedOllamaModel = null;
+let statusCheckInterval = null;
+
 // --- Custom Confirmation Modal ---
 function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', cancelText = 'Cancel') {
     const existing = document.getElementById('confirm-modal');
@@ -89,6 +104,13 @@ function showAlertModal(title, message) {
     if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
+// --- HTML Escape Helper (XSS Prevention) ---
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // --- Theme Toggle ---
 function initTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -120,6 +142,130 @@ initTheme();
 if (themeToggle) {
     themeToggle.addEventListener('click', toggleTheme);
 }
+
+// --- LLM Provider Management ---
+
+async function checkOllamaStatus() {
+    try {
+        const response = await fetch('/api/ollama/status');
+        const data = await response.json();
+
+        ollamaAvailable = data.available;
+        ollamaModels = data.models || [];
+        selectedOllamaModel = data.selected_model;
+
+        updateOllamaStatusUI(data.available, ollamaModels);
+
+    } catch (error) {
+        console.error('Failed to check Ollama status:', error);
+        updateOllamaStatusUI(false, []);
+    }
+}
+
+function updateOllamaStatusUI(available, models) {
+    if (!ollamaStatus || !statusIndicator || !statusText) return;
+
+    if (currentProvider !== 'ollama') {
+        // LM Studio mode - hide Ollama-specific UI
+        ollamaStatus.style.display = 'none';
+        if (modelSelector) modelSelector.style.display = 'none';
+        return;
+    }
+
+    ollamaStatus.style.display = 'flex';
+
+    if (available) {
+        statusIndicator.classList.remove('offline');
+        statusIndicator.classList.add('online');
+        statusText.textContent = 'Ollama Connected';
+
+        // Populate model dropdown
+        if (modelSelector && modelSelect) {
+            modelSelector.style.display = 'block';
+            modelSelect.disabled = false;
+            modelSelect.innerHTML = '<option value="">Select model...</option>';
+
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                if (model === selectedOllamaModel) {
+                    option.selected = true;
+                }
+                modelSelect.appendChild(option);
+            });
+
+            // Auto-select first model if none selected
+            if (!selectedOllamaModel && models.length > 0) {
+                modelSelect.value = models[0];
+                selectedOllamaModel = models[0];
+                setOllamaModel(models[0]);
+            }
+        }
+    } else {
+        statusIndicator.classList.remove('online');
+        statusIndicator.classList.add('offline');
+        statusText.textContent = 'Ollama Offline';
+        if (modelSelector) modelSelector.style.display = 'none';
+        if (modelSelect) modelSelect.disabled = true;
+    }
+}
+
+async function setOllamaModel(model) {
+    try {
+        const response = await fetch('/api/ollama/model', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: model })
+        });
+
+        if (response.ok) {
+            selectedOllamaModel = model;
+            console.log('Ollama model set to:', model);
+        }
+    } catch (error) {
+        console.error('Failed to set model:', error);
+        showAlertModal('Error', 'Failed to set Ollama model.');
+    }
+}
+
+function initProviderSelector() {
+    if (!providerSelect) return;
+
+    providerSelect.addEventListener('change', async (e) => {
+        currentProvider = e.target.value;
+
+        if (currentProvider === 'ollama') {
+            await checkOllamaStatus();
+            // Start polling for Ollama status
+            if (!statusCheckInterval) {
+                statusCheckInterval = setInterval(checkOllamaStatus, 30000);
+            }
+        } else {
+            // Stop polling when using LM Studio
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+            if (ollamaStatus) ollamaStatus.style.display = 'none';
+            if (modelSelector) modelSelector.style.display = 'none';
+        }
+    });
+}
+
+function initModelSelector() {
+    if (!modelSelect) return;
+
+    modelSelect.addEventListener('change', async (e) => {
+        const model = e.target.value;
+        if (!model) return;
+        await setOllamaModel(model);
+    });
+}
+
+// Initialize provider management
+initProviderSelector();
+initModelSelector();
 
 // --- Event Listeners ---
 
@@ -331,13 +477,13 @@ async function executeTableSearch(searchTerm, caseSensitive = false) {
 
     } catch (error) {
         console.error('Search error:', error);
-        resultsContainer.innerHTML = `<div class="search-error">Error: ${error.message}</div>`;
+        resultsContainer.innerHTML = `<div class="search-error">Error: ${escapeHtml(error.message)}</div>`;
     }
 }
 
 function renderSearchResults(data, searchTerm, container, caseSensitive = false) {
     if (data.total_matches === 0) {
-        container.innerHTML = `<div class="search-no-results">No matches found for "${searchTerm}"</div>`;
+        container.innerHTML = `<div class="search-no-results">No matches found for "${escapeHtml(searchTerm)}"</div>`;
         return;
     }
 
@@ -345,22 +491,27 @@ function renderSearchResults(data, searchTerm, container, caseSensitive = false)
 
     for (const [tableName, tableData] of Object.entries(data.results)) {
         const moreCount = tableData.total_matches > 3 ? tableData.total_matches - 3 : 0;
+        const safeTableName = escapeHtml(tableName);
 
         html += `<div class="search-table-card">`;
-        html += `<div class="search-table-title">📋 ${tableName}</div>`;
+        html += `<div class="search-table-title">${safeTableName}</div>`;
 
         // Build column entries
         for (const [colName, values] of Object.entries(tableData.columns)) {
-            // Highlight search term in values
+            const safeColName = escapeHtml(colName);
+
+            // Escape values first, then highlight search term
             const highlightedValues = values.map(val => {
+                const safeVal = escapeHtml(val);
+                const safeSearchTerm = escapeHtml(searchTerm);
                 const regex = caseSensitive
-                    ? new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
-                    : new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-                return val.replace(regex, match => `<mark>${match}</mark>`);
+                    ? new RegExp(safeSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
+                    : new RegExp(safeSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                return safeVal.replace(regex, match => `<mark>${match}</mark>`);
             });
 
             html += `<div class="search-column-entry">`;
-            html += `<span class="search-col-name">${colName}:</span> `;
+            html += `<span class="search-col-name">${safeColName}:</span> `;
             html += `<span class="search-col-values">${highlightedValues.join(', ')}</span>`;
             html += `</div>`;
         }
@@ -426,7 +577,10 @@ async function sendMessage() {
         const response = await fetch('/chat_stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message }),
+            body: JSON.stringify({
+                message: message,
+                provider: currentProvider
+            }),
             signal: controller.signal
         });
 
@@ -540,19 +694,24 @@ async function sendMessage() {
 
         if (error.name === 'AbortError') {
             errorTitle.textContent = 'Request Timed Out';
-            errorDetails.textContent = 'The local LLM did not respond within 15 seconds.';
-        } else if (error.message.includes("503") || error.message.includes("Failed to fetch") || error.message.includes("LM Studio")) {
-            errorTitle.textContent = 'Unable to connect to Local LLM';
+            errorDetails.textContent = `The ${currentProvider === 'ollama' ? 'Ollama' : 'LM Studio'} server did not respond within 15 seconds.`;
+        } else if (error.message.includes("503") || error.message.includes("Failed to fetch") || error.message.includes("LM Studio") || error.message.includes("Ollama")) {
+            const isOllama = currentProvider === 'ollama';
+            errorTitle.textContent = `Unable to connect to ${isOllama ? 'Ollama' : 'LM Studio'}`;
 
             const helpList = document.createElement('ol');
-            ['Is the server running? (Green bar at top)', 'Is the port set to 1234?', 'Is a model loaded?'].forEach(item => {
+            const helpItems = isOllama
+                ? ['Is Ollama running? (ollama serve)', 'Is a model pulled? (ollama pull llama3.2)', 'Check port 11434 is accessible']
+                : ['Is LM Studio running? (Green bar at top)', 'Is the port set to 1234?', 'Is a model loaded?'];
+
+            helpItems.forEach(item => {
                 const li = document.createElement('li');
                 li.textContent = item;
                 helpList.appendChild(li);
             });
 
             const helpText = document.createElement('span');
-            helpText.textContent = 'Please check LM Studio:';
+            helpText.textContent = `Please check ${isOllama ? 'Ollama' : 'LM Studio'}:`;
             errorDetails.appendChild(helpText);
             errorDetails.appendChild(helpList);
         } else {

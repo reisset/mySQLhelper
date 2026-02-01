@@ -1,5 +1,35 @@
 CHANGELOG
 
+### v2.5 - Ollama Integration & Security Hardening (Feb 1, 2026)
+
+#### Features
+- **Dual LLM Provider Support:** Switch between LM Studio and Ollama via dropdown in sidebar.
+- **Ollama Status Indicator:** Green/red dot shows connection status with pulse animation when connected.
+- **Dynamic Model Selection:** Dropdown auto-populates with available Ollama models from `/api/tags`.
+- **30-Second Polling:** Automatic status checks when Ollama provider is selected.
+- **Provider-Specific Errors:** Helpful troubleshooting messages for each LLM backend.
+
+#### Security Fixes
+- **XSS Prevention (Export):** Escaped `original_filename` and `hostname` in HTML exports using `html.escape()`.
+- **XSS Prevention (Search):** Escaped table names, column names, and values in Search All Tables results.
+- **Request Validation:** All POST endpoints now validate `request.json` is not None before accessing.
+- **Error Message Escaping:** Search error messages now escaped to prevent injection.
+
+#### New Endpoints
+- `GET /api/ollama/status` - Check Ollama availability and list models
+- `POST /api/ollama/model` - Set active Ollama model for session
+- `GET /api/provider/status` - Unified provider status check
+
+#### Environment Variables
+- `LLM_PROVIDER` - Default provider: `lmstudio` or `ollama`
+- `OLLAMA_URL` - Ollama endpoint (default: `http://localhost:11434`)
+- `OLLAMA_MODEL` - Default Ollama model (default: `llama3.2`)
+
+### v2.4 - UI/UX Polish (Jan 31, 2026)
+- Custom confirmation/alert modals with accessibility improvements
+- Hover effects and transitions throughout UI
+- Improved focus management in modals
+
 ### v2.3 - Bloat Removal (Jan 14, 2026)
 
 #### Removed

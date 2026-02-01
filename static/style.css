@@ -356,6 +356,108 @@ body::before {
 }
 
 /* ==========================================================================
+   LLM Status Section
+   ========================================================================== */
+
+.llm-provider-status {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.provider-selector {
+    width: 100%;
+}
+
+.provider-select,
+.model-select {
+    width: 100%;
+    padding: 0.65rem 0.8rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    background-color: var(--background-lighter);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238a8a9a' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2rem;
+}
+
+.provider-select:hover,
+.model-select:hover {
+    border-color: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.provider-select:focus,
+.model-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.model-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ollama-status {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--background-lighter);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--foreground-muted);
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.status-indicator.online {
+    background-color: var(--success);
+    box-shadow: 0 0 8px var(--success), 0 0 16px rgba(64, 192, 96, 0.3);
+    animation: pulse-online 2s ease-in-out infinite;
+}
+
+.status-indicator.offline {
+    background-color: var(--error);
+    box-shadow: 0 0 8px var(--error);
+}
+
+@keyframes pulse-online {
+    0%, 100% {
+        box-shadow: 0 0 8px var(--success), 0 0 16px rgba(64, 192, 96, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 12px var(--success), 0 0 24px rgba(64, 192, 96, 0.5);
+    }
+}
+
+.status-text {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--foreground-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.model-selector {
+    margin-top: 0.25rem;
+}
+
+/* ==========================================================================
    Welcome Screen
    ========================================================================== */
 

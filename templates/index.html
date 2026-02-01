@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mySQLhelper</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.4">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.5">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
 </head>
 <body>
@@ -34,6 +34,30 @@
                     <h3 class="section-label">Actions</h3>
                     <button id="search-all-tables-button" class="sidebar-button">Search All Tables</button>
                     <button id="export-chat-button" class="sidebar-button">Export Chat</button>
+                </div>
+
+                <!-- LLM Status Section -->
+                <div class="sidebar-section">
+                    <h3 class="section-label">LLM Status</h3>
+                    <div class="llm-provider-status">
+                        <div class="provider-selector">
+                            <label for="llm-provider-select" class="visually-hidden">LLM Provider</label>
+                            <select id="llm-provider-select" class="provider-select">
+                                <option value="lmstudio">LM Studio</option>
+                                <option value="ollama">Ollama</option>
+                            </select>
+                        </div>
+                        <div id="ollama-status" class="ollama-status" style="display: none;">
+                            <span class="status-indicator offline" id="status-indicator"></span>
+                            <span class="status-text" id="status-text">Checking...</span>
+                        </div>
+                        <div id="model-selector" class="model-selector" style="display: none;">
+                            <label for="ollama-model-select" class="visually-hidden">Ollama Model</label>
+                            <select id="ollama-model-select" class="model-select" disabled>
+                                <option value="">Select model...</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Schema Section -->
@@ -79,6 +103,6 @@
     <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=2.4" defer></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=2.5" defer></script>
 </body>
 </html>
