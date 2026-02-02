@@ -1,5 +1,15 @@
 CHANGELOG
 
+### v3.0.1 - PyInstaller Build Fixes (Feb 2, 2026)
+
+#### Fixes
+- **numpy bundling:** Removed numpy from PyInstaller excludes list (pandas requires it)
+- **PyGObject bundling:** Added `--system-site-packages` to venv creation so PyInstaller can access system-installed `gi` module for GTK/WebKit rendering
+
+#### Files Changed
+- `yourSQLfriend.spec` - Removed numpy from excludes
+- `build_linux.sh` - Use `--system-site-packages` when creating venv
+
 ### v3.0 - Desktop App Packaging with PyInstaller + pywebview (Feb 2, 2026)
 
 #### New Features
