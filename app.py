@@ -724,6 +724,112 @@ def upload_file():
         logger.error(f"Upload failed: {str(e)}", exc_info=True)
         return jsonify({'error': f'Upload processing failed: {str(e)}'}), 500
 
+
+@app.route('/upload_path', methods=['POST'])
+def upload_file_from_path():
+    """
+    Upload database from local file path (for pywebview desktop app).
+    Accepts JSON: {"file_path": "/path/to/database.db"}
+    """
+    import shutil
+
+    data = request.get_json()
+    if not data or 'file_path' not in data:
+        return jsonify({'error': 'No file path provided'}), 400
+
+    file_path = data['file_path']
+
+    # Security: verify file exists and has allowed extension
+    if not os.path.isfile(file_path):
+        return jsonify({'error': 'File not found'}), 400
+
+    allowed_extensions = {'.db', '.sqlite', '.sqlite3', '.sql', '.csv'}
+    file_ext = os.path.splitext(file_path)[1].lower()
+    if file_ext not in allowed_extensions:
+        return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
+
+    original_filename = os.path.basename(file_path)
+    secure_name = secure_filename(original_filename)
+    final_filepath = os.path.join(UPLOAD_FOLDER, secure_name)
+
+    try:
+        shutil.copy2(file_path, final_filepath)
+
+        # Calculate hash
+        file_hash = calculate_file_hash(final_filepath)
+        logger.info(f"File copied from path: {file_path}")
+        logger.info(f"SHA256: {file_hash}")
+
+        schema = {}
+
+        if file_ext in ['.db', '.sqlite', '.sqlite3']:
+            # SQLite validation (same as /upload)
+            conn = sqlite3.connect(final_filepath)
+            cursor = conn.cursor()
+
+            cursor.execute("PRAGMA integrity_check;")
+            integrity = cursor.fetchone()[0]
+            if integrity != 'ok':
+                conn.close()
+                os.remove(final_filepath)
+                return jsonify({'error': f'Database integrity check failed: {integrity}'}), 400
+
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = cursor.fetchall()
+            for table_name in tables:
+                table_name = table_name[0]
+                cursor.execute(f"PRAGMA table_info({table_name});")
+                columns = cursor.fetchall()
+                schema[table_name] = [column[1] for column in columns]
+
+            conn.close()
+            logger.info(f"SQLite validated: {len(schema)} tables found")
+
+        elif file_ext == '.csv':
+            final_db_path = final_filepath.replace('.csv', '.db')
+            schema = convert_csv_to_sqlite(final_filepath, final_db_path)
+            os.remove(final_filepath)
+            final_filepath = final_db_path
+
+        elif file_ext == '.sql':
+            final_db_path = final_filepath.replace('.sql', '.db')
+            schema = execute_sql_file(final_filepath, final_db_path)
+            os.remove(final_filepath)
+            final_filepath = final_db_path
+
+        # Update session
+        session['db_filepath'] = final_filepath
+        session['db_hash'] = file_hash
+        session['original_filename'] = original_filename
+        session['upload_timestamp'] = datetime.now().isoformat()
+        session['file_size_bytes'] = os.path.getsize(final_filepath)
+        session['chat_history'] = []
+        session.modified = True
+
+        logger.info(f"Database loaded from path: {original_filename}")
+
+        return jsonify({
+            'schema': schema,
+            'metadata': {
+                'filename': original_filename,
+                'hash': file_hash,
+                'size_mb': os.path.getsize(final_filepath) / (1024*1024),
+                'tables': len(schema)
+            }
+        })
+
+    except sqlite3.Error as e:
+        if os.path.exists(final_filepath):
+            os.remove(final_filepath)
+        logger.error(f"SQLite validation failed: {str(e)}")
+        return jsonify({'error': f'Invalid SQLite database: {str(e)}'}), 400
+    except Exception as e:
+        if os.path.exists(final_filepath):
+            os.remove(final_filepath)
+        logger.error(f"Upload from path failed: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+
+
 def build_system_prompt(schema_context):
     """Build the system prompt with schema context."""
     return f"""

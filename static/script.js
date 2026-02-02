@@ -35,6 +35,83 @@ let statusCheckInterval = null;
 // Version display
 const appVersion = document.getElementById('app-version');
 
+// --- Pywebview Support ---
+// Detect pywebview environment (check both at load and later when pywebview injects itself)
+let isPywebview = typeof pywebview !== 'undefined';
+
+// Pywebview file dialog support
+function setupPywebviewFileDialog() {
+    const chooseFileLabel = document.querySelector('label[for="database-file"]');
+    if (!chooseFileLabel) return;
+
+    chooseFileLabel.addEventListener('click', async (e) => {
+        // Only intercept in pywebview
+        if (typeof pywebview === 'undefined') return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        try {
+            const filePath = await pywebview.api.open_file_dialog();
+            if (filePath) {
+                uploadFileFromPath(filePath);
+            }
+        } catch (err) {
+            console.error('File dialog error:', err);
+            showAlertModal('Error', 'Could not open file dialog');
+        }
+    });
+}
+
+function uploadFileFromPath(filePath) {
+    const fileName = filePath.split(/[\\/]/).pop();
+    fileNameDisplay.textContent = `Uploading ${fileName}...`;
+
+    if (dropZone) dropZone.classList.add('uploading');
+    if (welcomeScreen) welcomeScreen.classList.add('minimized');
+
+    // Clear existing chat messages
+    const messages = chatHistory.querySelectorAll('.chat-message');
+    messages.forEach(msg => msg.remove());
+
+    fetch('/upload_path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path: filePath })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (dropZone) dropZone.classList.remove('uploading');
+
+        if (data.error) {
+            fileNameDisplay.textContent = fileName;
+            showAlertModal('Upload Error', data.error);
+        } else {
+            appendMessage('Database loaded successfully. You can now ask questions about it.', 'bot');
+            renderSchema(data.schema);
+            updateDatabaseStatus(fileName);
+            fileNameDisplay.textContent = fileName;
+        }
+    })
+    .catch(error => {
+        if (dropZone) dropZone.classList.remove('uploading');
+        fileNameDisplay.textContent = fileName;
+        console.error('Upload error:', error);
+        showAlertModal('Upload Error', 'Failed to upload file');
+    });
+}
+
+// Initialize pywebview file dialog when ready
+if (isPywebview) {
+    setupPywebviewFileDialog();
+} else {
+    // pywebview might not be ready yet - listen for the ready event
+    window.addEventListener('pywebviewready', () => {
+        isPywebview = true;
+        setupPywebviewFileDialog();
+    });
+}
+
 // Fetch and display version on load
 async function fetchVersion() {
     try {
