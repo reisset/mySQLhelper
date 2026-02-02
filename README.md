@@ -55,6 +55,6 @@ Flask, Vanilla JS, CSS for styling, HTML, and SQLite + Local LLM (OpenAI-compati
 
 ## License
 
-Apache 2.0
+Apache 2.0 - See [LICENSE](LICENSE) and [NOTICE](NOTICE) files.
 
 Built by [Reisset](https://github.com/reisset)

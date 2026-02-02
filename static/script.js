@@ -1,3 +1,7 @@
+// Copyright 2025 Reisset
+// Licensed under the Apache License, Version 2.0
+// See LICENSE file for details
+
 const userInput = document.getElementById('user-input');
 const sendButton = document.getElementById('send-button');
 const chatHistory = document.getElementById('chat-history');
