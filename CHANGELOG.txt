@@ -1,5 +1,41 @@
 CHANGELOG
 
+### v3.0 - Desktop App Packaging with PyInstaller + pywebview (Feb 2, 2026)
+
+#### New Features
+- **Standalone Desktop App:** yourSQLfriend now runs as a native desktop application with no browser required. Uses pywebview for native window rendering.
+- **Single-File Executables:** Build distributable binaries for Windows (.exe) and Linux with PyInstaller.
+- **Version Display:** App version now shown in sidebar footer and fetched via new `/api/version` endpoint.
+- **LLM Connection Guidance:** When LLM is offline, sidebar now shows helpful setup instructions (commands for Ollama/LM Studio).
+
+#### New Files
+- `main.py` - Desktop entry point using pywebview with 1400x900 window (min 1024x700)
+- `yourSQLfriend.spec` - PyInstaller configuration bundling templates, static, assets, and ascii.txt
+- `build_linux.sh` - Linux build script (creates venv, installs deps, runs PyInstaller)
+- `build_windows.bat` - Windows build script (same workflow)
+
+#### Architecture Changes
+- **User Data Directory:** All runtime data (uploads, logs, sessions) now stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows) instead of project directory.
+- **Frozen Detection:** Added `get_base_path()` to resolve bundled resources when running as compiled executable.
+- **Path Abstraction:** Added `get_data_dir()` for cross-platform user data storage.
+
+#### Code Changes
+- `app.py`: Added `VERSION = "3.0.0"` constant, `get_base_path()`, `get_data_dir()`, `/api/version` endpoint
+- `app.py`: Updated `UPLOAD_FOLDER`, `LOG_DIR`, `SESSION_FILE_DIR` to use `DATA_DIR`
+- `app.py`: Updated template/static paths and CSS path resolution for PyInstaller compatibility
+- `app.py`: Export report footer now uses `VERSION` constant instead of hardcoded version
+- `templates/index.html`: Added version display element in sidebar
+- `static/script.js`: Added version fetching on load, LLM guidance panel when offline
+- `static/style.css`: Added `.sidebar-version` and `.llm-guidance` styling
+- `requirements.txt`: Added `pywebview>=5.0`
+
+#### Documentation
+- `README.md`: Complete restructure with Quick Start for desktop users, Linux WebKitGTK requirements table, Building from Source section, Data Storage documentation
+
+#### Platform Requirements
+- **Windows:** No additional dependencies (uses EdgeChromium/WinForms)
+- **Linux:** Requires WebKitGTK (`gir1.2-webkit2-4.1` on Ubuntu/Debian, `webkit2gtk4.1` on Fedora, `webkit2gtk-4.1` on Arch)
+
 ### v2.9 - ASCII Art Fix & Bloat Removal (Feb 1, 2026)
 
 #### Fixes

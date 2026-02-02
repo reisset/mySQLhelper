@@ -32,6 +32,26 @@ let ollamaModels = [];
 let selectedOllamaModel = null;
 let statusCheckInterval = null;
 
+// Version display
+const appVersion = document.getElementById('app-version');
+
+// Fetch and display version on load
+async function fetchVersion() {
+    try {
+        const response = await fetch('/api/version');
+        if (response.ok) {
+            const data = await response.json();
+            if (appVersion) {
+                appVersion.textContent = `yourSQLfriend v${data.version}`;
+            }
+        }
+    } catch (error) {
+        console.warn('Could not fetch version:', error);
+    }
+}
+
+fetchVersion();
+
 // --- Custom Confirmation Modal ---
 function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', cancelText = 'Cancel') {
     const existing = document.getElementById('confirm-modal');
@@ -176,6 +196,10 @@ function updateProviderStatusUI(available, models) {
     // Always show status for both providers
     ollamaStatus.style.display = 'flex';
 
+    // Remove existing guidance if any
+    const existingGuidance = document.querySelector('.llm-guidance');
+    if (existingGuidance) existingGuidance.remove();
+
     if (available) {
         statusIndicator.classList.remove('offline');
         statusIndicator.classList.add('online');
@@ -213,6 +237,32 @@ function updateProviderStatusUI(available, models) {
         statusText.textContent = currentProvider === 'ollama' ? 'Ollama Offline' : 'LM Studio Offline';
         if (modelSelector) modelSelector.style.display = 'none';
         if (modelSelect) modelSelect.disabled = true;
+
+        // Add friendly guidance
+        const guidanceDiv = document.createElement('div');
+        guidanceDiv.className = 'llm-guidance';
+
+        if (currentProvider === 'ollama') {
+            guidanceDiv.innerHTML = `
+                <p>To connect Ollama:</p>
+                <ol>
+                    <li>Run <code>ollama serve</code></li>
+                    <li>Pull a model: <code>ollama pull llama3.2</code></li>
+                </ol>
+            `;
+        } else {
+            guidanceDiv.innerHTML = `
+                <p>To connect LM Studio:</p>
+                <ol>
+                    <li>Open LM Studio</li>
+                    <li>Load a model</li>
+                    <li>Start server on port 1234</li>
+                </ol>
+            `;
+        }
+
+        // Insert after the ollama-status div
+        ollamaStatus.parentNode.insertBefore(guidanceDiv, ollamaStatus.nextSibling);
     }
 }
 

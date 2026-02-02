@@ -5,6 +5,7 @@
 # Standard Library
 import sqlite3
 import os
+import sys
 import hashlib
 import logging
 import re
@@ -23,32 +24,61 @@ from flask import Flask, render_template, request, jsonify, session, make_respon
 from flask_session import Session
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
+# --- Version ---
+VERSION = "3.0.0"
+
+# --- PyInstaller Compatibility ---
+def get_base_path():
+    """Get base path for bundled resources (templates, static, etc.)"""
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+def get_data_dir():
+    """Get user data directory for uploads, logs, sessions"""
+    if sys.platform == 'win32':
+        base = os.environ.get('APPDATA', os.path.expanduser('~'))
+    else:
+        base = os.path.expanduser('~')
+
+    data_dir = os.path.join(base, '.yourSQLfriend')
+    os.makedirs(data_dir, exist_ok=True)
+    return data_dir
+
+# Set up paths
+BASE_PATH = get_base_path()
+DATA_DIR = get_data_dir()
+
+app = Flask(__name__,
+            template_folder=os.path.join(BASE_PATH, 'templates'),
+            static_folder=os.path.join(BASE_PATH, 'static'))
 
 # --- Configuration ---
 # Use environment variable for secret key, or default for dev
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['SESSION_FILE_DIR'] = './flask_session/'
+app.config['SESSION_FILE_DIR'] = os.path.join(DATA_DIR, 'sessions')
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 
 # --- Logging Setup ---
 # Ensure upload directory exists (defined early for logging)
-UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+UPLOAD_FOLDER = os.path.join(DATA_DIR, 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Ensure logs directory exists
-if not os.path.exists('logs'):
-    os.makedirs('logs')
+LOG_DIR = os.path.join(DATA_DIR, 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Ensure sessions directory exists
+os.makedirs(app.config['SESSION_FILE_DIR'], exist_ok=True)
 
 # Configure structured logging with daily rotation
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(f'logs/analysis_{datetime.now().strftime("%Y%m%d")}.log'),
+        logging.FileHandler(os.path.join(LOG_DIR, f'analysis_{datetime.now().strftime("%Y%m%d")}.log')),
         logging.StreamHandler()
     ]
 )
@@ -554,11 +584,16 @@ def get_provider_status():
 def index():
     # Load ASCII art from file
     ascii_art = ''
-    ascii_path = os.path.join(os.path.dirname(__file__), 'ascii.txt')
+    ascii_path = os.path.join(BASE_PATH, 'ascii.txt')
     if os.path.exists(ascii_path):
         with open(ascii_path, 'r', encoding='utf-8') as f:
             ascii_art = f.read()
     return render_template('index.html', ascii_art=ascii_art)
+
+@app.route('/api/version')
+def get_version():
+    """Return the application version."""
+    return jsonify({'version': VERSION})
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -1127,7 +1162,7 @@ def add_note():
     return jsonify({'status': 'success'})
 
 def _get_css_content():
-    css_path = os.path.join(app.root_path, 'static', 'style.css')
+    css_path = os.path.join(BASE_PATH, 'static', 'style.css')
     try:
         with open(css_path, 'r') as f:
             return f.read()
@@ -1207,7 +1242,7 @@ def export_chat():
             <span>Host: {hostname}</span>
         </div>
         <div style="margin-top: 8px; font-size: 0.7rem; color: #5a5a6a;">
-            yourSQLfriend v2.9 | READ-ONLY mode | <span title="{db_hash}" style="cursor: help; text-decoration: underline dotted;">Full hash on hover</span>
+            yourSQLfriend v{VERSION} | READ-ONLY mode | <span title="{db_hash}" style="cursor: help; text-decoration: underline dotted;">Full hash on hover</span>
         </div>
     </div>
     """

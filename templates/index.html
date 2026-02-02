@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>yourSQLfriend</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.9">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
 </head>
 <body>
@@ -71,6 +71,11 @@
                         <!-- Schema will be displayed here -->
                     </div>
                 </div>
+
+                <!-- Version Display -->
+                <div class="sidebar-version">
+                    <span id="app-version">yourSQLfriend</span>
+                </div>
             </div>
         </div>
         <div class="main-chat" id="main-chat">
@@ -101,6 +106,6 @@
     <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=2.9" defer></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=3.0" defer></script>
 </body>
 </html>

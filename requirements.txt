@@ -2,3 +2,4 @@ Flask
 pandas
 requests
 Flask-Session
+pywebview>=5.0
