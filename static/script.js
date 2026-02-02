@@ -268,19 +268,28 @@ async function checkProviderStatus() {
 }
 
 function updateProviderStatusUI(available, models) {
-    if (!ollamaStatus || !statusIndicator || !statusText) return;
+    // Re-query elements to handle PyWebView timing issues where initial queries may fail
+    const ollamaStatusEl = ollamaStatus || document.getElementById('ollama-status');
+    const statusIndicatorEl = statusIndicator || document.getElementById('status-indicator');
+    const statusTextEl = statusText || document.getElementById('status-text');
+
+    if (!ollamaStatusEl || !statusIndicatorEl || !statusTextEl) {
+        console.warn('LLM status elements not found, retrying in 500ms...');
+        setTimeout(() => checkProviderStatus(), 500);
+        return;
+    }
 
     // Always show status for both providers
-    ollamaStatus.style.display = 'flex';
+    ollamaStatusEl.style.display = 'flex';
 
     // Remove existing guidance if any
     const existingGuidance = document.querySelector('.llm-guidance');
     if (existingGuidance) existingGuidance.remove();
 
     if (available) {
-        statusIndicator.classList.remove('offline');
-        statusIndicator.classList.add('online');
-        statusText.textContent = currentProvider === 'ollama' ? 'Ollama Connected' : 'LM Studio Connected';
+        statusIndicatorEl.classList.remove('offline');
+        statusIndicatorEl.classList.add('online');
+        statusTextEl.textContent = currentProvider === 'ollama' ? 'Ollama Connected' : 'LM Studio Connected';
 
         // Populate model dropdown for Ollama only
         if (currentProvider === 'ollama' && modelSelector && modelSelect) {
@@ -309,9 +318,9 @@ function updateProviderStatusUI(available, models) {
             if (modelSelector) modelSelector.style.display = 'none';
         }
     } else {
-        statusIndicator.classList.remove('online');
-        statusIndicator.classList.add('offline');
-        statusText.textContent = currentProvider === 'ollama' ? 'Ollama Offline' : 'LM Studio Offline';
+        statusIndicatorEl.classList.remove('online');
+        statusIndicatorEl.classList.add('offline');
+        statusTextEl.textContent = currentProvider === 'ollama' ? 'Ollama Offline' : 'LM Studio Offline';
         if (modelSelector) modelSelector.style.display = 'none';
         if (modelSelect) modelSelect.disabled = true;
 
@@ -339,7 +348,7 @@ function updateProviderStatusUI(available, models) {
         }
 
         // Insert after the ollama-status div
-        ollamaStatus.parentNode.insertBefore(guidanceDiv, ollamaStatus.nextSibling);
+        ollamaStatusEl.parentNode.insertBefore(guidanceDiv, ollamaStatusEl.nextSibling);
     }
 }
 
@@ -389,9 +398,17 @@ function initModelSelector() {
     });
 }
 
-// Initialize provider management
-initProviderSelector();
-initModelSelector();
+// Initialize provider management after DOM is ready
+// This handles PyWebView/WebKit2 timing issues where defer may not guarantee DOM readiness
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        initProviderSelector();
+        initModelSelector();
+    });
+} else {
+    initProviderSelector();
+    initModelSelector();
+}
 
 // --- Database Status Management ---
 function updateDatabaseStatus(filename = null) {
@@ -410,16 +427,17 @@ function updateDatabaseStatus(filename = null) {
 
 // --- Event Listeners ---
 
-if (sendButton) sendButton.addEventListener('click', sendMessage);
-if (userInput) {
-    userInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
+
+if (sendButton) {
+    sendButton.addEventListener('click', function() {
+        sendMessage();
     });
-    // Ctrl+Enter also sends message
+}
+
+if (userInput) {
+    // Use keydown instead of keypress for better WebKit2 compatibility
     userInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        if (e.key === 'Enter') {
             e.preventDefault();
             sendMessage();
         }
@@ -527,7 +545,9 @@ if (exportChatButton) {
 // --- Search All Tables ---
 const searchAllTablesButton = document.getElementById('search-all-tables-button');
 if (searchAllTablesButton) {
-    searchAllTablesButton.addEventListener('click', showSearchModal);
+    searchAllTablesButton.addEventListener('click', () => {
+        showSearchModal();
+    });
 }
 
 function showSearchModal() {
