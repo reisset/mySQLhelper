@@ -6,8 +6,7 @@ Connect your SQLite databases to a pretty webchat interface, then obtain help fr
 https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-2.9-blue)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)![Version](https://img.shields.io/badge/version-2.9-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/flask-3.x-green)
 
@@ -58,6 +57,6 @@ Flask, Vanilla JS, CSS for styling, HTML, and SQLite + Local LLM (OpenAI-compati
 
 MIT
 
----
+Apache 2.0
 
 Built by [Reisset](https://github.com/reisset)
