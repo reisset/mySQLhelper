@@ -14,6 +14,7 @@ const sidebarToggle = document.getElementById('sidebar-toggle');
 const fileNameDisplay = document.getElementById('file-name-display');
 const welcomeScreen = document.getElementById('welcome-screen');
 const themeToggle = document.getElementById('theme-toggle');
+const refreshBtn = document.getElementById('refresh-btn');
 // Database state
 let databaseLoaded = false;
 
@@ -244,6 +245,20 @@ initTheme();
 
 if (themeToggle) {
     themeToggle.addEventListener('click', toggleTheme);
+}
+
+// Refresh button handler
+if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+        const hasChat = document.querySelectorAll('.chat-message').length > 0;
+        if (hasChat) {
+            showConfirmModal('Reload Page', 'This will clear your current session. Continue?', () => {
+                window.location.reload();
+            });
+        } else {
+            window.location.reload();
+        }
+    });
 }
 
 // --- LLM Provider Management ---

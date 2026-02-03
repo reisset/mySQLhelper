@@ -784,7 +784,8 @@ body::before {
 
 /* Toggle Buttons */
 #sidebar-toggle,
-#theme-toggle {
+#theme-toggle,
+#refresh-btn {
     position: absolute;
     top: 12px;
     background: var(--background-light);
@@ -809,8 +810,13 @@ body::before {
     left: 60px;
 }
 
+#refresh-btn {
+    left: 108px;
+}
+
 #sidebar-toggle:hover,
-#theme-toggle:hover {
+#theme-toggle:hover,
+#refresh-btn:hover {
     background-color: var(--background-lighter);
     border-color: var(--primary);
     color: var(--primary);

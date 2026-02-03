@@ -1,5 +1,16 @@
 CHANGELOG
 
+### v3.0.3 - Refresh Button (Feb 2, 2026)
+
+#### Features
+- **Reload button:** Added refresh button (↻) next to theme toggle for reloading the app
+- Shows confirmation modal if chat session exists to prevent accidental data loss
+
+#### Files Changed
+- `templates/index.html` - Added refresh button element
+- `static/style.css` - Added button positioning and hover styles
+- `static/script.js` - Added click handler with confirmation logic
+
 ### v3.0.2 - Windows Build Fix (Feb 2, 2026)
 
 #### Fixes
