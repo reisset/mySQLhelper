@@ -11,9 +11,11 @@ logs/
 instance/
 .webassets-cache
 
+# Build artifacts
+build/
+dist/
+
 # Project Specific
-GEMINI.md
-initial-prompt.md
 flask_session/
 uploads/
 temp_*.db
@@ -30,6 +32,5 @@ Thumbs.db
 .idea/
 
 # Exports
-asciiart.txt
 chat_export.html
 logs/
