@@ -11,6 +11,9 @@ import logging
 import re
 import json
 import uuid
+import argparse
+import webbrowser
+import threading
 from datetime import datetime, timedelta
 import base64
 from html import escape as html_escape
@@ -25,14 +28,9 @@ from flask_session import Session
 from werkzeug.utils import secure_filename
 
 # --- Version ---
-VERSION = "3.1.0"
+VERSION = "3.3.0"
 
-# --- PyInstaller Compatibility ---
-def get_base_path():
-    """Get base path for bundled resources (templates, static, etc.)"""
-    if getattr(sys, 'frozen', False):
-        return sys._MEIPASS
-    return os.path.dirname(os.path.abspath(__file__))
+# --- Paths ---
 
 def get_data_dir():
     """Get user data directory for uploads, logs, sessions"""
@@ -46,7 +44,7 @@ def get_data_dir():
     return data_dir
 
 # Set up paths
-BASE_PATH = get_base_path()
+BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = get_data_dir()
 
 app = Flask(__name__,
@@ -581,9 +579,16 @@ def get_provider_status():
             'url': LLM_API_URL
         })
 
+@app.route('/service-worker.js')
+def service_worker():
+    """Serve service worker from root scope for PWA support."""
+    return app.send_static_file('service-worker.js'), 200, {
+        'Content-Type': 'application/javascript',
+        'Service-Worker-Allowed': '/'
+    }
+
 @app.route('/')
 def index():
-    # Load ASCII art from file (supports PyInstaller/Nuitka frozen builds)
     ascii_art = ''
     ascii_path = os.path.join(BASE_PATH, 'ascii.txt')
     if os.path.exists(ascii_path):
@@ -724,111 +729,6 @@ def upload_file():
             os.remove(temp_filepath)
         logger.error(f"Upload failed: {str(e)}", exc_info=True)
         return jsonify({'error': f'Upload processing failed: {str(e)}'}), 500
-
-
-@app.route('/upload_path', methods=['POST'])
-def upload_file_from_path():
-    """
-    Upload database from local file path (for pywebview desktop app).
-    Accepts JSON: {"file_path": "/path/to/database.db"}
-    """
-    import shutil
-
-    data = request.get_json()
-    if not data or 'file_path' not in data:
-        return jsonify({'error': 'No file path provided'}), 400
-
-    file_path = data['file_path']
-
-    # Security: verify file exists and has allowed extension
-    if not os.path.isfile(file_path):
-        return jsonify({'error': 'File not found'}), 400
-
-    allowed_extensions = {'.db', '.sqlite', '.sqlite3', '.sql', '.csv'}
-    file_ext = os.path.splitext(file_path)[1].lower()
-    if file_ext not in allowed_extensions:
-        return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
-
-    original_filename = os.path.basename(file_path)
-    secure_name = secure_filename(original_filename)
-    final_filepath = os.path.join(UPLOAD_FOLDER, secure_name)
-
-    try:
-        shutil.copy2(file_path, final_filepath)
-
-        # Calculate hash
-        file_hash = calculate_file_hash(final_filepath)
-        logger.info(f"File copied from path: {file_path}")
-        logger.info(f"SHA256: {file_hash}")
-
-        schema = {}
-
-        if file_ext in ['.db', '.sqlite', '.sqlite3']:
-            # SQLite validation (same as /upload)
-            conn = sqlite3.connect(final_filepath)
-            cursor = conn.cursor()
-
-            cursor.execute("PRAGMA integrity_check;")
-            integrity = cursor.fetchone()[0]
-            if integrity != 'ok':
-                conn.close()
-                os.remove(final_filepath)
-                return jsonify({'error': f'Database integrity check failed: {integrity}'}), 400
-
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-            tables = cursor.fetchall()
-            for table_name in tables:
-                table_name = table_name[0]
-                cursor.execute(f'PRAGMA table_info("{table_name}");')
-                columns = cursor.fetchall()
-                schema[table_name] = [column[1] for column in columns]
-
-            conn.close()
-            logger.info(f"SQLite validated: {len(schema)} tables found")
-
-        elif file_ext == '.csv':
-            final_db_path = final_filepath.replace('.csv', '.db')
-            schema = convert_csv_to_sqlite(final_filepath, final_db_path)
-            os.remove(final_filepath)
-            final_filepath = final_db_path
-
-        elif file_ext == '.sql':
-            final_db_path = final_filepath.replace('.sql', '.db')
-            schema = execute_sql_file(final_filepath, final_db_path)
-            os.remove(final_filepath)
-            final_filepath = final_db_path
-
-        # Update session
-        session['db_filepath'] = final_filepath
-        session['db_hash'] = file_hash
-        session['original_filename'] = original_filename
-        session['upload_timestamp'] = datetime.now().isoformat()
-        session['file_size_bytes'] = os.path.getsize(final_filepath)
-        session['chat_history'] = []
-        session.modified = True
-
-        logger.info(f"Database loaded from path: {original_filename}")
-
-        return jsonify({
-            'schema': schema,
-            'metadata': {
-                'filename': original_filename,
-                'hash': file_hash,
-                'size_mb': os.path.getsize(final_filepath) / (1024*1024),
-                'tables': len(schema)
-            }
-        })
-
-    except sqlite3.Error as e:
-        if os.path.exists(final_filepath):
-            os.remove(final_filepath)
-        logger.error(f"SQLite validation failed: {str(e)}")
-        return jsonify({'error': f'Invalid SQLite database: {str(e)}'}), 400
-    except Exception as e:
-        if os.path.exists(final_filepath):
-            os.remove(final_filepath)
-        logger.error(f"Upload from path failed: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 
 def build_schema_context(db_filepath):
@@ -1555,4 +1455,18 @@ def unhandled_exception(e):
     return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true')
+    parser = argparse.ArgumentParser(description='yourSQLfriend — SQLite forensic analysis tool')
+    parser.add_argument('--port', type=int, default=5000, help='Port to run on (default: 5000)')
+    parser.add_argument('--host', default='127.0.0.1', help='Host to bind to (default: 127.0.0.1)')
+    parser.add_argument('--no-browser', action='store_true', help='Do not auto-open browser')
+    args = parser.parse_args()
+
+    if not args.no_browser:
+        url = f'http://{args.host}:{args.port}'
+        threading.Timer(1.5, webbrowser.open, args=[url]).start()
+
+    app.run(
+        host=args.host,
+        port=args.port,
+        debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    )

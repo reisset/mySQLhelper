@@ -8,7 +8,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>yourSQLfriend</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.0">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#f0a030">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.3.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
 </head>
 <body>
@@ -108,6 +111,12 @@
     <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=3.0" defer></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=3.3.0" defer></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+                .catch(err => console.warn('SW registration failed:', err));
+        }
+    </script>
 </body>
 </html>

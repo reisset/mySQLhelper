@@ -7,7 +7,7 @@ https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
-![Version](https://img.shields.io/badge/version-3.1-blue)
+![Version](https://img.shields.io/badge/version-3.3-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/flask-3.x-green)
 
@@ -19,34 +19,43 @@ https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 - **Forensic Functions** => Built-in timestamp converters, Base64/Hex decode, pattern extractors
 - **Interactive Tables** => Sort, filter, paginate results. Dark/light theme
 - **Export Sessions** => Save your entire chat session via a nicely formatted HTML file
-- **Desktop App** => Native window application (no browser required)
+- **Install as App** => Use Chrome/Edge/Brave to install as a standalone desktop app (PWA)
 
 > **Note:** Designed for localhost use on a single workstation. For network deployment, set `SECRET_KEY` env var.
 
 ---
 
-## Quick Start (Desktop App)
+## Quick Start
+
+### Linux/macOS
+
+```bash
+git clone https://github.com/reisset/yourSQLfriend.git
+cd yourSQLfriend
+./run.sh
+```
 
 ### Windows
 
-1. Download `yourSQLfriend.exe` from the [Releases](https://github.com/reisset/yourSQLfriend/releases) page
-2. Double-click to run
-3. That's it!
+```bash
+git clone https://github.com/reisset/yourSQLfriend.git
+cd yourSQLfriend
+run.bat
+```
 
-### Linux
+The launcher script handles everything: creates a virtual environment, installs dependencies, and opens the app in your default browser.
 
-1. Install WebKitGTK (one-time setup):
+To use a different port: `./run.sh 8080` or `run.bat 8080`
 
-   | Distro | Command |
-   |--------|---------|
-   | Ubuntu/Debian | `sudo apt install gir1.2-webkit2-4.1` |
-   | Fedora | `sudo dnf install webkit2gtk4.1` |
-   | Arch | `sudo pacman -S webkit2gtk-4.1` |
-   | openSUSE | `sudo zypper install webkit2gtk3` |
+### Install as Desktop App (Optional)
 
-2. Download `yourSQLfriend` from the [Releases](https://github.com/reisset/yourSQLfriend/releases) page
-3. Make executable: `chmod +x yourSQLfriend`
-4. Run: `./yourSQLfriend`
+Once the app is running in Chrome, Edge, or Brave, click the **install icon** in the address bar to install yourSQLfriend as a standalone app. This gives you:
+
+- Its own window (no browser tabs or address bar)
+- A desktop icon / taskbar entry
+- Full browser rendering quality
+
+> **Note:** The Flask server must be running for the app to work. Use `./run.sh` to start it.
 
 ---
 
@@ -75,54 +84,30 @@ ollama serve
 
 ---
 
-## Running from Source
+## Running Manually
 
-If you prefer to run from source instead of using the desktop app:
+If you prefer not to use the launcher scripts:
 
 ```bash
-git clone https://github.com/reisset/yourSQLfriend.git
-cd yourSQLfriend
-
 # Create and activate virtual environment
 python3 -m venv venv && source venv/bin/activate  # Windows: .\venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Run as web app (opens in browser)
-flask run
+# Run (auto-opens browser)
+python app.py
 
-# OR run as desktop app (native window)
-python main.py
-```
-
-Then open [http://127.0.0.1:5000](http://127.0.0.1:5000) (web app) or the native window will appear (desktop app).
-
----
-
-## Building from Source
-
-To build your own standalone executable:
-
-### Linux
-
-```bash
-./build_linux.sh
-# Output: dist/yourSQLfriend
-```
-
-### Windows
-
-```batch
-build_windows.bat
-REM Output: dist\yourSQLfriend.exe
+# Or with options:
+python app.py --port 8080          # Custom port
+python app.py --no-browser         # Don't auto-open browser
 ```
 
 ---
 
 ## Data Storage
 
-The desktop app stores data in your home directory:
+yourSQLfriend stores data in your home directory:
 
 - **Linux/macOS:** `~/.yourSQLfriend/`
 - **Windows:** `%APPDATA%\.yourSQLfriend\`
@@ -147,7 +132,7 @@ Contents:
 
 ## Technology Stack
 
-Flask, Vanilla JS, CSS for styling, HTML, SQLite, pywebview (desktop), and Local LLM (OpenAI-compatible API)
+Flask, Vanilla JS, CSS, HTML, SQLite, PWA, and Local LLM (OpenAI-compatible API)
 
 ---
 

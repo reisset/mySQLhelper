@@ -106,6 +106,17 @@
     outline-offset: 2px;
 }
 
+/* Text selection highlight */
+::selection {
+    background: var(--primary);
+    color: #0a0a0c;
+}
+
+::-moz-selection {
+    background: var(--primary);
+    color: #0a0a0c;
+}
+
 /* Accessibility: Visually hidden but accessible to screen readers */
 .visually-hidden {
     position: absolute;
@@ -1187,23 +1198,37 @@ body::before {
     height: 8px;
 }
 
+/* Dark theme (default) — hardcoded because WebKit2 doesn't resolve var() in scrollbar pseudo-elements */
 ::-webkit-scrollbar-track {
-    background: var(--background-lighter);
+    background: #2a2a3a;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--primary);
+    background: #f0a030;
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-light);
+    background: #d08820;
 }
 
-/* Firefox scrollbar support */
+/* Light theme scrollbar overrides */
+[data-theme="light"] ::-webkit-scrollbar-track {
+    background: #c8c8d0;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: #b06800;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: #8a5000;
+}
+
+/* Firefox scrollbar support (var() works fine here) */
 * {
     scrollbar-width: thin;
-    scrollbar-color: var(--primary) var(--background-lighter);
+    scrollbar-color: var(--primary) var(--border);
 }
 
 /* ==========================================================================

@@ -36,83 +36,6 @@ let statusCheckInterval = null;
 // Version display
 const appVersion = document.getElementById('app-version');
 
-// --- Pywebview Support ---
-// Detect pywebview environment (check both at load and later when pywebview injects itself)
-let isPywebview = typeof pywebview !== 'undefined';
-
-// Pywebview file dialog support
-function setupPywebviewFileDialog() {
-    const chooseFileLabel = document.querySelector('label[for="database-file"]');
-    if (!chooseFileLabel) return;
-
-    chooseFileLabel.addEventListener('click', async (e) => {
-        // Only intercept in pywebview
-        if (typeof pywebview === 'undefined') return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        try {
-            const filePath = await pywebview.api.open_file_dialog();
-            if (filePath) {
-                uploadFileFromPath(filePath);
-            }
-        } catch (err) {
-            console.error('File dialog error:', err);
-            showAlertModal('Error', 'Could not open file dialog');
-        }
-    });
-}
-
-function uploadFileFromPath(filePath) {
-    const fileName = filePath.split(/[\\/]/).pop();
-    fileNameDisplay.textContent = `Uploading ${fileName}...`;
-
-    if (dropZone) dropZone.classList.add('uploading');
-    if (welcomeScreen) welcomeScreen.classList.add('minimized');
-
-    // Clear existing chat messages
-    const messages = chatHistory.querySelectorAll('.chat-message');
-    messages.forEach(msg => msg.remove());
-
-    fetch('/upload_path', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path: filePath })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (dropZone) dropZone.classList.remove('uploading');
-
-        if (data.error) {
-            fileNameDisplay.textContent = fileName;
-            showAlertModal('Upload Error', data.error);
-        } else {
-            appendMessage('Database loaded successfully. You can now ask questions about it.', 'bot');
-            renderSchema(data.schema);
-            updateDatabaseStatus(fileName);
-            fileNameDisplay.textContent = fileName;
-        }
-    })
-    .catch(error => {
-        if (dropZone) dropZone.classList.remove('uploading');
-        fileNameDisplay.textContent = fileName;
-        console.error('Upload error:', error);
-        showAlertModal('Upload Error', 'Failed to upload file');
-    });
-}
-
-// Initialize pywebview file dialog when ready
-if (isPywebview) {
-    setupPywebviewFileDialog();
-} else {
-    // pywebview might not be ready yet - listen for the ready event
-    window.addEventListener('pywebviewready', () => {
-        isPywebview = true;
-        setupPywebviewFileDialog();
-    });
-}
-
 // Fetch and display version on load
 async function fetchVersion() {
     try {
@@ -288,28 +211,18 @@ async function checkProviderStatus() {
 }
 
 function updateProviderStatusUI(available, models) {
-    // Re-query elements to handle PyWebView timing issues where initial queries may fail
-    const ollamaStatusEl = ollamaStatus || document.getElementById('ollama-status');
-    const statusIndicatorEl = statusIndicator || document.getElementById('status-indicator');
-    const statusTextEl = statusText || document.getElementById('status-text');
+    if (!ollamaStatus || !statusIndicator || !statusText) return;
 
-    if (!ollamaStatusEl || !statusIndicatorEl || !statusTextEl) {
-        console.warn('LLM status elements not found, retrying in 500ms...');
-        setTimeout(() => checkProviderStatus(), 500);
-        return;
-    }
-
-    // Always show status for both providers
-    ollamaStatusEl.style.display = 'flex';
+    ollamaStatus.style.display = 'flex';
 
     // Remove existing guidance if any
     const existingGuidance = document.querySelector('.llm-guidance');
     if (existingGuidance) existingGuidance.remove();
 
     if (available) {
-        statusIndicatorEl.classList.remove('offline');
-        statusIndicatorEl.classList.add('online');
-        statusTextEl.textContent = currentProvider === 'ollama' ? 'Ollama Connected' : 'LM Studio Connected';
+        statusIndicator.classList.remove('offline');
+        statusIndicator.classList.add('online');
+        statusText.textContent = currentProvider === 'ollama' ? 'Ollama Connected' : 'LM Studio Connected';
 
         // Populate model dropdown for Ollama only
         if (currentProvider === 'ollama' && modelSelector && modelSelect) {
@@ -338,9 +251,9 @@ function updateProviderStatusUI(available, models) {
             if (modelSelector) modelSelector.style.display = 'none';
         }
     } else {
-        statusIndicatorEl.classList.remove('online');
-        statusIndicatorEl.classList.add('offline');
-        statusTextEl.textContent = currentProvider === 'ollama' ? 'Ollama Offline' : 'LM Studio Offline';
+        statusIndicator.classList.remove('online');
+        statusIndicator.classList.add('offline');
+        statusText.textContent = currentProvider === 'ollama' ? 'Ollama Offline' : 'LM Studio Offline';
         if (modelSelector) modelSelector.style.display = 'none';
         if (modelSelect) modelSelect.disabled = true;
 
@@ -368,7 +281,7 @@ function updateProviderStatusUI(available, models) {
         }
 
         // Insert after the ollama-status div
-        ollamaStatusEl.parentNode.insertBefore(guidanceDiv, ollamaStatusEl.nextSibling);
+        ollamaStatus.parentNode.insertBefore(guidanceDiv, ollamaStatus.nextSibling);
     }
 }
 
@@ -539,44 +452,26 @@ if (sidebarToggle) {
 const exportChatButton = document.getElementById('export-chat-button');
 if (exportChatButton) {
     exportChatButton.addEventListener('click', () => {
-        if (window.pywebview && window.pywebview.api) {
-            // Desktop app: use native save dialog
-            fetch('/export_chat')
-                .then(response => {
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    return response.text();
-                })
-                .then(html => {
-                    const filename = 'chat_export.html';
-                    return window.pywebview.api.save_file_dialog(html, filename);
-                })
-                .catch(error => {
-                    console.error('Error exporting chat:', error);
-                    showAlertModal('Export Error', 'Error exporting chat. Please try again.');
-                });
-        } else {
-            // Browser: use blob download
-            fetch('/export_chat')
-                .then(response => {
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    return response.blob();
-                })
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = 'chat_export.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    a.remove();
-                })
-                .catch(error => {
-                    console.error('Error exporting chat:', error);
-                    showAlertModal('Export Error', 'Error exporting chat. Please try again.');
-                });
-        }
+        fetch('/export_chat')
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'chat_export.html';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            })
+            .catch(error => {
+                console.error('Error exporting chat:', error);
+                showAlertModal('Export Error', 'Error exporting chat. Please try again.');
+            });
     });
 }
 

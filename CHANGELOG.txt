@@ -1,5 +1,23 @@
 CHANGELOG
 
+### v3.3 - Browser-First Pivot + PWA Support (Feb 7, 2026)
+
+#### Architecture Change
+- **Dropped pywebview/PyInstaller** — Embraces the browser as the UI runtime for superior CSS rendering, right-click menus, scrollbar behavior, and theme support.
+- **PWA Support:** Added `manifest.json` and service worker so Chrome/Edge/Brave users can "Install" the app as a standalone window with desktop icon.
+- **Launcher Scripts:** Added `run.sh` (Linux/macOS) and `run.bat` (Windows) — one-command setup that creates venv, installs deps, and opens the browser.
+- **Auto-Browser-Open:** `python app.py` now auto-opens the default browser (like Jupyter). Use `--no-browser` to disable.
+- **CLI Flags:** Added `--port` and `--host` arguments to `app.py` for flexible deployment.
+
+#### Removed
+- Deleted `main.py` (pywebview desktop wrapper)
+- Deleted `build_linux.sh`, `build_windows.bat`, `yourSQLfriend.spec` (PyInstaller build infrastructure)
+- Removed `pywebview>=5.0` from `requirements.txt`
+- Removed `get_base_path()` / `sys._MEIPASS` PyInstaller path resolution from `app.py`
+- Removed `/upload_path` route from `app.py` (pywebview-only endpoint)
+- Removed ~120 lines of pywebview-specific JS: file dialog setup, desktop context menu, desktop export path, pywebview timing workarounds
+- Removed desktop context menu CSS styles
+
 ### v3.2 - Desktop Fixes & LLM Overhaul (Feb 7, 2026)
 
 #### Desktop App Fixes
