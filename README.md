@@ -30,17 +30,26 @@ https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 ### Linux/macOS
 
 ```bash
-git clone https://github.com/reisset/yourSQLfriend.git
-cd yourSQLfriend
+curl -fsSL https://raw.githubusercontent.com/reisset/yourSQLfriend/main/install.sh | sh
+cd ~/yourSQLfriend
 ./run.sh
 ```
 
-### Windows
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/reisset/yourSQLfriend/main/install.ps1 | iex
+cd ~\yourSQLfriend
+.\run.bat
+```
+
+### With Git (alternative)
 
 ```bash
 git clone https://github.com/reisset/yourSQLfriend.git
 cd yourSQLfriend
-run.bat
+./run.sh          # Linux/macOS
+run.bat           # Windows
 ```
 
 The launcher script handles everything: creates a virtual environment, installs dependencies, and opens the app in your default browser.

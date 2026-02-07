@@ -1,5 +1,17 @@
 CHANGELOG
 
+### v3.3.2 - One-Line Installer Scripts (Feb 7, 2026)
+
+#### Features
+- **curl | sh installer (Linux/macOS):** `curl -fsSL <url> | sh` downloads source archive from GitHub and extracts to `~/yourSQLfriend` — no git required.
+- **PowerShell installer (Windows):** `irm <url> | iex` downloads zip archive and extracts via `Expand-Archive` — no git required.
+- **Update support:** Re-run with `--update` flag to replace an existing installation.
+- **Custom install path:** Set `INSTALL_DIR` env var to change install location.
+- **Prerequisite checks:** Both scripts verify Python 3.10+, download tools (curl/wget), and provide clear error messages.
+
+#### Docs
+- **README updated:** One-liner install commands are now the primary Quick Start method; git clone moved to alternative.
+
 ### v3.3.1 - Responsive Table Fix + Persistent ASCII Banner (Feb 7, 2026)
 
 #### Fixes
