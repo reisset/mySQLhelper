@@ -1,5 +1,18 @@
 CHANGELOG
 
+### v3.2 - Desktop Fixes & LLM Overhaul (Feb 7, 2026)
+
+#### Desktop App Fixes
+- **Text Selection:** Fixed inability to select/copy text in desktop app — added `text_select=True` to pywebview window.
+- **Export Chat:** Fixed broken export in desktop app — blob/anchor download doesn't work in WebKit2GTK. Desktop now uses native save dialog via `pywebview.api.save_file_dialog()`.
+- **Scrollbar Visibility:** Track was invisible against the dark background. Changed track to `--background-lighter`, removed thumb border for full 8px width, brightened thumb to `--primary`.
+- **ASCII Art:** Minimized welcome banner was nearly invisible at `0.3em`. Bumped to `0.4em` and hidden redundant paragraph text in minimized state.
+
+#### LLM Pipeline Overhaul
+- **Richer Schema Context:** `build_schema_context()` now sends CREATE TABLE DDL (from `sqlite_master`), foreign key relationships (via `PRAGMA foreign_key_list`), and 3 sample rows per table. LLMs can now generate accurate JOINs.
+- **Decision Framework:** System prompt now distinguishes structural questions (plain language answer, no SQL) from data retrieval questions (SQL query). Prevents unnecessary SQL for conversational questions.
+- **Few-Shot Examples:** Added 2 examples to system prompt — one data retrieval, one structural — to guide local models on expected response format.
+
 ### v3.1.1 - Linux Build Fix (Feb 7, 2026)
 
 #### Fixes

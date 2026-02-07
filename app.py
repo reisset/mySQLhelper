@@ -832,28 +832,50 @@ def upload_file_from_path():
 
 
 def build_schema_context(db_filepath):
-    """Build schema context string from database file for LLM prompts."""
-    schema_context = ""
+    """Build schema context string from database file for LLM prompts.
+
+    Includes CREATE TABLE DDL, foreign key relationships, and sample data
+    to give the LLM maximum context for accurate query generation.
+    """
     if not db_filepath:
-        return schema_context
+        return ""
     conn = sqlite3.connect(db_filepath)
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+
+    cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
     tables = cursor.fetchall()
-    schema_context = "Database Schema:\n"
-    for table_name in tables:
-        table_name = table_name[0]
-        schema_context += f"Table: {table_name}\n"
-        cursor.execute(f'PRAGMA table_info("{table_name}");')
-        columns = cursor.fetchall()
-        for col in columns:
-            col_name = col[1]
-            col_type = col[2] or "TEXT"
-            pk = " [PRIMARY KEY]" if col[5] else ""
-            notnull = " NOT NULL" if col[3] else ""
-            schema_context += f"  - {col_name} ({col_type}){pk}{notnull}\n"
+
+    parts = ["Database Schema:\n"]
+
+    for table_name, create_sql in tables:
+        # CREATE TABLE DDL
+        if create_sql:
+            parts.append(f"{create_sql};\n")
+
+        # Foreign keys
+        cursor.execute(f'PRAGMA foreign_key_list("{table_name}");')
+        fks = cursor.fetchall()
+        if fks:
+            for fk in fks:
+                parts.append(f"  -- FK: {table_name}.{fk[3]} → {fk[2]}.{fk[4]}")
+            parts.append("")
+
+        # Sample data (3 rows)
+        try:
+            cursor.execute(f'SELECT * FROM "{table_name}" LIMIT 3;')
+            rows = cursor.fetchall()
+            if rows:
+                col_names = [desc[0] for desc in cursor.description]
+                parts.append(f"Sample data from {table_name}:")
+                parts.append(f"  Columns: {', '.join(col_names)}")
+                for row in rows:
+                    parts.append(f"  {row}")
+                parts.append("")
+        except sqlite3.Error:
+            pass
+
     conn.close()
-    return schema_context
+    return '\n'.join(parts)
 
 
 def build_error_correction_prompt(error_msg, failed_sql, schema_context):
@@ -884,19 +906,35 @@ Output ONLY the corrected SQL query in a ```sql code block. No explanation neede
 
 
 def build_system_prompt(schema_context):
-    """Build the system prompt with schema context."""
-    return f"""You are a SQLite SQL expert helping a forensic analyst. READ-ONLY environment — never output INSERT, UPDATE, DELETE, or DROP.
+    """Build the system prompt with schema context and few-shot examples."""
+    return f"""You are a SQLite expert assisting a forensic analyst. This is a READ-ONLY environment — never output INSERT, UPDATE, DELETE, DROP, or any modification commands.
 
 Rules:
-- Briefly explain your approach (1-2 sentences), then output ONE SQL query in a ```sql code block.
-- Use only columns and tables that exist in the schema below. SQLite syntax only.
-- For simple requests ("pull [table]", "show me [data]"), execute immediately — no confirmation needed.
-- If genuinely ambiguous, ask one clarifying question.
+- If the question can be answered from the schema alone (structure, relationships, column descriptions), respond in plain language. Do NOT generate SQL.
+- If the question requires retrieving or analyzing actual data, briefly explain your approach (1-2 sentences), then output exactly ONE SQL query in a ```sql code block.
+- Use only tables and columns that exist in the schema below. SQLite syntax only.
+- For direct requests ("show me [table]", "pull [data]"), write the query immediately — no confirmation needed.
+- If genuinely ambiguous, ask one short clarifying question.
 
-Forensic functions available:
-- Timestamps: unix_to_datetime(ts), webkit_to_datetime(ts), ios_to_datetime(ts), filetime_to_datetime(ts)
-- Encoding: encode_base64(text), decode_base64(text), to_hex(text), decode_hex(hex)
-- Extractors: extract_email(text), extract_ip(text), extract_url(text), extract_phone(text)
+Custom forensic functions (use these in SQL when relevant):
+- Timestamps: unix_to_datetime(col), webkit_to_datetime(col), ios_to_datetime(col), filetime_to_datetime(col)
+- Encoding: encode_base64(col), decode_base64(col), to_hex(col), decode_hex(col)
+- Extractors: extract_email(col), extract_ip(col), extract_url(col), extract_phone(col)
+
+Example 1 — Data retrieval:
+User: "Show me the 10 most recent entries in the logs table"
+Assistant: "I'll query the most recent 10 log entries by timestamp."
+```sql
+SELECT * FROM logs ORDER BY timestamp DESC LIMIT 10;
+```
+
+Example 2 — Structural/conversational question:
+User: "How are the tables in this database related?"
+Assistant: "Based on the schema, here are the relationships:
+- **orders** links to **customers** via CustomerId (foreign key)
+- **order_items** links to **orders** via OrderId
+- **order_items** links to **products** via ProductId
+These form a standard e-commerce data model."
 
 {schema_context}"""
 

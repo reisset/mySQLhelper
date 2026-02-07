@@ -37,6 +37,19 @@ class Api:
             return result[0]
         return None
 
+    def save_file_dialog(self, content, filename):
+        """Open native save dialog and write content to the chosen path."""
+        result = self.window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            save_filename=filename
+        )
+        if result:
+            path = result if isinstance(result, str) else result[0]
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            return True
+        return False
+
 
 api = Api()
 
@@ -49,7 +62,8 @@ def main():
         width=1400,
         height=900,
         min_size=(1024, 700),
-        js_api=api
+        js_api=api,
+        text_select=True
     )
     api.set_window(window)
     webview.start()

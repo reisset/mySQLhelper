@@ -539,26 +539,44 @@ if (sidebarToggle) {
 const exportChatButton = document.getElementById('export-chat-button');
 if (exportChatButton) {
     exportChatButton.addEventListener('click', () => {
-        fetch('/export_chat')
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.blob();
-            })
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'chat_export.html';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                a.remove();
-            })
-            .catch(error => {
-                console.error('Error exporting chat:', error);
-                showAlertModal('Export Error', 'Error exporting chat. Please try again.');
-            });
+        if (window.pywebview && window.pywebview.api) {
+            // Desktop app: use native save dialog
+            fetch('/export_chat')
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.text();
+                })
+                .then(html => {
+                    const filename = 'chat_export.html';
+                    return window.pywebview.api.save_file_dialog(html, filename);
+                })
+                .catch(error => {
+                    console.error('Error exporting chat:', error);
+                    showAlertModal('Export Error', 'Error exporting chat. Please try again.');
+                });
+        } else {
+            // Browser: use blob download
+            fetch('/export_chat')
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'chat_export.html';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                })
+                .catch(error => {
+                    console.error('Error exporting chat:', error);
+                    showAlertModal('Export Error', 'Error exporting chat. Please try again.');
+                });
+        }
     });
 }
 

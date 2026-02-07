@@ -612,7 +612,7 @@ body::before {
 }
 
 #welcome-screen.minimized pre {
-    font-size: 0.3em;
+    font-size: 0.4em;
     margin-bottom: 0.5rem;
 }
 
@@ -624,8 +624,7 @@ body::before {
 }
 
 #welcome-screen.minimized p {
-    font-size: 0.85rem;
-    margin: 0;
+    display: none;
 }
 
 /* Example Queries */
@@ -1189,23 +1188,22 @@ body::before {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--background);
+    background: var(--background-lighter);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--primary-dark);
+    background: var(--primary);
     border-radius: 4px;
-    border: 2px solid var(--background);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--primary);
+    background: var(--primary-light);
 }
 
 /* Firefox scrollbar support */
 * {
     scrollbar-width: thin;
-    scrollbar-color: var(--primary-dark) var(--background);
+    scrollbar-color: var(--primary) var(--background-lighter);
 }
 
 /* ==========================================================================
