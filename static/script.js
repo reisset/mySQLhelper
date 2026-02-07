@@ -332,7 +332,7 @@ function initModelSelector() {
 }
 
 // Initialize provider management after DOM is ready
-// This handles PyWebView/WebKit2 timing issues where defer may not guarantee DOM readiness
+// Ensure DOM is ready before initializing provider UI
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
         initProviderSelector();
