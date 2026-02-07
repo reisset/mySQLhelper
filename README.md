@@ -1,6 +1,6 @@
 # yourSQLfriend
 
-Connect your SQLite databases to a pretty webchat interface, then obtain help from a local LLM. Ask questions in plain English, get SQL queries and results. Built to be used in offline environments.
+Connect your SQLite databases to a local LLM through a webchat interface. Ask questions in plain English, get SQL queries and results. Built for offline environments.
 
 
 https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
@@ -13,12 +13,12 @@ https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 
 ## Features
 
-- **100% Offline**  => Utilizes Local LLM deployment via Ollama/LM studio
-- **Natural Language** => Ask "show me the top 5 customers" and get results + exact SQL query used
+- **100% Offline**  => Runs on a local LLM via Ollama or LM Studio
+- **Natural Language** => Ask "show me the top 5 customers" and get results + the exact SQL query
 - **Search All Tables** => Find a value across your entire database in one click
 - **Forensic Functions** => Built-in timestamp converters, Base64/Hex decode, pattern extractors
 - **Interactive Tables** => Sort, filter, paginate results. Dark/light theme
-- **Export Sessions** => Save your entire chat session via a nicely formatted HTML file
+- **Export Sessions** => Save your entire chat session as a formatted HTML file
 - **Install as App** => Use Chrome/Edge/Brave to install as a standalone desktop app (PWA)
 
 > **Note:** Designed for localhost use on a single workstation. For network deployment, set `SECRET_KEY` env var.
@@ -52,13 +52,13 @@ cd yourSQLfriend
 run.bat           # Windows
 ```
 
-The launcher script handles everything: creates a virtual environment, installs dependencies, and opens the app in your default browser.
+The launcher script creates a virtual environment, installs dependencies, and opens the app in your default browser.
 
 To use a different port: `./run.sh 8080` or `run.bat 8080`
 
 ### Install as Desktop App (Optional)
 
-Once the app is running in Chrome, Edge, or Brave, click the **install icon** in the address bar to install yourSQLfriend as a standalone app. This gives you:
+With the app running in Chrome, Edge, or Brave, click the **install icon** in the address bar to install yourSQLfriend as a standalone app. This gives you:
 
 - Its own window (no browser tabs or address bar)
 - A desktop icon / taskbar entry
@@ -70,7 +70,7 @@ Once the app is running in Chrome, Edge, or Brave, click the **install icon** in
 
 ## LLM Setup
 
-Before using yourSQLfriend, you need a local LLM running:
+yourSQLfriend requires a local LLM. Set one up before you start:
 
 ### Option A: Ollama (Recommended)
 
@@ -89,13 +89,13 @@ ollama serve
 2. Load a model
 3. Start local server on port 1234
 
-> **LLM Model recommendation:** Ministral-3:7b or 14b, devstral-small-2:24b, GLM 4.6v flash, GLM 4.7 (30b).
+> **Recommended models:** Ministral-3:7b or 14b, devstral-small-2:24b, GLM 4.6v flash, GLM 4.7 (30b).
 
 ---
 
 ## Data Storage
 
-yourSQLfriend stores data in your home directory:
+yourSQLfriend stores its data in your home directory:
 
 - **Linux/macOS:** `~/.yourSQLfriend/`
 - **Windows:** `%APPDATA%\.yourSQLfriend\`
@@ -107,25 +107,25 @@ Contents:
 
 ---
 
-## For Forensic Purposes
+## Forensic Integrity
 
-- **Read-only guaranteed** - SQL validation + SQLite `mode=ro` blocks any writes
+- **Read-only guaranteed** - SQL validation + SQLite `mode=ro` block all writes
 - **Chain of custody** - SHA256 hashes logged, timestamped exports
 - **Audit logs** - All queries logged to `logs/` with daily rotation
-- **Air-gapped safe** - Zero telemetry, no internet required
+- **Air-gap safe** - Zero telemetry, works fully offline
 
-**Heads up:** WAL files (`.db-wal`, `.db-shm`) aren't uploaded with the main DB. Checkpoint first if you need recent transactions.
+**Heads up:** The upload process excludes WAL files (`.db-wal`, `.db-shm`). Checkpoint your database first to include recent transactions.
 
 ---
 
 ## Technology Stack
 
-Flask, Vanilla JS, CSS, HTML, SQLite, PWA, and Local LLM (OpenAI-compatible API)
+Flask, Vanilla JS, CSS, HTML, SQLite, PWA, local LLM (OpenAI-compatible API)
 
 ---
 
 ## License
 
-Apache 2.0 - See [LICENSE](LICENSE) and [NOTICE](NOTICE) files.
+Apache 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 Built by [Reisset](https://github.com/reisset)
