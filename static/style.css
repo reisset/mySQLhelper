@@ -101,6 +101,11 @@
     box-sizing: border-box;
 }
 
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 /* Accessibility: Visually hidden but accessible to screen readers */
 .visually-hidden {
     position: absolute;
@@ -580,6 +585,8 @@ body::before {
     font-family: var(--font-mono);
     font-size: 0.55em;
     line-height: 1.1;
+    white-space: pre;
+    overflow-x: auto;
     /* Animated gradient */
     background: linear-gradient(
         90deg,
@@ -1819,6 +1826,42 @@ input.gridjs-search-input::placeholder {
 
 .sql-error-message .error-icon {
     font-size: 1rem;
+}
+
+/* Auto-corrected SQL Badge */
+.auto-corrected-badge {
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(64, 192, 96, 0.1);
+    border-left: 3px solid var(--success);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--foreground-dark);
+}
+
+.auto-corrected-badge summary {
+    cursor: pointer;
+    color: var(--success);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    user-select: none;
+}
+
+.auto-corrected-detail {
+    margin-top: 0.5rem;
+}
+
+.auto-corrected-detail pre {
+    margin: 0.25rem 0 0.5rem;
+    padding: 0.5rem;
+    background: var(--background);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 /* ==========================================================================

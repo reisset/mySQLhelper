@@ -141,10 +141,14 @@ function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', c
 
     const modalContent = document.createElement('div');
     modalContent.className = 'confirm-modal';
+    modalContent.setAttribute('role', 'dialog');
+    modalContent.setAttribute('aria-modal', 'true');
+    modalContent.setAttribute('aria-labelledby', 'confirm-modal-title');
 
     const header = document.createElement('div');
     header.className = 'confirm-modal-header';
     const h3 = document.createElement('h3');
+    h3.id = 'confirm-modal-title';
     h3.textContent = title;
     header.appendChild(h3);
 
@@ -217,7 +221,8 @@ function escapeHtml(text) {
 
 // --- Theme Toggle ---
 function initTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
+    let savedTheme = 'dark';
+    try { savedTheme = localStorage.getItem('theme') || 'dark'; } catch (e) { /* private browsing */ }
     document.documentElement.setAttribute('data-theme', savedTheme);
     updateThemeIcon(savedTheme);
 }
@@ -236,7 +241,7 @@ function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
+    try { localStorage.setItem('theme', newTheme); } catch (e) { /* private browsing */ }
     updateThemeIcon(newTheme);
 }
 
@@ -574,9 +579,9 @@ function showSearchModal() {
     modal.id = 'search-modal';
     modal.className = 'search-modal-overlay';
     modal.innerHTML = `
-        <div class="search-modal">
+        <div class="search-modal" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
             <div class="search-modal-header">
-                <h3>Search All Tables</h3>
+                <h3 id="search-modal-title">Search All Tables</h3>
                 <button class="search-modal-close">&times;</button>
             </div>
             <div class="search-modal-body">
@@ -856,6 +861,7 @@ async function sendMessage() {
         // Create error container with proper styling
         const errorDiv = document.createElement('div');
         errorDiv.className = 'chat-error-message';
+        errorDiv.setAttribute('role', 'alert');
 
         const errorIcon = document.createElement('span');
         errorIcon.className = 'error-icon';
@@ -952,9 +958,13 @@ function addCopyButtons(container) {
         const copyBtn = document.createElement('button');
         copyBtn.className = 'copy-sql-button';
         copyBtn.textContent = 'Copy';
-        copyBtn.onclick = () => {
-            navigator.clipboard.writeText(code.textContent);
-            copyBtn.textContent = 'Copied!';
+        copyBtn.onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(code.textContent);
+                copyBtn.textContent = 'Copied!';
+            } catch (err) {
+                copyBtn.textContent = 'Failed';
+            }
             setTimeout(() => copyBtn.textContent = 'Copy', 2000);
         };
         
@@ -984,6 +994,20 @@ async function executeSqlAndRender(fullText, contentContainer) {
 
         const data = await response.json();
 
+        // Show auto-corrected badge if retry happened
+        if (data.retried) {
+            const badge = document.createElement('details');
+            badge.className = 'auto-corrected-badge';
+            const summary = document.createElement('summary');
+            summary.textContent = 'Auto-corrected';
+            badge.appendChild(summary);
+            const detail = document.createElement('div');
+            detail.className = 'auto-corrected-detail';
+            detail.innerHTML = `<strong>Original:</strong><pre><code>${escapeHtml(data.original_sql)}</code></pre><strong>Corrected:</strong><pre><code>${escapeHtml(data.corrected_sql)}</code></pre>`;
+            badge.appendChild(detail);
+            contentContainer.appendChild(badge);
+        }
+
         // Render Result Table
         if (data.query_results && data.query_results.length > 0) {
             appendResultsTable(data.query_results, contentContainer, sqlQuery);
@@ -1007,6 +1031,7 @@ async function executeSqlAndRender(fullText, contentContainer) {
         console.error('SQL Error:', error);
         const errorDiv = document.createElement('div');
         errorDiv.className = 'sql-error-message';
+        errorDiv.setAttribute('role', 'alert');
 
         const icon = document.createElement('span');
         icon.className = 'error-icon';

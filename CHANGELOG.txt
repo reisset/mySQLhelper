@@ -1,15 +1,37 @@
 CHANGELOG
 
+### v3.1 - SQL Accuracy, Security & Accessibility (Feb 7, 2026)
+
+#### SQL Generation Accuracy
+- **Enriched Schema Context:** LLM now sees column types, PRIMARY KEY, and NOT NULL constraints (e.g., `id (INTEGER) [PRIMARY KEY] NOT NULL`) instead of bare column names.
+- **Streamlined System Prompt:** Replaced verbose 5-section prompt with concise version optimized for smaller LLMs. Schema placed at end of prompt for better LLM attention.
+- **SQL Auto-Retry:** Failed SQL queries are automatically corrected by the LLM and retried once. Users see a collapsible "Auto-corrected" badge showing original vs corrected SQL.
+
+#### Security Hardening
+- **Fixed 14 bare `except:` clauses** to `except Exception:` across all UDF functions and `check_llm_available`.
+- **Quoted all PRAGMA table names** with double-quoted identifiers to prevent SQL injection in schema introspection.
+- **Added SAVEPOINT, RELEASE, REINDEX** to forbidden SQL keywords list.
+- **Clipboard write with try/catch:** Copy button now handles clipboard API failures gracefully.
+- **localStorage wrapped in try/catch:** Theme persistence now works in private browsing mode.
+
+#### Accessibility
+- **ARIA attributes on modals:** `role="dialog"`, `aria-modal="true"`, `aria-labelledby` added to confirm and search modals.
+- **Error announcements:** `role="alert"` added to SQL error and chat error messages for screen reader support.
+- **`:focus-visible` styling:** Global focus outline using accent color for keyboard navigation.
+
+#### Icon & ASCII Art
+- **Favicon added:** Browser tab now shows the yourSQLfriend icon.
+- **ASCII art robustness:** Added `white-space: pre` and `overflow-x: auto` to prevent line-wrapping on wide block characters.
+
+#### Internal
+- Extracted `build_schema_context()` helper for reuse in chat and retry logic.
+- Added `call_llm_non_streaming()` helper for non-streaming LLM calls (used by retry).
+
 ### v3.0.3 - Refresh Button (Feb 2, 2026)
 
 #### Features
-- **Reload button:** Added refresh button (↻) next to theme toggle for reloading the app
+- **Reload button:** Added refresh button next to theme toggle for reloading the app
 - Shows confirmation modal if chat session exists to prevent accidental data loss
-
-#### Files Changed
-- `templates/index.html` - Added refresh button element
-- `static/style.css` - Added button positioning and hover styles
-- `static/script.js` - Added click handler with confirmation logic
 
 ### v3.0.2 - Windows Build Fix (Feb 2, 2026)
 
@@ -17,55 +39,19 @@ CHANGELOG
 - **pythonnet compatibility:** Windows build requires Python 3.12 (pythonnet lacks pre-built wheels for Python 3.14)
 - **ASCII art asset:** Added `ascii.txt` with yourSQLfriend logo for welcome screen display
 
-#### Notes
-- Windows users must use Python 3.10-3.12 to build (pythonnet dependency)
-- Linux builds work with any Python 3.10+
-
 ### v3.0.1 - PyInstaller Build Fixes (Feb 2, 2026)
 
 #### Fixes
 - **numpy bundling:** Removed numpy from PyInstaller excludes list (pandas requires it)
-- **PyGObject bundling:** Added `--system-site-packages` to venv creation so PyInstaller can access system-installed `gi` module for GTK/WebKit rendering
-
-#### Files Changed
-- `yourSQLfriend.spec` - Removed numpy from excludes
-- `build_linux.sh` - Use `--system-site-packages` when creating venv
+- **PyGObject bundling:** Added `--system-site-packages` to venv creation so PyInstaller can access system-installed `gi` module
 
 ### v3.0 - Desktop App Packaging with PyInstaller + pywebview (Feb 2, 2026)
 
 #### New Features
-- **Standalone Desktop App:** yourSQLfriend now runs as a native desktop application with no browser required. Uses pywebview for native window rendering.
-- **Single-File Executables:** Build distributable binaries for Windows (.exe) and Linux with PyInstaller.
-- **Version Display:** App version now shown in sidebar footer and fetched via new `/api/version` endpoint.
-- **LLM Connection Guidance:** When LLM is offline, sidebar now shows helpful setup instructions (commands for Ollama/LM Studio).
-
-#### New Files
-- `main.py` - Desktop entry point using pywebview with 1400x900 window (min 1024x700)
-- `yourSQLfriend.spec` - PyInstaller configuration bundling templates, static, assets, and ascii.txt
-- `build_linux.sh` - Linux build script (creates venv, installs deps, runs PyInstaller)
-- `build_windows.bat` - Windows build script (same workflow)
-
-#### Architecture Changes
-- **User Data Directory:** All runtime data (uploads, logs, sessions) now stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows) instead of project directory.
-- **Frozen Detection:** Added `get_base_path()` to resolve bundled resources when running as compiled executable.
-- **Path Abstraction:** Added `get_data_dir()` for cross-platform user data storage.
-
-#### Code Changes
-- `app.py`: Added `VERSION = "3.0.0"` constant, `get_base_path()`, `get_data_dir()`, `/api/version` endpoint
-- `app.py`: Updated `UPLOAD_FOLDER`, `LOG_DIR`, `SESSION_FILE_DIR` to use `DATA_DIR`
-- `app.py`: Updated template/static paths and CSS path resolution for PyInstaller compatibility
-- `app.py`: Export report footer now uses `VERSION` constant instead of hardcoded version
-- `templates/index.html`: Added version display element in sidebar
-- `static/script.js`: Added version fetching on load, LLM guidance panel when offline
-- `static/style.css`: Added `.sidebar-version` and `.llm-guidance` styling
-- `requirements.txt`: Added `pywebview>=5.0`
-
-#### Documentation
-- `README.md`: Complete restructure with Quick Start for desktop users, Linux WebKitGTK requirements table, Building from Source section, Data Storage documentation
-
-#### Platform Requirements
-- **Windows:** No additional dependencies (uses EdgeChromium/WinForms)
-- **Linux:** Requires WebKitGTK (`gir1.2-webkit2-4.1` on Ubuntu/Debian, `webkit2gtk4.1` on Fedora, `webkit2gtk-4.1` on Arch)
+- **Standalone Desktop App:** Native desktop application via pywebview (no browser required)
+- **Single-File Executables:** Build distributable binaries for Windows (.exe) and Linux with PyInstaller
+- **Version Display:** App version shown in sidebar footer via `/api/version` endpoint
+- **LLM Connection Guidance:** Sidebar shows setup instructions when LLM is offline
 
 ### v2.9 - ASCII Art Fix & Bloat Removal (Feb 1, 2026)
 

@@ -25,7 +25,7 @@ from flask_session import Session
 from werkzeug.utils import secure_filename
 
 # --- Version ---
-VERSION = "3.0.0"
+VERSION = "3.1.0"
 
 # --- PyInstaller Compatibility ---
 def get_base_path():
@@ -196,7 +196,8 @@ def validate_sql(sql):
     forbidden_keywords = [
         "DROP", "DELETE", "INSERT", "UPDATE", "ALTER",
         "TRUNCATE", "EXEC", "GRANT", "REVOKE", "CREATE",
-        "ATTACH", "DETACH", "REPLACE", "VACUUM"
+        "ATTACH", "DETACH", "REPLACE", "VACUUM",
+        "SAVEPOINT", "RELEASE", "REINDEX"
     ]
     for keyword in forbidden_keywords:
         if re.search(r'\b' + keyword + r'\b', sql_upper):
@@ -227,7 +228,7 @@ def unix_to_datetime(timestamp):
         return None
     try:
         return datetime.utcfromtimestamp(float(timestamp)).isoformat()
-    except:
+    except Exception:
         return None
 
 def webkit_to_datetime(timestamp):
@@ -237,7 +238,7 @@ def webkit_to_datetime(timestamp):
     try:
         webkit_epoch = datetime(1601, 1, 1)
         return (webkit_epoch + timedelta(microseconds=float(timestamp))).isoformat()
-    except:
+    except Exception:
         return None
 
 def ios_to_datetime(timestamp):
@@ -247,7 +248,7 @@ def ios_to_datetime(timestamp):
     try:
         ios_epoch = datetime(2001, 1, 1)
         return (ios_epoch + timedelta(seconds=float(timestamp))).isoformat()
-    except:
+    except Exception:
         return None
 
 def filetime_to_datetime(timestamp):
@@ -257,7 +258,7 @@ def filetime_to_datetime(timestamp):
     try:
         filetime_epoch = datetime(1601, 1, 1)
         return (filetime_epoch + timedelta(microseconds=float(timestamp) / 10)).isoformat()
-    except:
+    except Exception:
         return None
 
 def decode_base64(text):
@@ -266,7 +267,7 @@ def decode_base64(text):
         return None
     try:
         return base64.b64decode(text).decode('utf-8', errors='replace')
-    except:
+    except Exception:
         return None
 
 def encode_base64(text):
@@ -275,7 +276,7 @@ def encode_base64(text):
         return None
     try:
         return base64.b64encode(str(text).encode('utf-8')).decode('ascii')
-    except:
+    except Exception:
         return None
 
 def decode_hex(hex_string):
@@ -284,7 +285,7 @@ def decode_hex(hex_string):
         return None
     try:
         return bytes.fromhex(hex_string).decode('utf-8', errors='replace')
-    except:
+    except Exception:
         return None
 
 def to_hex(text):
@@ -293,7 +294,7 @@ def to_hex(text):
         return None
     try:
         return str(text).encode('utf-8').hex()
-    except:
+    except Exception:
         return None
 
 def extract_email(text):
@@ -303,7 +304,7 @@ def extract_email(text):
     try:
         match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', str(text))
         return match.group(0) if match else None
-    except:
+    except Exception:
         return None
 
 def extract_ip(text):
@@ -313,7 +314,7 @@ def extract_ip(text):
     try:
         match = re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', str(text))
         return match.group(0) if match else None
-    except:
+    except Exception:
         return None
 
 def extract_url(text):
@@ -323,7 +324,7 @@ def extract_url(text):
     try:
         match = re.search(r'https?://[^\s<>"\']+', str(text))
         return match.group(0) if match else None
-    except:
+    except Exception:
         return None
 
 def extract_phone(text):
@@ -334,7 +335,7 @@ def extract_phone(text):
         # Matches: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890
         match = re.search(r'(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}', str(text))
         return match.group(0) if match else None
-    except:
+    except Exception:
         return None
 
 def register_custom_functions(conn):
@@ -430,7 +431,7 @@ def convert_csv_to_sqlite(csv_filepath, db_filepath):
 
         # Extract schema
         cursor = conn.cursor()
-        cursor.execute(f"PRAGMA table_info({table_name});")
+        cursor.execute(f'PRAGMA table_info("{table_name}");')
         columns = cursor.fetchall()
         schema = {table_name: [column[1] for column in columns]}
 
@@ -480,7 +481,7 @@ def execute_sql_file(sql_filepath, db_filepath):
         schema = {}
         for table_name in tables:
             table_name = table_name[0]
-            cursor.execute(f"PRAGMA table_info({table_name});")
+            cursor.execute(f'PRAGMA table_info("{table_name}");')
             columns = cursor.fetchall()
             schema[table_name] = [column[1] for column in columns]
 
@@ -504,7 +505,7 @@ def check_llm_available():
         test_url = LLM_API_URL.replace('/chat/completions', '/models')
         response = requests.get(test_url, timeout=2)
         return response.status_code == 200
-    except:
+    except Exception:
         return False
 
 def check_ollama_available():
@@ -582,7 +583,7 @@ def get_provider_status():
 
 @app.route('/')
 def index():
-    # Load ASCII art from file
+    # Load ASCII art from file (supports PyInstaller/Nuitka frozen builds)
     ascii_art = ''
     ascii_path = os.path.join(BASE_PATH, 'ascii.txt')
     if os.path.exists(ascii_path):
@@ -652,7 +653,7 @@ def upload_file():
                 tables = cursor.fetchall()
                 for table_name in tables:
                     table_name = table_name[0]
-                    cursor.execute(f"PRAGMA table_info({table_name});")
+                    cursor.execute(f'PRAGMA table_info("{table_name}");')
                     columns = cursor.fetchall()
                     schema[table_name] = [column[1] for column in columns]
 
@@ -778,7 +779,7 @@ def upload_file_from_path():
             tables = cursor.fetchall()
             for table_name in tables:
                 table_name = table_name[0]
-                cursor.execute(f"PRAGMA table_info({table_name});")
+                cursor.execute(f'PRAGMA table_info("{table_name}");')
                 columns = cursor.fetchall()
                 schema[table_name] = [column[1] for column in columns]
 
@@ -830,39 +831,106 @@ def upload_file_from_path():
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 
-def build_system_prompt(schema_context):
-    """Build the system prompt with schema context."""
-    return f"""
-You are a SQL expert assisting a digital forensics analyst.
+def build_schema_context(db_filepath):
+    """Build schema context string from database file for LLM prompts."""
+    schema_context = ""
+    if not db_filepath:
+        return schema_context
+    conn = sqlite3.connect(db_filepath)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cursor.fetchall()
+    schema_context = "Database Schema:\n"
+    for table_name in tables:
+        table_name = table_name[0]
+        schema_context += f"Table: {table_name}\n"
+        cursor.execute(f'PRAGMA table_info("{table_name}");')
+        columns = cursor.fetchall()
+        for col in columns:
+            col_name = col[1]
+            col_type = col[2] or "TEXT"
+            pk = " [PRIMARY KEY]" if col[5] else ""
+            notnull = " NOT NULL" if col[3] else ""
+            schema_context += f"  - {col_name} ({col_type}){pk}{notnull}\n"
+    conn.close()
+    return schema_context
 
-1. **Reasoning & Execution:** When the user asks for data, briefly explain your approach in 1-2 sentences, then output the SQL query in a markdown code block.
 
-   Example:
-   User: "pull customers"
-   Response: "I'll retrieve all rows from the customers table."
-   ```sql
-   SELECT * FROM customers;
-   ```
+def build_error_correction_prompt(error_msg, failed_sql, schema_context):
+    """Build a prompt to ask the LLM to correct a failed SQL query."""
+    # Classify error type for targeted guidance
+    error_upper = str(error_msg).upper()
+    if "NO SUCH COLUMN" in error_upper:
+        hint = "Check column names against the schema — the column may be misspelled or belong to a different table."
+    elif "NO SUCH TABLE" in error_upper:
+        hint = "Check table names against the schema — the table may be misspelled."
+    elif "SYNTAX ERROR" in error_upper or "NEAR" in error_upper:
+        hint = "Fix the SQLite syntax error."
+    else:
+        hint = "Fix the error based on the message below."
 
-   For simple requests like "pull [table]" or "show me [data]", execute immediately without asking for confirmation.
+    return f"""The following SQL query failed. {hint}
 
-2. **Conversation:** If the user chats about the schema or asks general questions, reply in plain text.
+Error: {error_msg}
 
-3. **Ambiguity Handling:** Only ask clarifying questions when the request is genuinely ambiguous (e.g., "show me the data" without specifying which table, or "top customers" without defining "top").
-
-4. **Safety First:** NEVER modify data. You are running in a READ-ONLY environment. Do not output INSERT, UPDATE, DELETE, or DROP commands. Only output ONE query at a time - if you need to query multiple tables, use UNION ALL with consistent column aliases:
-   ```sql
-   SELECT col AS result FROM table1 UNION ALL SELECT col AS result FROM table2
-   ```
-
-5. **Custom SQL Functions:** You have access to these forensic utility functions:
-   - Timestamp converters: `unix_to_datetime(ts)`, `webkit_to_datetime(ts)`, `ios_to_datetime(ts)`, `filetime_to_datetime(ts)`
-   - Encode/decode: `encode_base64(text)`, `decode_base64(text)`, `to_hex(text)`, `decode_hex(hex)`
-   - String extractors: `extract_email(text)`, `extract_ip(text)`, `extract_url(text)`, `extract_phone(text)`
-   IMPORTANT: Always verify column names exist in the schema before using them. Each table has different columns.
+Failed query:
+```sql
+{failed_sql}
+```
 
 {schema_context}
-"""
+
+Output ONLY the corrected SQL query in a ```sql code block. No explanation needed."""
+
+
+def build_system_prompt(schema_context):
+    """Build the system prompt with schema context."""
+    return f"""You are a SQLite SQL expert helping a forensic analyst. READ-ONLY environment — never output INSERT, UPDATE, DELETE, or DROP.
+
+Rules:
+- Briefly explain your approach (1-2 sentences), then output ONE SQL query in a ```sql code block.
+- Use only columns and tables that exist in the schema below. SQLite syntax only.
+- For simple requests ("pull [table]", "show me [data]"), execute immediately — no confirmation needed.
+- If genuinely ambiguous, ask one clarifying question.
+
+Forensic functions available:
+- Timestamps: unix_to_datetime(ts), webkit_to_datetime(ts), ios_to_datetime(ts), filetime_to_datetime(ts)
+- Encoding: encode_base64(text), decode_base64(text), to_hex(text), decode_hex(hex)
+- Extractors: extract_email(text), extract_ip(text), extract_url(text), extract_phone(text)
+
+{schema_context}"""
+
+def call_llm_non_streaming(messages, provider='lmstudio', model=None):
+    """Make a non-streaming LLM call and return the response text. Used for SQL retry."""
+    try:
+        if provider == 'ollama':
+            model = model or OLLAMA_MODEL
+            payload = {
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "options": {"temperature": 0.1}
+            }
+            r = requests.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=30)
+            r.raise_for_status()
+            return r.json().get('message', {}).get('content', '')
+        else:
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "messages": messages,
+                "temperature": 0.1,
+                "stream": False
+            }
+            r = requests.post(LLM_API_URL, headers=headers, json=payload, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+            if 'choices' in data and data['choices']:
+                return data['choices'][0].get('message', {}).get('content', '')
+            return ''
+    except Exception as e:
+        logger.error(f"Non-streaming LLM call failed: {e}")
+        return ''
+
 
 def stream_lmstudio_response(messages_to_send):
     """Stream response from LM Studio (OpenAI-compatible API)."""
@@ -1003,18 +1071,7 @@ def chat_stream():
     schema_context = ""
     if db_filepath:
         try:
-            conn = sqlite3.connect(db_filepath)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-            tables = cursor.fetchall()
-            schema_context = "Database Schema:\n"
-            for table_name in tables:
-                table_name = table_name[0]
-                schema_context += f"Table: {table_name}\nColumns: "
-                cursor.execute(f"PRAGMA table_info({table_name});")
-                columns = cursor.fetchall()
-                schema_context += ", ".join([column[1] for column in columns]) + "\n"
-            conn.close()
+            schema_context = build_schema_context(db_filepath)
         except sqlite3.Error as e:
             logger.error(f"Database access error during schema injection: {e}")
             return jsonify({'error': f"Database access error: {e}"}), 500
@@ -1136,8 +1193,70 @@ def execute_sql():
         })
 
     except sqlite3.Error as e:
-        logger.error(f"SQL Execution Error: {e} | Query: {sql_query}")
-        return jsonify({'error': f"SQL Error: {e}"}), 500
+        logger.warning(f"SQL Execution Error (will attempt retry): {e} | Query: {sql_query}")
+
+        # Attempt auto-correction via LLM (max 1 retry)
+        try:
+            schema_context = build_schema_context(db_filepath)
+            correction_prompt = build_error_correction_prompt(str(e), sql_query, schema_context)
+
+            provider = session.get('llm_provider', LLM_PROVIDER)
+            model = session.get('ollama_model', OLLAMA_MODEL) if provider == 'ollama' else None
+            messages = [
+                {"role": "system", "content": "You are a SQL correction assistant. Output only the corrected SQL in a ```sql code block."},
+                {"role": "user", "content": correction_prompt}
+            ]
+
+            llm_response = call_llm_non_streaming(messages, provider=provider, model=model)
+
+            # Extract SQL from response
+            sql_match = re.search(r'```sql\n([\s\S]*?)\n```', llm_response)
+            if not sql_match:
+                raise ValueError("LLM did not return corrected SQL")
+
+            corrected_sql = sql_match.group(1).strip()
+            logger.info(f"LLM suggested correction: {corrected_sql}")
+
+            # Validate corrected SQL
+            is_valid_retry, retry_error = validate_sql(corrected_sql)
+            if not is_valid_retry:
+                raise ValueError(f"Corrected SQL failed validation: {retry_error}")
+
+            # Execute corrected query
+            cleaned_retry = corrected_sql.rstrip(';').strip()
+            conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
+            conn.execute("PRAGMA query_only = ON")
+            register_custom_functions(conn)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(cleaned_retry)
+            results = cursor.fetchall()
+            results_limit = results[:2000]
+            results_dict = [dict(row) for row in results_limit]
+            conn.close()
+
+            logger.info(f"Retry SQL Executed Successfully. Rows returned: {len(results_dict)}")
+
+            # Update History with Result Metadata
+            if chat_history:
+                last_msg = chat_history[-1]
+                if last_msg['role'] == 'assistant':
+                    last_msg['sql_query'] = corrected_sql
+                    last_msg['query_results_preview'] = results_dict[:20]
+                    last_msg['total_results'] = len(results_dict)
+                    session['chat_history'] = chat_history
+
+            return jsonify({
+                'response': f"Found {len(results_dict)} results.",
+                'query_results': results_dict,
+                'retried': True,
+                'original_sql': sql_query,
+                'corrected_sql': corrected_sql
+            })
+
+        except Exception as retry_error:
+            logger.error(f"SQL retry also failed: {retry_error} | Original query: {sql_query}")
+            return jsonify({'error': f"SQL Error: {e}"}), 500
 
 @app.route('/search_all_tables', methods=['POST'])
 def search_all_tables():
@@ -1172,7 +1291,7 @@ def search_all_tables():
 
         for table in tables:
             # Get column info for this table
-            cursor.execute(f"PRAGMA table_info({table})")
+            cursor.execute(f'PRAGMA table_info("{table}")')
             columns = cursor.fetchall()
 
             # Get all column names (SQLite is dynamically typed, search everything)

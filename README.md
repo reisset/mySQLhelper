@@ -6,7 +6,8 @@ Connect your SQLite databases to a pretty webchat interface, then obtain help fr
 https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 
 
-![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)![Version](https://img.shields.io/badge/version-3.0-blue)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.1-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Flask](https://img.shields.io/badge/flask-3.x-green)
 
