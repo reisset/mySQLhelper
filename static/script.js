@@ -640,9 +640,11 @@ async function sendMessage() {
     const message = userInput.value.trim();
     if (!message) return;
 
-    // Minimize welcome screen instead of removing it
-    if (welcomeScreen) {
+    // Minimize welcome screen and move it above the scrollable chat area
+    if (welcomeScreen && !welcomeScreen.classList.contains('minimized')) {
         welcomeScreen.classList.add('minimized');
+        const chatContainer = chatHistory.parentElement;
+        chatContainer.insertBefore(welcomeScreen, chatHistory);
     }
 
     appendMessage(message, 'user');
@@ -1080,9 +1082,11 @@ function uploadFile() {
         const formData = new FormData();
         formData.append('database_file', file);
 
-        // Minimize welcome screen and clear only chat messages
-        if (welcomeScreen) {
+        // Minimize welcome screen and move it above the scrollable chat area
+        if (welcomeScreen && !welcomeScreen.classList.contains('minimized')) {
             welcomeScreen.classList.add('minimized');
+            const chatContainer = chatHistory.parentElement;
+            chatContainer.insertBefore(welcomeScreen, chatHistory);
         }
 
         // Remove all chat messages but keep the welcome screen if it exists

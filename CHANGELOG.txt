@@ -1,5 +1,12 @@
 CHANGELOG
 
+### v3.3.1 - Responsive Table Fix + Persistent ASCII Banner (Feb 7, 2026)
+
+#### Fixes
+- **Table Overflow Fix:** Grid.js result tables no longer spill outside chat bubbles at narrow viewport widths. Added overflow containment on bot message containers and horizontal scroll on the results wrapper.
+- **ASCII Art Banner Persistence:** Minimized welcome banner no longer disappears when scrolling through chat messages. On first message, the banner is moved above the scrollable chat area so it stays pinned as a compact header bar.
+- **Transition Scoping:** Welcome screen CSS transition narrowed from `all` to specific properties (`padding`, `min-height`) to prevent visual artifacts during minimize.
+
 ### v3.3 - Browser-First Pivot + PWA Support (Feb 7, 2026)
 
 #### Architecture Change
