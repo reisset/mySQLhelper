@@ -93,27 +93,6 @@ ollama serve
 
 ---
 
-## Running Manually
-
-If you prefer not to use the launcher scripts:
-
-```bash
-# Create and activate virtual environment
-python3 -m venv venv && source venv/bin/activate  # Windows: .\venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run (auto-opens browser)
-python app.py
-
-# Or with options:
-python app.py --port 8080          # Custom port
-python app.py --no-browser         # Don't auto-open browser
-```
-
----
-
 ## Data Storage
 
 yourSQLfriend stores data in your home directory:
