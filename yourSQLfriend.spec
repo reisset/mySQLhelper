@@ -52,12 +52,8 @@ if sys.platform == 'win32':
 elif sys.platform == 'linux':
     hiddenimports.extend([
         'webview.platforms.gtk',
-        'gi',
-        'gi.repository.Gtk',
-        'gi.repository.Gdk',
-        'gi.repository.GLib',
-        'gi.repository.WebKit2',
     ])
+    hiddenimports += collect_submodules('gi')
 elif sys.platform == 'darwin':
     hiddenimports.extend([
         'webview.platforms.cocoa',

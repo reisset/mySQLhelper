@@ -18,15 +18,33 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# Create virtual environment if it doesn't exist
+# Create virtual environment with system-site-packages access
+# (Required for gi/PyGObject which must come from system packages)
+if [ -d "venv" ]; then
+    if ! grep -qi "include-system-site-packages = true" venv/pyvenv.cfg 2>/dev/null; then
+        echo "Existing venv missing system-site-packages. Recreating..."
+        rm -rf venv
+    fi
+fi
+
 if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
+    echo "Creating virtual environment with --system-site-packages..."
     python3 -m venv --system-site-packages venv
 fi
 
 # Activate virtual environment
 echo "Activating virtual environment..."
 source venv/bin/activate
+
+# Verify gi (PyGObject) is accessible
+if ! python3 -c "import gi" 2>/dev/null; then
+    echo ""
+    echo "Error: PyGObject (gi) not found. Install it with:"
+    echo "  Ubuntu/Debian: sudo apt install python3-gi python3-gi-cairo gir1.2-webkit2-4.1"
+    echo "  Fedora:        sudo dnf install python3-gobject webkit2gtk4.1"
+    echo "  Arch:          sudo pacman -S python-gobject webkit2gtk-4.1"
+    exit 1
+fi
 
 # Install dependencies
 echo "Installing dependencies..."

@@ -1,5 +1,12 @@
 CHANGELOG
 
+### v3.1.1 - Linux Build Fix (Feb 7, 2026)
+
+#### Fixes
+- **Stale venv detection:** Build script now validates that existing venv has `--system-site-packages` enabled and recreates it if not. Fixes crash where PyInstaller couldn't bundle the `gi` (PyGObject) module.
+- **Early gi check:** Build script verifies `gi` is importable after venv activation, with clear install instructions if missing.
+- **Robust gi collection:** Replaced manual `gi` hidden import list in spec with `collect_submodules('gi')` for automatic discovery of all GTK/GLib submodules.
+
 ### v3.1 - SQL Accuracy, Security & Accessibility (Feb 7, 2026)
 
 #### SQL Generation Accuracy
