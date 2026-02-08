@@ -652,9 +652,10 @@ async function sendMessage() {
 
     // Minimize welcome screen and move it above the scrollable chat area
     if (welcomeScreen && !welcomeScreen.classList.contains('minimized')) {
-        welcomeScreen.classList.add('minimized');
         const chatContainer = chatHistory.parentElement;
         chatContainer.insertBefore(welcomeScreen, chatHistory);
+        void welcomeScreen.offsetHeight; // force reflow so transition animates
+        welcomeScreen.classList.add('minimized');
     }
 
     appendMessage(message, 'user');
@@ -1332,9 +1333,10 @@ function uploadFile() {
 
         // Minimize welcome screen and move it above the scrollable chat area
         if (welcomeScreen && !welcomeScreen.classList.contains('minimized')) {
-            welcomeScreen.classList.add('minimized');
             const chatContainer = chatHistory.parentElement;
             chatContainer.insertBefore(welcomeScreen, chatHistory);
+            void welcomeScreen.offsetHeight; // force reflow so transition animates
+            welcomeScreen.classList.add('minimized');
         }
 
         // Destroy Chart.js instances before clearing chat

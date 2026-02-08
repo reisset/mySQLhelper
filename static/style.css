@@ -606,7 +606,7 @@ body::before {
     font-size: 0.55em;
     line-height: 1.1;
     white-space: pre;
-    overflow-x: auto;
+    overflow: hidden;
     /* Animated gradient */
     background: linear-gradient(
         90deg,
