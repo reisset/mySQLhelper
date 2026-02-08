@@ -11,11 +11,18 @@ echo   yourSQLfriend v3.4.1
 echo ===================================
 echo.
 
-REM Check for Python
+REM Check for Python 3
 python --version >nul 2>&1
 if errorlevel 1 (
     echo Error: Python 3 is required but not found.
     echo Install from https://python.org
+    pause
+    exit /b 1
+)
+for /f "tokens=2" %%V in ('python --version 2^>^&1') do set PYVER=%%V
+if not "%PYVER:~0,2%"=="3." (
+    echo Error: Python 3 is required but found Python %PYVER%
+    echo Install Python 3 from https://python.org
     pause
     exit /b 1
 )

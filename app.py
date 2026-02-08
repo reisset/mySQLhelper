@@ -11,6 +11,7 @@ import logging
 import re
 import json
 import uuid
+import socket
 import argparse
 import webbrowser
 import threading
@@ -458,7 +459,7 @@ def execute_sql_file(sql_filepath, db_filepath):
         Exception: If SQL execution fails or contains forbidden commands
     """
     try:
-        with open(sql_filepath, 'r') as f:
+        with open(sql_filepath, 'r', encoding='utf-8') as f:
             sql_content = f.read()
 
         # Security check: block destructive operations
@@ -626,6 +627,8 @@ def upload_file():
     # === UPLOAD PHASE ===
     original_filename = file.filename
     secure_name = secure_filename(original_filename)
+    if not secure_name:
+        secure_name = f"upload_{uuid.uuid4().hex[:8]}{file_ext}"
     temp_filepath = os.path.join(UPLOAD_FOLDER, f"temp_{secure_name}")
     final_filepath = os.path.join(UPLOAD_FOLDER, secure_name)
 
@@ -676,7 +679,7 @@ def upload_file():
 
         elif file_ext == '.csv':
             # CSV file - convert to SQLite
-            final_db_path = final_filepath.replace('.csv', '.db')
+            final_db_path = os.path.splitext(final_filepath)[0] + '.db'
             try:
                 schema = convert_csv_to_sqlite(temp_filepath, final_db_path)
                 final_filepath = final_db_path  # Update to use converted DB
@@ -689,7 +692,7 @@ def upload_file():
 
         elif file_ext == '.sql':
             # SQL file - execute to create database
-            final_db_path = final_filepath.replace('.sql', '.db')
+            final_db_path = os.path.splitext(final_filepath)[0] + '.db'
             try:
                 schema = execute_sql_file(temp_filepath, final_db_path)
                 final_filepath = final_db_path  # Update to use created DB
@@ -1104,12 +1107,9 @@ def execute_sql():
 
         # Execute query directly
         cursor.execute(cleaned_query)
-        results = cursor.fetchall()
+        results = cursor.fetchmany(2001)  # Fetch at most 2001 to detect overflow
 
-        # Limit results for performance (hardcoded 2000 limit)
-        results_limit = results[:2000]
-
-        results_dict = [dict(row) for row in results_limit]
+        results_dict = [dict(row) for row in results[:2000]]
 
         conn.close()
 
@@ -1168,9 +1168,8 @@ def execute_sql():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(cleaned_retry)
-            results = cursor.fetchall()
-            results_limit = results[:2000]
-            results_dict = [dict(row) for row in results_limit]
+            results = cursor.fetchmany(2001)
+            results_dict = [dict(row) for row in results[:2000]]
             conn.close()
 
             logger.info(f"Retry SQL Executed Successfully. Rows returned: {len(results_dict)}")
@@ -1396,7 +1395,7 @@ def _generate_chat_html(chat_history):
 
         if role == "user":
             user_text = content.split("User Question: ")[-1] if "User Question: " in content else content
-            chat_html_parts.append(f'<div class="chat-message user-message"><p>{user_text}</p></div>')
+            chat_html_parts.append(f'<div class="chat-message user-message"><p>{html_escape(user_text)}</p></div>')
 
         elif role == "assistant":
             # Build token counter HTML if usage data exists
@@ -1411,21 +1410,21 @@ def _generate_chat_html(chat_history):
                     <span title="Prompt: {prompt_tokens} | Completion: {completion_tokens}">{total_tokens} tokens ({cumulative_tokens} total)</span>
                 </div>'''
 
-            parts = [f"<p>{content}</p>"]
+            parts = [f"<p>{html_escape(content)}</p>"]
             if entry.get("sql_query"):
-                parts.append(f"<pre><code>{entry['sql_query']}</code></pre>")
+                parts.append(f"<pre><code>{html_escape(entry['sql_query'])}</code></pre>")
 
             preview = entry.get("query_results_preview")
             if preview:
                 headers = preview[0].keys()
-                table = "<table><thead><tr>" + "".join(f"<th>{h}</th>" for h in headers) + "</tr></thead><tbody>"
+                table = "<table><thead><tr>" + "".join(f"<th>{html_escape(str(h))}</th>" for h in headers) + "</tr></thead><tbody>"
                 for row in preview:
-                    table += "<tr>" + "".join(f"<td>{row[h]}</td>" for h in headers) + "</tr>"
+                    table += "<tr>" + "".join(f"<td>{html_escape(str(row[h]))}</td>" for h in headers) + "</tr>"
                 table += "</tbody></table>"
                 parts.append(f'<div class="results-table-container">{table}</div>')
 
             if entry.get("note"):
-                note_text = entry["note"].replace("<", "&lt;").replace(">", "&gt;") # Basic escaping
+                note_text = html_escape(entry["note"])
                 parts.append(f'<div class="forensic-note" style="margin-top: 10px; padding: 10px; background: #332b00; border-left: 3px solid #ffcc00; font-style: italic; color: #fff;"><strong>Analyst Note:</strong> {note_text}</div>')
 
             # Wrap in content-container with token counter
@@ -1444,7 +1443,7 @@ def export_chat():
     upload_timestamp = session.get('upload_timestamp', 'N/A')
     file_size_bytes = session.get('file_size_bytes', 0)
     export_timestamp = datetime.now().isoformat()
-    hostname = html_escape(os.uname().nodename if hasattr(os, 'uname') else 'Localhost')
+    hostname = html_escape(socket.gethostname())
 
     # Forensic Header HTML - Compact version
     file_size_mb = file_size_bytes / (1024*1024)

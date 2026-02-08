@@ -1,5 +1,19 @@
 CHANGELOG
 
+### v3.4.2 - Security & Cross-Platform Bug Fixes (Feb 2026)
+
+#### Security
+- **XSS in HTML Export:** All dynamic content in exported forensic reports (user messages, SQL queries, query result headers/values, analyst notes) is now properly escaped via `html_escape()`. Previously, malicious data in database columns could execute JavaScript when an exported report was opened.
+
+#### Fixes
+- **Modal Escape Handler Leak:** Closing modals via cancel button or overlay click now properly removes the `keydown` listener. Previously, each open/close cycle left an orphaned Escape key handler on `document`.
+- **Path Extension Replacement:** CSV/SQL-to-DB conversion now uses `os.path.splitext()` instead of string `.replace()`, preventing path corruption if `.csv` or `.sql` appeared in directory names.
+- **Query Memory Usage:** `fetchall()` replaced with `fetchmany(2001)` so large tables no longer load all rows into memory before truncating to 2000.
+- **Empty Filename Fallback:** If `secure_filename()` returns an empty string (all-special-character filenames), a UUID-based fallback name is generated.
+- **Windows Hostname in Export:** Forensic report header now uses `socket.gethostname()` (cross-platform) instead of `os.uname()` which doesn't exist on Windows.
+- **SQL File Encoding:** `.sql` file import now explicitly uses UTF-8 encoding instead of system default, fixing garbled text on Windows with non-ASCII SQL content.
+- **`run.bat` Python 3 Check:** Windows launcher now verifies the Python version is 3.x, matching the existing check in `run.sh`.
+
 ### v3.4.1 - Table Header Fix + CSV Encoding (Feb 2026)
 
 #### Fixes

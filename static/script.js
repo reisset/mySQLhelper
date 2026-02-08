@@ -103,7 +103,10 @@ function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', c
 
     document.body.appendChild(modal);
 
-    const closeModal = () => modal.remove();
+    const closeModal = () => {
+        document.removeEventListener('keydown', escHandler);
+        modal.remove();
+    };
 
     cancelBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
@@ -117,10 +120,7 @@ function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', c
 
     // Escape key closes modal
     const escHandler = (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', escHandler);
-        }
+        if (e.key === 'Escape') closeModal();
     };
     document.addEventListener('keydown', escHandler);
 
@@ -526,7 +526,10 @@ function showSearchModal() {
 
     document.body.appendChild(modal);
 
-    const closeModal = () => modal.remove();
+    const closeModal = () => {
+        document.removeEventListener('keydown', escHandler);
+        modal.remove();
+    };
 
     // Event listeners
     modal.querySelector('.search-modal-close').addEventListener('click', closeModal);
@@ -536,10 +539,7 @@ function showSearchModal() {
 
     // Escape key closes modal
     const escHandler = (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', escHandler);
-        }
+        if (e.key === 'Escape') closeModal();
     };
     document.addEventListener('keydown', escHandler);
 
@@ -1574,7 +1574,10 @@ async function showERDiagramModal() {
 
     document.body.appendChild(modal);
 
-    const closeModal = () => modal.remove();
+    const closeModal = () => {
+        document.removeEventListener('keydown', escHandler);
+        modal.remove();
+    };
 
     modal.querySelector('.er-modal-close').addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
@@ -1582,10 +1585,7 @@ async function showERDiagramModal() {
     });
 
     const escHandler = (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', escHandler);
-        }
+        if (e.key === 'Escape') closeModal();
     };
     document.addEventListener('keydown', escHandler);
 
