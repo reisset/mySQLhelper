@@ -379,6 +379,12 @@ body::before {
     box-shadow: 0 0 15px var(--primary-glow);
 }
 
+.sidebar-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 #file-name-display {
     display: block;
     margin-top: 0.75rem;
@@ -1051,12 +1057,18 @@ body::before {
    Results Table
    ========================================================================== */
 
+.results-actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    padding: 0.35rem 0;
+}
+
 .results-row-count {
     font-family: var(--font-mono);
     font-size: 0.8rem;
     color: var(--accent);
-    margin-bottom: 0.5rem;
-    padding: 0.35rem 0;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1126,6 +1138,101 @@ body::before {
     top: 0;
     z-index: 10;
     background-color: var(--background-lighter);
+}
+
+/* ==========================================================================
+   Chart Visualization
+   ========================================================================== */
+
+.chart-toggle-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--foreground-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.chart-toggle-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.chart-toggle-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.chart-container {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    animation: fadeIn 0.2s ease;
+}
+
+.chart-type-selector {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.chart-type-btn {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--background-light);
+    color: var(--foreground-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.chart-type-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.chart-type-btn.active {
+    background: var(--gradient-primary);
+    color: #0a0a0c;
+    border-color: var(--primary);
+    font-weight: 600;
+}
+
+[data-theme="light"] .chart-type-btn.active {
+    color: #ffffff;
+}
+
+.chart-canvas {
+    max-height: 350px;
+}
+
+.chart-not-suitable {
+    padding: 0.75rem 1rem;
+    background: var(--background);
+    border-left: 3px solid var(--warning);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--foreground-muted);
+    font-style: italic;
+    margin-top: 0.5rem;
+    animation: fadeIn 0.2s ease;
 }
 
 /* ==========================================================================
@@ -2092,6 +2199,240 @@ input.gridjs-search-input::placeholder {
 
     .example-query {
         font-size: 0.75rem;
+    }
+}
+
+/* ==========================================================================
+   ER Diagram Modal
+   ========================================================================== */
+
+.er-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+.er-modal {
+    background: var(--background-light);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    width: 95vw;
+    height: 90vh;
+    max-width: 1400px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-md), 0 0 60px var(--primary-glow);
+}
+
+.er-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.er-modal-header h3 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.er-modal-header h3::before {
+    content: '//';
+    opacity: 0.5;
+}
+
+.er-modal-close {
+    background: none;
+    border: none;
+    color: var(--foreground-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: all 0.2s ease;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius);
+}
+
+.er-modal-close:hover {
+    color: var(--error);
+    background: rgba(224, 64, 64, 0.1);
+}
+
+.er-modal-body {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    background: var(--background);
+}
+
+/* SVG Styling */
+.er-svg {
+    display: block;
+    cursor: default;
+}
+
+.er-table-bg {
+    fill: var(--background-light);
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+.er-table-header {
+    fill: var(--primary);
+    opacity: 0.9;
+}
+
+.er-table-name {
+    fill: #0a0a0c;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+[data-theme="light"] .er-table-name {
+    fill: #ffffff;
+}
+
+.er-separator {
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+.er-col-name {
+    fill: var(--foreground);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.er-col-name.er-fk {
+    fill: var(--accent);
+}
+
+.er-col-type {
+    fill: var(--foreground-muted);
+    font-family: var(--font-mono);
+    font-size: 10px;
+}
+
+.er-pk-label {
+    fill: var(--warning);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.er-arrow {
+    fill: var(--accent);
+}
+
+.er-relationship-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    opacity: 0.7;
+    transition: opacity 0.3s ease, stroke-width 0.2s ease;
+}
+
+.er-rel-label {
+    fill: var(--foreground-muted);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    transition: opacity 0.3s ease;
+}
+
+.er-no-fk-notice {
+    fill: var(--foreground-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* Hover on table group */
+.er-table-group:hover .er-table-header {
+    opacity: 1;
+    filter: brightness(1.1);
+}
+
+.er-table-group:hover .er-table-bg {
+    stroke: var(--primary);
+}
+
+/* Highlight/dim for click interaction */
+.er-dimmed {
+    opacity: 0.15;
+    transition: opacity 0.3s ease;
+}
+
+.er-highlighted {
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.er-highlighted .er-table-bg {
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+
+.er-highlighted.er-relationship-line {
+    stroke-width: 3;
+    opacity: 1;
+}
+
+/* Loading / Error / Empty states */
+.er-loading,
+.er-error,
+.er-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--foreground-muted);
+}
+
+.er-loading::before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 0.75rem;
+}
+
+.er-error {
+    color: var(--error);
+}
+
+@media (max-width: 768px) {
+    .er-modal {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
     }
 }
 

@@ -11,7 +11,7 @@
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#f0a030">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.3.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.4.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
 </head>
 <body>
@@ -41,6 +41,7 @@
                 <div class="sidebar-section">
                     <h3 class="section-label">Actions</h3>
                     <button id="search-all-tables-button" class="sidebar-button">Search All Tables</button>
+                    <button id="schema-diagram-button" class="sidebar-button" disabled>Schema Diagram</button>
                     <button id="export-chat-button" class="sidebar-button">Export Chat</button>
                 </div>
 
@@ -111,7 +112,8 @@
     <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=3.3.0" defer></script>
+    <script src="{{ url_for('static', filename='lib/chart.umd.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=3.4.0" defer></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/service-worker.js', { scope: '/' })

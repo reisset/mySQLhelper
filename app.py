@@ -28,7 +28,7 @@ from flask_session import Session
 from werkzeug.utils import secure_filename
 
 # --- Version ---
-VERSION = "3.3.0"
+VERSION = "3.4.0"
 
 # --- Paths ---
 
@@ -1292,6 +1292,60 @@ def search_all_tables():
 
     except sqlite3.Error as e:
         logger.error(f"Search All Tables Error: {e}")
+        return jsonify({'error': f'Database error: {e}'}), 500
+
+@app.route('/api/schema/diagram', methods=['GET'])
+def schema_diagram():
+    """Return schema data for ER diagram: tables, columns, types, PKs, FKs."""
+    db_filepath = session.get('db_filepath')
+    if not db_filepath:
+        return jsonify({'error': 'No database loaded'}), 400
+
+    try:
+        conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+        table_names = [row[0] for row in cursor.fetchall()]
+
+        tables = []
+        relationships = []
+
+        for table_name in table_names:
+            cursor.execute(f'PRAGMA table_info("{table_name}");')
+            columns_raw = cursor.fetchall()
+            columns = []
+            for col in columns_raw:
+                columns.append({
+                    'name': col[1],
+                    'type': col[2] or 'TEXT',
+                    'pk': bool(col[5])
+                })
+
+            tables.append({
+                'name': table_name,
+                'columns': columns
+            })
+
+            cursor.execute(f'PRAGMA foreign_key_list("{table_name}");')
+            fks = cursor.fetchall()
+            for fk in fks:
+                relationships.append({
+                    'from_table': table_name,
+                    'from_column': fk[3],
+                    'to_table': fk[2],
+                    'to_column': fk[4]
+                })
+
+        conn.close()
+
+        return jsonify({
+            'tables': tables,
+            'relationships': relationships
+        })
+
+    except sqlite3.Error as e:
+        logger.error(f"Schema diagram error: {e}")
         return jsonify({'error': f'Database error: {e}'}), 500
 
 @app.route('/add_note', methods=['POST'])

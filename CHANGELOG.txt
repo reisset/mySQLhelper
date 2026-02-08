@@ -1,5 +1,17 @@
 CHANGELOG
 
+### v3.4.0 - Chart Visualization + Schema ER Diagram (Feb 2026)
+
+#### Features
+- **Chart Visualization:** "Chart" button on every query result table. Auto-detects bar, line, pie, or scatter chart type based on column data types. Chart type selector toggles between types. Charts respect dark/light theme and update on theme change.
+- **Schema ER Diagram:** "Schema Diagram" button in sidebar opens near-full-screen modal with interactive SVG entity-relationship diagram. Force-directed layout clusters related tables. Drag tables, scroll to zoom, pan background. Click table to highlight its connections. No external library — pure SVG + vanilla JS.
+
+#### Backend
+- New endpoint `/api/schema/diagram` returns table columns, types, PKs, and FK relationships as JSON.
+
+#### Dependencies
+- Chart.js 4.x vendored in `static/lib/chart.umd.min.js`
+
 ### v3.3.2 - One-Line Installer Scripts (Feb 7, 2026)
 
 #### Features
