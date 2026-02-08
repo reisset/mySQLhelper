@@ -17,6 +17,8 @@ https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 - **Natural Language** => Ask "show me the top 5 customers" and get results + the exact SQL query
 - **Search All Tables** => Find a value across your entire database in one click
 - **Forensic Functions** => Built-in timestamp converters, Base64/Hex decode, pattern extractors
+- **Chart Visualization** => One-click bar, line, pie, or scatter charts on any query result
+- **Schema Diagram** => Interactive ER diagram with drag, zoom, pan, and click-to-highlight relationships
 - **Interactive Tables** => Sort, filter, paginate results. Dark/light theme
 - **Export Sessions** => Save your entire chat session as a formatted HTML file
 - **Install as App** => Use Chrome/Edge/Brave to install as a standalone desktop app (PWA)
