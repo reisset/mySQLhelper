@@ -11,7 +11,8 @@ Built for offline analysis on a single workstation.
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?style=for-the-badge&logo=python&logoColor=white&labelColor=0a0a0c)](https://python.org)
 [![Flask](https://img.shields.io/badge/flask-3.x-green?style=for-the-badge&labelColor=0a0a0c)](https://flask.palletsprojects.com)
 
-<img width="1707" height="1391" alt="yoursqlfriend" src="https://github.com/user-attachments/assets/9e0816cc-a047-46fb-9ba5-f5b4f35c5a6c" />
+![yourSQLfriend](https://github.com/user-attachments/assets/9984c22c-53f8-4679-9443-6d99574f4280)
+
 
 </div>
 
