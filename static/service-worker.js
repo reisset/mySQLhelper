@@ -2,7 +2,7 @@
 // Caches static assets for fast app shell loading;
 // all API/data requests pass through to the Flask server.
 
-const CACHE_NAME = 'ysqf-v3.4.0';
+const CACHE_NAME = 'ysqf-v3.4.1';
 const STATIC_ASSETS = [
   '/static/style.css',
   '/static/script.js',

@@ -28,7 +28,7 @@ from flask_session import Session
 from werkzeug.utils import secure_filename
 
 # --- Version ---
-VERSION = "3.4.0"
+VERSION = "3.4.1"
 
 # --- Paths ---
 
@@ -417,7 +417,7 @@ def convert_csv_to_sqlite(csv_filepath, db_filepath):
     """
     try:
         # Read CSV with pandas (handles encoding, delimiters automatically)
-        df = pd.read_csv(csv_filepath)
+        df = pd.read_csv(csv_filepath, encoding_errors='replace')
 
         # Sanitize column names (remove special chars, spaces)
         df.columns = [re.sub(r'[^\w]', '_', col) for col in df.columns]

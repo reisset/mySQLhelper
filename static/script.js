@@ -1013,15 +1013,22 @@ function appendResultsTable(queryResults, container, sqlQuery = '') {
         search: { placeholder: 'Filter results...' },
         sort: { multiColumn: true },
         resizable: false,
-        fixedHeader: true,
         style: {
             table: { 'white-space': 'nowrap', 'font-size': '0.85rem', 'table-layout': 'auto', 'width': '100%' },
-            th: { 'background-color': 'var(--background-lighter)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)', 'position': 'sticky', 'top': '0' },
+            th: { 'background-color': 'var(--background-lighter)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
             td: { 'background-color': 'var(--background-light)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
             footer: { 'background-color': 'var(--card)' }
         },
         className: { table: 'custom-grid-table', th: 'custom-grid-th', td: 'custom-grid-td', container: 'custom-grid-container' }
     }).render(tableWrapper);
+
+    // Reset scroll on pagination to prevent sticky header clipping
+    tableWrapper.addEventListener('click', (e) => {
+        if (e.target.closest('.gridjs-pagination button')) {
+            const wrapper = tableWrapper.querySelector('.gridjs-wrapper');
+            if (wrapper) wrapper.scrollTop = 0;
+        }
+    });
 }
 
 // --- Chart Visualization ---

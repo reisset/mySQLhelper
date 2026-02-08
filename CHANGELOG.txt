@@ -1,5 +1,11 @@
 CHANGELOG
 
+### v3.4.1 - Table Header Fix + CSV Encoding (Feb 2026)
+
+#### Fixes
+- **Sticky Header Clipping:** Fixed table column headers clipping through content above when scrolling within paginated Grid.js tables. Removed redundant `fixedHeader` and inline sticky styles that conflicted with CSS rules. Added scroll-to-top reset on pagination to prevent stale scroll state.
+- **CSV Encoding:** Non-UTF8 CSV files (Windows-1252, Latin-1, etc.) now import gracefully instead of failing silently.
+
 ### v3.4.0 - Chart Visualization + Schema ER Diagram (Feb 2026)
 
 #### Features
