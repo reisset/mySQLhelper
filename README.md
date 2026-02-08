@@ -4,21 +4,20 @@
 
 **Connect SQLite databases to a local LLM. Ask questions in plain English, get SQL queries and results.**
 
-Built for offline forensic analysis on a single workstation.
+Built for offline analysis on a single workstation.
 
 [![Version](https://img.shields.io/badge/version-3.4.1-00c896?style=for-the-badge&labelColor=0a0a0c)](https://github.com/reisset/yourSQLfriend/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=for-the-badge&labelColor=0a0a0c)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?style=for-the-badge&logo=python&logoColor=white&labelColor=0a0a0c)](https://python.org)
 [![Flask](https://img.shields.io/badge/flask-3.x-green?style=for-the-badge&labelColor=0a0a0c)](https://flask.palletsprojects.com)
 
-https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
+<img width="1707" height="1391" alt="yoursqlfriend" src="https://github.com/user-attachments/assets/9e0816cc-a047-46fb-9ba5-f5b4f35c5a6c" />
 
 </div>
 
 ---
 
 ## ✨ Features
-
 | | |
 |---|---|
 | 🔒 **100% Offline** | Runs on a local LLM via Ollama or LM Studio. Zero telemetry, air-gap safe |
@@ -30,12 +29,14 @@ https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 | 📋 **Interactive Tables** | Sort, filter, paginate results with dark/light theme |
 | 💾 **Export Sessions** | Save your entire chat session as a formatted HTML file |
 | 🖥️ **Install as App** | PWA support — install as a standalone desktop app from Chrome/Edge/Brave |
+> The Flask server must be running for the app to work. Use `./run.sh` to start it.
+                        
 
 ---
 
 ## 🚀 Quick Start
 
-### Linux / macOS
+### Linux 
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/reisset/yourSQLfriend/main/install.sh | sh
@@ -86,15 +87,10 @@ ollama serve
 2. Load a model
 3. Start local server on port 1234
 
-> **Recommended models:** Ministral-3:7b or 14b, devstral-small-2:24b, GLM 4.6v flash, GLM 4.7 (30b).
+> **Fair Warning:** The system prompt required to get better SQL query results is token-heavy. For optimal usage, a ~16 000 tokens context window is MINIMUM, and ~32 000 or more is highly recommended.
+ 
+> **Recommended models:** Smallest => Qwen3:4B | Mid-Size => Qwen3:8B | Large => Ministral-3:14B OR Qwen3:14B | Largest => Qwen3-coder:30B
 
----
-
-## 📱 Install as Desktop App
-
-With the app running in Chrome, Edge, or Brave, click the **install icon** in the address bar. This gives you its own window, a desktop icon, and full browser rendering quality.
-
-> The Flask server must be running for the app to work. Use `./run.sh` to start it.
 
 ---
 
