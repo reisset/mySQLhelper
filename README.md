@@ -17,23 +17,23 @@ https://github.com/user-attachments/assets/26c8eaf8-cd35-4c20-9427-a87385680cce
 
 ---
 
-## Features
+## ✨ Features
 
 | | |
 |---|---|
-| **100% Offline** | Runs on a local LLM via Ollama or LM Studio. Zero telemetry, air-gap safe |
-| **Natural Language** | Ask "show me the top 5 customers" and get results + the exact SQL query |
-| **Search All Tables** | Find a value across your entire database in one click |
-| **Forensic Functions** | Built-in timestamp converters, Base64/Hex decode, pattern extractors |
-| **Chart Visualization** | One-click bar, line, pie, or scatter charts on any query result |
-| **Schema Diagram** | Interactive ER diagram with drag, zoom, pan, and click-to-highlight |
-| **Interactive Tables** | Sort, filter, paginate results with dark/light theme |
-| **Export Sessions** | Save your entire chat session as a formatted HTML file |
-| **Install as App** | PWA support — install as a standalone desktop app from Chrome/Edge/Brave |
+| 🔒 **100% Offline** | Runs on a local LLM via Ollama or LM Studio. Zero telemetry, air-gap safe |
+| 💬 **Natural Language** | Ask "show me the top 5 customers" and get results + the exact SQL query |
+| 🔍 **Search All Tables** | Find a value across your entire database in one click |
+| 🧪 **Forensic Functions** | Built-in timestamp converters, Base64/Hex decode, pattern extractors |
+| 📊 **Chart Visualization** | One-click bar, line, pie, or scatter charts on any query result |
+| 🗺️ **Schema Diagram** | Interactive ER diagram with drag, zoom, pan, and click-to-highlight |
+| 📋 **Interactive Tables** | Sort, filter, paginate results with dark/light theme |
+| 💾 **Export Sessions** | Save your entire chat session as a formatted HTML file |
+| 🖥️ **Install as App** | PWA support — install as a standalone desktop app from Chrome/Edge/Brave |
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Linux / macOS
 
@@ -69,7 +69,7 @@ Custom port: `./run.sh 8080` or `run.bat 8080`
 
 ---
 
-## LLM Setup
+## 🤖 LLM Setup
 
 yourSQLfriend requires a local LLM. Set one up before you start:
 
@@ -90,7 +90,7 @@ ollama serve
 
 ---
 
-## Install as Desktop App
+## 📱 Install as Desktop App
 
 With the app running in Chrome, Edge, or Brave, click the **install icon** in the address bar. This gives you its own window, a desktop icon, and full browser rendering quality.
 
@@ -98,7 +98,7 @@ With the app running in Chrome, Edge, or Brave, click the **install icon** in th
 
 ---
 
-## Forensic Integrity
+## 🛡️ Forensic Integrity
 
 | | |
 |---|---|
@@ -111,7 +111,7 @@ With the app running in Chrome, Edge, or Brave, click the **install icon** in th
 
 ---
 
-## Data Storage
+## 📂 Data Storage
 
 All data lives in your home directory:
 
@@ -124,7 +124,7 @@ Contains `uploads/`, `logs/`, and `sessions/`.
 
 ---
 
-## Tech Stack
+## 🧰 Tech Stack
 
 Flask, Vanilla JS, CSS, HTML, SQLite, PWA, local LLM (OpenAI-compatible API)
 
