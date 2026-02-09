@@ -33,6 +33,7 @@
     --primary-dark: #d08820;
     --primary-glow: rgba(240, 160, 48, 0.15);
     --primary-glow-strong: rgba(240, 160, 48, 0.3);
+    --shimmer-highlight: rgba(255, 255, 255, 0.55);
 
     /* Data Highlight - Cyan */
     --accent: #40d0d0;
@@ -80,6 +81,7 @@
     --primary-dark: #8a5000;
     --primary-glow: rgba(176, 104, 0, 0.15);
     --primary-glow-strong: rgba(176, 104, 0, 0.28);
+    --shimmer-highlight: rgba(255, 255, 255, 0.7);
 
     --accent: #006868;
     --accent-dark: #004848;
@@ -1000,25 +1002,53 @@ body::before {
     font-weight: 500;
     letter-spacing: 0.03em;
     line-height: 1.65;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     background: linear-gradient(
         90deg,
-        var(--foreground-muted) 0%,
-        var(--foreground-muted) 35%,
-        var(--primary) 50%,
-        var(--foreground-muted) 65%,
-        var(--foreground-muted) 100%
+        var(--primary) 0%,
+        var(--primary) 35%,
+        var(--shimmer-highlight) 50%,
+        var(--primary) 65%,
+        var(--primary) 100%
     );
     background-size: 250% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: shimmer 2s ease-in-out infinite;
+    animation: shimmer var(--shimmer-duration, 2s) ease-in-out infinite;
     opacity: 1;
     transition: opacity 0.25s ease;
 }
 
 .status-shimmer.fade-out {
     opacity: 0;
+}
+
+.shimmer-icon {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 1em;
+    height: 1em;
+    animation: iconPulseRotate 3s ease-in-out infinite;
+    -webkit-text-fill-color: initial;
+}
+
+.shimmer-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    stroke: var(--primary);
+    fill: none;
+}
+
+@keyframes iconPulseRotate {
+    0%   { transform: scale(1) rotate(0deg); opacity: 0.85; }
+    25%  { transform: scale(1.1) rotate(-8deg); opacity: 1; }
+    50%  { transform: scale(1) rotate(0deg); opacity: 0.85; }
+    75%  { transform: scale(1.05) rotate(5deg); opacity: 0.95; }
+    100% { transform: scale(1) rotate(0deg); opacity: 0.85; }
 }
 
 @keyframes shimmer {

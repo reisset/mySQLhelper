@@ -681,7 +681,16 @@ async function sendMessage() {
 
     const statusEl = document.createElement('p');
     statusEl.className = 'status-shimmer';
-    statusEl.textContent = statusMessages[0];
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'shimmer-icon';
+    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = statusMessages[0];
+
+    statusEl.appendChild(iconSpan);
+    statusEl.appendChild(textSpan);
     statusBar.innerHTML = '';
     statusBar.appendChild(statusEl);
     statusBar.classList.add('active');
@@ -689,7 +698,9 @@ async function sendMessage() {
 
     const shimmerInterval = setInterval(() => {
         statusIndex = (statusIndex + 1) % statusMessages.length;
-        statusEl.textContent = statusMessages[statusIndex];
+        textSpan.textContent = statusMessages[statusIndex];
+        const duration = 1.8 + Math.random() * 0.7;
+        statusEl.style.setProperty('--shimmer-duration', duration.toFixed(2) + 's');
     }, 3500);
 
     // Bot message container (created now but empty until streaming)
