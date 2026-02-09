@@ -7,7 +7,7 @@ set PORT=%1
 if "%PORT%"=="" set PORT=5000
 
 echo ===================================
-echo   yourSQLfriend v3.4.1
+echo   yourSQLfriend v3.4.3
 echo ===================================
 echo.
 

@@ -1,5 +1,10 @@
 CHANGELOG
 
+### v3.4.3 - Shimmer Status Bar (Feb 2026)
+
+#### Features
+- **Shimmer Status Bar:** Claude Code-style activity indicator above the chat input. Displays cycling status messages ("Reading schema...", "Analyzing question...", "Generating SQL...", "Preparing response...") with an amber gradient shimmer animation while the LLM streams its response. Slides in when a question is sent and collapses smoothly after the stream completes (minimum 2.5s display). Messages appear in random order each time.
+
 ### v3.4.2 - Security & Cross-Platform Bug Fixes (Feb 2026)
 
 #### Security

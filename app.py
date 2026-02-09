@@ -29,7 +29,7 @@ from flask_session import Session
 from werkzeug.utils import secure_filename
 
 # --- Version ---
-VERSION = "3.4.1"
+VERSION = "3.4.3"
 
 # --- Paths ---
 

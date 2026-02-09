@@ -11,7 +11,7 @@
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#f0a030">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.4.1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.4.3">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
 </head>
 <body>
@@ -100,6 +100,7 @@
                         </div>
                     </div>
                 </div>
+                <div id="status-bar"></div>
                 <div class="chat-input">
                     <label for="user-input" class="visually-hidden">Ask a question about your database</label>
                     <input type="text" id="user-input" placeholder="Load a database to start chatting..." disabled aria-label="Ask a question about your database">
@@ -113,7 +114,7 @@
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/chart.umd.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=3.4.1" defer></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=3.4.3" defer></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/service-worker.js', { scope: '/' })

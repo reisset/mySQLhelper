@@ -664,17 +664,38 @@ async function sendMessage() {
     sendButton.disabled = true;
     sendButton.classList.add('sending');
 
-    // Create Bot Message Container
+    // Status Bar Shimmer
+    const statusBar = document.getElementById('status-bar');
+    const statusMessages = [
+        'Reading schema\u2026',
+        'Analyzing question\u2026',
+        'Generating SQL\u2026',
+        'Preparing response\u2026'
+    ];
+    // Shuffle messages so the starting message varies each time
+    for (let i = statusMessages.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [statusMessages[i], statusMessages[j]] = [statusMessages[j], statusMessages[i]];
+    }
+    let statusIndex = 0;
+
+    const statusEl = document.createElement('p');
+    statusEl.className = 'status-shimmer';
+    statusEl.textContent = statusMessages[0];
+    statusBar.innerHTML = '';
+    statusBar.appendChild(statusEl);
+    statusBar.classList.add('active');
+    const shimmerStart = Date.now();
+
+    const shimmerInterval = setInterval(() => {
+        statusIndex = (statusIndex + 1) % statusMessages.length;
+        statusEl.textContent = statusMessages[statusIndex];
+    }, 3500);
+
+    // Bot message container (created now but empty until streaming)
     const botMessageElement = appendMessage('', 'bot');
     const contentContainer = botMessageElement.querySelector('.content-container');
-    
-    // Thinking Indicator
-    const spinner = document.createElement('div');
-    spinner.className = 'thinking-spinner';
-    contentContainer.appendChild(spinner);
-    
     const pText = document.createElement('p');
-    pText.textContent = 'Thinking...';
     contentContainer.appendChild(pText);
 
     const controller = new AbortController();
@@ -710,9 +731,7 @@ async function sendMessage() {
             if (done) break;
 
             if (firstChunk) {
-                clearTimeout(timeoutId); // Success! Data received.
-                spinner.remove();
-                pText.textContent = '';
+                clearTimeout(timeoutId);
                 firstChunk = false;
             }
 
@@ -755,6 +774,14 @@ async function sendMessage() {
 
         // Final render
         renderText(pText, accumulatedText);
+
+        // Dismiss status bar (with minimum display time)
+        clearInterval(shimmerInterval);
+        const elapsed = Date.now() - shimmerStart;
+        const remaining = Math.max(0, 2500 - elapsed);
+        setTimeout(() => {
+            statusBar.classList.remove('active');
+        }, remaining);
 
         // Add token counter to chat bubble if usage data available
         if (tokenUsage) {
@@ -836,7 +863,8 @@ async function sendMessage() {
         pText.appendChild(errorDiv);
     } finally {
         clearTimeout(timeoutId); // Ensure cleanup
-        if (spinner && spinner.isConnected) spinner.remove(); // Force remove spinner if still present
+        clearInterval(shimmerInterval);
+        statusBar.classList.remove('active');
         userInput.disabled = false;
         sendButton.disabled = false;
         sendButton.classList.remove('sending');

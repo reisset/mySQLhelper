@@ -6,7 +6,7 @@
 
 Built for offline analysis on a single workstation.
 
-[![Version](https://img.shields.io/badge/version-3.4.1-00c896?style=for-the-badge&labelColor=0a0a0c)](https://github.com/reisset/yourSQLfriend/releases)
+[![Version](https://img.shields.io/badge/version-3.4.3-00c896?style=for-the-badge&labelColor=0a0a0c)](https://github.com/reisset/yourSQLfriend/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=for-the-badge&labelColor=0a0a0c)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?style=for-the-badge&logo=python&logoColor=white&labelColor=0a0a0c)](https://python.org)
 [![Flask](https://img.shields.io/badge/flask-3.x-green?style=for-the-badge&labelColor=0a0a0c)](https://flask.palletsprojects.com)
