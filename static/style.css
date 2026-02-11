@@ -876,7 +876,7 @@ body::before {
 /* Scroll to Bottom Button */
 .scroll-to-bottom {
     position: absolute;
-    bottom: 80px;
+    bottom: 100px;
     right: 2rem;
     z-index: 100;
     width: 36px;
