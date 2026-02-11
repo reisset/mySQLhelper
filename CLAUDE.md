@@ -20,7 +20,7 @@ python app.py --no-browser # Don't auto-open browser
 
 **Single-page Flask app** with vanilla JS frontend. No build step, no bundler, no framework. Installable as a PWA from Chrome/Edge/Brave.
 
-- `app.py` — All backend logic: routes, SQL validation, LLM streaming (SSE), UDFs, file upload handling, forensic features (hashing, audit logging, read-only enforcement)
+- `app.py` — All backend logic: routes, SQL validation, LLM streaming (SSE), file upload handling, security features (hashing, audit logging, read-only enforcement)
 - `static/script.js` — Chat UI, SQL execution, Grid.js table rendering, chart visualization, ER diagram, LLM provider management, theme toggle
 - `static/style.css` — Dark/light forensic terminal theme
 - `templates/index.html` — Jinja2 single-page template, loads vendored libs from `static/lib/`
@@ -42,7 +42,6 @@ python app.py --no-browser # Don't auto-open browser
 - **Read-only databases**: All connections use `mode=ro` + `PRAGMA query_only = ON`
 - **SQL validation** (`validate_sql()`): Strips string literals and comments first, then checks allowed statement starts (SELECT/WITH/EXPLAIN/PRAGMA) and blocks 13 forbidden keywords. Multi-statement queries rejected
 - **PRAGMA table names must be double-quoted**: `PRAGMA table_info("table_name")` — not single quotes
-- **All UDFs use `except Exception:`** — never bare `except:`
 - **Version tracked in 6 places**: `app.py` (`VERSION`), `templates/index.html` (CSS/JS cache bust `?v=` x2), `README.md` (badge), `static/service-worker.js` (`CACHE_NAME`), `run.sh`, `run.bat`
 - **User data**: stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows)
 - **Session state**: Server-side filesystem sessions — set `session.modified = True` after updates

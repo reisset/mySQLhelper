@@ -1,5 +1,15 @@
 CHANGELOG
 
+### v3.5.0 - Remove Forensic UDFs (Feb 2026)
+
+#### Removed
+- **12 forensic SQL UDFs:** Timestamp converters (`unix_to_datetime`, `webkit_to_datetime`, `ios_to_datetime`, `filetime_to_datetime`), encoding functions (`encode_base64`, `decode_base64`, `to_hex`, `decode_hex`), and pattern extractors (`extract_email`, `extract_ip`, `extract_url`, `extract_phone`). Never used in practice — dedicated tools handle these tasks better. Removes ~136 lines of dead code and the `register_custom_functions()` helper.
+- **UDF section from LLM system prompt:** Saves ~120 tokens per query by no longer listing forensic functions in the prompt sent to the LLM.
+- **Unused imports:** `base64` and `timedelta` (only used by removed UDFs).
+
+#### Fixes
+- **ASCII art on Windows:** Added `Cascadia Mono` to the welcome screen font stack before `Consolas`. Cascadia Mono ships with Windows 10 1903+ and renders Unicode block characters at consistent monospace widths, fixing the crooked "y"/"d" on machines without JetBrains Mono or Fira Code.
+
 ### v3.4.3 - Shimmer Status Bar (Feb 2026)
 
 #### Features
@@ -89,7 +99,7 @@ Key milestones from the pre-PWA era:
 - **v2.5** — Dual LLM provider support (LM Studio + Ollama) with status polling, dynamic model selection, XSS prevention in exports and search
 - **v2.4** — Custom confirmation/alert modals with focus management
 - **v2.2** — Digital Forensics Terminal theme (JetBrains Mono, amber/cyan palette, scan-line effects, slide-in animations)
-- **v2.0** — Dark/light theme toggle, Search All Tables, 12 forensic SQL functions (timestamp converters, base64/hex encode-decode, pattern extractors), multi-column sorting
+- **v2.0** — Dark/light theme toggle, Search All Tables, 12 forensic SQL functions (removed in v3.5.0), multi-column sorting
 - **v1.7** — CTE (WITH clause) support, EXPLAIN/PRAGMA support, database-level read-only enforcement (`mode=ro` + `query_only`)
 - **v1.6** — Grid.js interactive tables, forensic annotations on messages, syntax highlighting
 - **v1.5** — Drag-and-drop file upload, persistent welcome banner

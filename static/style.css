@@ -604,7 +604,7 @@ body::before {
 }
 
 #welcome-screen pre {
-    font-family: var(--font-mono);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Mono', 'Consolas', monospace;
     font-size: 0.55em;
     line-height: 1.1;
     white-space: pre;

@@ -15,7 +15,7 @@ if [ -f ascii.txt ] && [ "$(tput cols 2>/dev/null || echo 80)" -ge 145 ]; then
 fi
 
 echo "==================================="
-echo "  yourSQLfriend v3.4.3"
+echo "  yourSQLfriend v3.5.0"
 echo "==================================="
 echo ""
 

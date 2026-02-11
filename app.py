@@ -15,8 +15,8 @@ import socket
 import argparse
 import webbrowser
 import threading
-from datetime import datetime, timedelta
-import base64
+from datetime import datetime
+
 from html import escape as html_escape
 
 # Third-party
@@ -29,7 +29,7 @@ from flask_session import Session
 from werkzeug.utils import secure_filename
 
 # --- Version ---
-VERSION = "3.4.3"
+VERSION = "3.5.0"
 
 # --- Paths ---
 
@@ -218,142 +218,6 @@ def validate_sql(sql):
                 return False, f"Security Warning: {write_pragma} is not allowed (can modify database)."
 
     return True, None
-
-# === Custom SQL Functions (UDFs) for Forensic Analysis ===
-
-def unix_to_datetime(timestamp):
-    """Convert Unix timestamp (seconds since 1970-01-01) to ISO datetime."""
-    if timestamp is None:
-        return None
-    try:
-        return datetime.utcfromtimestamp(float(timestamp)).isoformat()
-    except Exception:
-        return None
-
-def webkit_to_datetime(timestamp):
-    """Convert WebKit timestamp (microseconds since 1601-01-01) to ISO datetime."""
-    if timestamp is None:
-        return None
-    try:
-        webkit_epoch = datetime(1601, 1, 1)
-        return (webkit_epoch + timedelta(microseconds=float(timestamp))).isoformat()
-    except Exception:
-        return None
-
-def ios_to_datetime(timestamp):
-    """Convert iOS/Mac Core Data timestamp (seconds since 2001-01-01) to ISO datetime."""
-    if timestamp is None:
-        return None
-    try:
-        ios_epoch = datetime(2001, 1, 1)
-        return (ios_epoch + timedelta(seconds=float(timestamp))).isoformat()
-    except Exception:
-        return None
-
-def filetime_to_datetime(timestamp):
-    """Convert Windows FILETIME (100ns intervals since 1601-01-01) to ISO datetime."""
-    if timestamp is None:
-        return None
-    try:
-        filetime_epoch = datetime(1601, 1, 1)
-        return (filetime_epoch + timedelta(microseconds=float(timestamp) / 10)).isoformat()
-    except Exception:
-        return None
-
-def decode_base64(text):
-    """Decode base64 encoded string to UTF-8 text."""
-    if text is None:
-        return None
-    try:
-        return base64.b64decode(text).decode('utf-8', errors='replace')
-    except Exception:
-        return None
-
-def encode_base64(text):
-    """Encode text to base64 string."""
-    if text is None:
-        return None
-    try:
-        return base64.b64encode(str(text).encode('utf-8')).decode('ascii')
-    except Exception:
-        return None
-
-def decode_hex(hex_string):
-    """Decode hex string to UTF-8 text."""
-    if hex_string is None:
-        return None
-    try:
-        return bytes.fromhex(hex_string).decode('utf-8', errors='replace')
-    except Exception:
-        return None
-
-def to_hex(text):
-    """Convert text to hexadecimal representation."""
-    if text is None:
-        return None
-    try:
-        return str(text).encode('utf-8').hex()
-    except Exception:
-        return None
-
-def extract_email(text):
-    """Extract first email address from text."""
-    if text is None:
-        return None
-    try:
-        match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', str(text))
-        return match.group(0) if match else None
-    except Exception:
-        return None
-
-def extract_ip(text):
-    """Extract first IPv4 address from text."""
-    if text is None:
-        return None
-    try:
-        match = re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', str(text))
-        return match.group(0) if match else None
-    except Exception:
-        return None
-
-def extract_url(text):
-    """Extract first URL from text."""
-    if text is None:
-        return None
-    try:
-        match = re.search(r'https?://[^\s<>"\']+', str(text))
-        return match.group(0) if match else None
-    except Exception:
-        return None
-
-def extract_phone(text):
-    """Extract first phone number (US format) from text."""
-    if text is None:
-        return None
-    try:
-        # Matches: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890
-        match = re.search(r'(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}', str(text))
-        return match.group(0) if match else None
-    except Exception:
-        return None
-
-def register_custom_functions(conn):
-    """Register all custom SQL functions with the SQLite connection."""
-    # Timestamp converters
-    conn.create_function('unix_to_datetime', 1, unix_to_datetime)
-    conn.create_function('webkit_to_datetime', 1, webkit_to_datetime)
-    conn.create_function('ios_to_datetime', 1, ios_to_datetime)
-    conn.create_function('filetime_to_datetime', 1, filetime_to_datetime)
-    # Encode/decode functions
-    conn.create_function('decode_base64', 1, decode_base64)
-    conn.create_function('encode_base64', 1, encode_base64)
-    conn.create_function('decode_hex', 1, decode_hex)
-    conn.create_function('to_hex', 1, to_hex)
-    # String extractors
-    conn.create_function('extract_email', 1, extract_email)
-    conn.create_function('extract_ip', 1, extract_ip)
-    conn.create_function('extract_url', 1, extract_url)
-    conn.create_function('extract_phone', 1, extract_phone)
 
 def calculate_file_hash(filepath):
     """
@@ -819,11 +683,6 @@ Rules:
 - For direct requests ("show me [table]", "pull [data]"), write the query immediately — no confirmation needed.
 - If genuinely ambiguous, ask one short clarifying question.
 
-Custom forensic functions (use these in SQL when relevant):
-- Timestamps: unix_to_datetime(col), webkit_to_datetime(col), ios_to_datetime(col), filetime_to_datetime(col)
-- Encoding: encode_base64(col), decode_base64(col), to_hex(col), decode_hex(col)
-- Extractors: extract_email(col), extract_ip(col), extract_url(col), extract_phone(col)
-
 Example 1 — Data retrieval:
 User: "Show me the 10 most recent entries in the logs table"
 Assistant: "I'll query the most recent 10 log entries by timestamp."
@@ -1099,7 +958,6 @@ def execute_sql():
         # Even if validation is bypassed, SQLite will reject writes
         conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
         conn.execute("PRAGMA query_only = ON")  # Extra safety layer
-        register_custom_functions(conn)  # Register forensic UDFs
 
         # Use a row factory to get dict-like access if needed, but list of dicts is fine
         conn.row_factory = sqlite3.Row
@@ -1164,7 +1022,6 @@ def execute_sql():
             cleaned_retry = corrected_sql.rstrip(';').strip()
             conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
             conn.execute("PRAGMA query_only = ON")
-            register_custom_functions(conn)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(cleaned_retry)
