@@ -678,7 +678,8 @@ body::before {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     transition: all 0.2s ease;
-    cursor: default;
+    cursor: pointer;
+    user-select: none;
 }
 
 .example-query:hover {
@@ -870,6 +871,39 @@ body::before {
     flex-direction: column;
     gap: 1.25rem;
     min-height: 0;
+}
+
+/* Scroll to Bottom Button */
+.scroll-to-bottom {
+    position: absolute;
+    bottom: 80px;
+    right: 2rem;
+    z-index: 100;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--background-light);
+    color: var(--accent);
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.scroll-to-bottom.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.scroll-to-bottom:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
+    transform: translateY(-2px);
 }
 
 /* Status Bar (sticky above chat input) */
@@ -1149,6 +1183,32 @@ body::before {
     opacity: 0.5;
 }
 
+.results-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.csv-export-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--foreground-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    transition: all 0.2s ease;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.csv-export-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
 .bot-message .results-table-container {
     margin-top: 0.75rem;
     border: 1px solid var(--border);
@@ -1321,7 +1381,7 @@ body::before {
     position: relative;
 }
 
-.chat-input input[type="text"] {
+.chat-input textarea {
     flex-grow: 1;
     padding: 0.9rem 1.15rem;
     border: 1px solid var(--border);
@@ -1330,16 +1390,21 @@ body::before {
     color: var(--foreground);
     font-family: var(--font-sans);
     font-size: 0.95rem;
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    resize: none;
+    overflow-y: hidden;
+    min-height: 44px;
+    max-height: 160px;
+    line-height: 1.5;
 }
 
-.chat-input input[type="text"]:focus {
+.chat-input textarea:focus {
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-glow), 0 0 20px var(--primary-glow);
 }
 
-.chat-input input[type="text"]::placeholder {
+.chat-input textarea::placeholder {
     color: var(--foreground-muted);
 }
 
@@ -2504,6 +2569,23 @@ input.gridjs-search-input::placeholder {
         width: 100vw;
         height: 100vh;
         border-radius: 0;
+    }
+}
+
+/* ==========================================================================
+   Reduced Motion
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    /* Remove scan-line overlay */
+    body::before {
+        display: none;
     }
 }
 

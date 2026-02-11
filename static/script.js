@@ -345,6 +345,46 @@ if (document.readyState === 'loading') {
     initModelSelector();
 }
 
+// --- Keyboard Shortcuts ---
+document.addEventListener('keydown', (e) => {
+    const active = document.activeElement;
+    const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+
+    // "/" to focus chat input (when not already typing)
+    if (e.key === '/' && !isTyping && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        userInput.focus();
+    }
+
+    // Escape to blur chat input
+    if (e.key === 'Escape' && active === userInput) {
+        userInput.blur();
+    }
+});
+
+// --- Scroll to Bottom Button ---
+const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
+if (scrollToBottomBtn && chatHistory) {
+    chatHistory.addEventListener('scroll', () => {
+        const distanceFromBottom = chatHistory.scrollHeight - chatHistory.scrollTop - chatHistory.clientHeight;
+        scrollToBottomBtn.classList.toggle('visible', distanceFromBottom > 100);
+    });
+
+    scrollToBottomBtn.addEventListener('click', () => {
+        chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
+    });
+}
+
+// --- Clickable Example Queries ---
+document.querySelectorAll('.example-query').forEach(el => {
+    el.addEventListener('click', () => {
+        // Strip surrounding quotes from the example text
+        const text = el.textContent.replace(/^["']|["']$/g, '');
+        userInput.value = text;
+        userInput.focus();
+    });
+});
+
 // --- Database Status Management ---
 function updateDatabaseStatus(filename = null) {
     if (filename) {
@@ -362,6 +402,11 @@ function updateDatabaseStatus(filename = null) {
     }
 }
 
+// --- Chat Input History ---
+const inputHistory = [];
+let historyIndex = -1;
+let currentDraft = '';
+
 // --- Event Listeners ---
 
 
@@ -372,11 +417,53 @@ if (sendButton) {
 }
 
 if (userInput) {
-    // Use keydown instead of keypress for better WebKit2 compatibility
+    // Auto-grow textarea as content changes
+    function autoGrowTextarea() {
+        userInput.style.height = 'auto';
+        userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
+        userInput.style.overflowY = userInput.scrollHeight > 160 ? 'auto' : 'hidden';
+    }
+
+    userInput.addEventListener('input', autoGrowTextarea);
+
+    // Enter sends, Shift+Enter adds newline, Up/Down for history
     userInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
+            return;
+        }
+
+        // Up arrow: navigate backward through history (only when at first line)
+        if (e.key === 'ArrowUp' && inputHistory.length > 0) {
+            const beforeCursor = userInput.value.substring(0, userInput.selectionStart);
+            if (!beforeCursor.includes('\n')) {
+                e.preventDefault();
+                if (historyIndex === -1) {
+                    currentDraft = userInput.value;
+                    historyIndex = inputHistory.length - 1;
+                } else if (historyIndex > 0) {
+                    historyIndex--;
+                }
+                userInput.value = inputHistory[historyIndex];
+                autoGrowTextarea();
+            }
+        }
+
+        // Down arrow: navigate forward through history (only when at last line)
+        if (e.key === 'ArrowDown' && historyIndex !== -1) {
+            const afterCursor = userInput.value.substring(userInput.selectionStart);
+            if (!afterCursor.includes('\n')) {
+                e.preventDefault();
+                if (historyIndex < inputHistory.length - 1) {
+                    historyIndex++;
+                    userInput.value = inputHistory[historyIndex];
+                } else {
+                    historyIndex = -1;
+                    userInput.value = currentDraft;
+                }
+                autoGrowTextarea();
+            }
         }
     });
 }
@@ -658,8 +745,14 @@ async function sendMessage() {
         welcomeScreen.classList.add('minimized');
     }
 
+    // Save to input history
+    inputHistory.push(message);
+    historyIndex = -1;
+    currentDraft = '';
+
     appendMessage(message, 'user');
     userInput.value = '';
+    userInput.style.height = 'auto';
     userInput.disabled = true;
     sendButton.disabled = true;
     sendButton.classList.add('sending');
@@ -1026,19 +1119,34 @@ function appendResultsTable(queryResults, container, sqlQuery = '') {
     rowCountLabel.textContent = `${queryResults.length} rows returned`;
     actionsRow.appendChild(rowCountLabel);
 
+    // CSV export button
+    const actionsRight = document.createElement('div');
+    actionsRight.className = 'results-actions-right';
+
+    const csvBtn = document.createElement('button');
+    csvBtn.className = 'csv-export-btn';
+    csvBtn.textContent = 'CSV';
+    csvBtn.title = 'Download results as CSV';
+    csvBtn.setAttribute('aria-label', 'Download results as CSV');
+    csvBtn.addEventListener('click', () => {
+        downloadCSV(queryResults);
+    });
+    actionsRight.appendChild(csvBtn);
+
     if (typeof Chart !== 'undefined' && queryResults.length > 0) {
         const chartBtn = document.createElement('button');
         chartBtn.className = 'chart-toggle-btn';
         chartBtn.innerHTML = chartIconSVG() + ' Chart';
         chartBtn.title = 'Visualize as chart';
         chartBtn.setAttribute('aria-label', 'Toggle chart visualization');
-        actionsRow.appendChild(chartBtn);
+        actionsRight.appendChild(chartBtn);
 
         chartBtn.addEventListener('click', () => {
             toggleChart(queryResults, container, chartBtn);
         });
     }
 
+    actionsRow.appendChild(actionsRight);
     container.appendChild(actionsRow);
 
     const tableWrapper = document.createElement('div');
@@ -1052,7 +1160,7 @@ function appendResultsTable(queryResults, container, sqlQuery = '') {
         pagination: { limit: 10, summary: true },
         search: { placeholder: 'Filter results...' },
         sort: { multiColumn: true },
-        resizable: false,
+        resizable: true,
         style: {
             table: { 'white-space': 'nowrap', 'font-size': '0.85rem', 'table-layout': 'auto', 'width': '100%' },
             th: { 'background-color': 'var(--background-lighter)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
@@ -1069,6 +1177,41 @@ function appendResultsTable(queryResults, container, sqlQuery = '') {
             if (wrapper) wrapper.scrollTop = 0;
         }
     });
+}
+
+// --- CSV Export ---
+
+function downloadCSV(queryResults) {
+    if (!queryResults || queryResults.length === 0) return;
+
+    const columns = Object.keys(queryResults[0]);
+
+    // RFC 4180: escape fields containing commas, quotes, or newlines
+    const escapeField = (val) => {
+        if (val === null || val === undefined) return '';
+        const str = String(val);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+    };
+
+    const header = columns.map(escapeField).join(',');
+    const rows = queryResults.map(row =>
+        columns.map(col => escapeField(row[col])).join(',')
+    );
+    const csv = header + '\n' + rows.join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'query_results.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    a.remove();
 }
 
 // --- Chart Visualization ---

@@ -1,5 +1,19 @@
 CHANGELOG
 
+### v3.6.0 - UX Improvements (Feb 2026)
+
+#### Features
+- **Clickable example queries:** Welcome screen examples now populate the chat input on click instead of being static text.
+- **CSV export:** "CSV" download button on every query result table for exporting data directly.
+- **Auto-growing textarea:** Chat input upgraded from single-line input to a textarea that grows up to 6 lines. Shift+Enter inserts newlines, Enter sends.
+- **Chat input history:** Up/Down arrow keys recall previously sent messages, terminal-style.
+- **Scroll-to-bottom button:** Floating "↓" button appears when scrolled up in chat, click to jump to latest message.
+- **Table column resizing:** Grid.js result table columns are now resizable by dragging column borders.
+- **Keyboard shortcuts:** Press `/` to focus the chat input from anywhere, `Escape` to blur it.
+
+#### Accessibility
+- **`prefers-reduced-motion` support:** All animations and transitions are disabled for users with reduced motion preferences. Scan-line overlay is also hidden.
+
 ### v3.5.0 - Remove Forensic UDFs (Feb 2026)
 
 #### Removed
