@@ -598,11 +598,11 @@ def upload_file():
         return jsonify({'error': f'Upload processing failed: {str(e)}'}), 500
 
 
-def build_schema_context(db_filepath):
+def build_schema_context(db_filepath, include_samples=True):
     """Build schema context string from database file for LLM prompts.
 
-    Includes CREATE TABLE DDL, foreign key relationships, and sample data
-    to give the LLM maximum context for accurate query generation.
+    Includes CREATE TABLE DDL, foreign key relationships, and optionally
+    sample data. Set include_samples=False for error correction prompts.
     """
     if not db_filepath:
         return ""
@@ -627,19 +627,24 @@ def build_schema_context(db_filepath):
                 parts.append(f"  -- FK: {table_name}.{fk[3]} → {fk[2]}.{fk[4]}")
             parts.append("")
 
-        # Sample data (3 rows)
-        try:
-            cursor.execute(f'SELECT * FROM "{table_name}" LIMIT 3;')
-            rows = cursor.fetchall()
-            if rows:
-                col_names = [desc[0] for desc in cursor.description]
-                parts.append(f"Sample data from {table_name}:")
-                parts.append(f"  Columns: {', '.join(col_names)}")
-                for row in rows:
-                    parts.append(f"  {row}")
-                parts.append("")
-        except sqlite3.Error:
-            pass
+        # Sample data (3 rows, compact pipe-delimited format)
+        if include_samples:
+            try:
+                cursor.execute(f'SELECT * FROM "{table_name}" LIMIT 3;')
+                rows = cursor.fetchall()
+                if rows:
+                    col_names = [desc[0] for desc in cursor.description]
+                    parts.append(f"-- {table_name} sample ({' | '.join(col_names)}):")
+                    for row in rows:
+                        parts.append('|'.join(
+                            str(v)[:50] + '...' if v is not None and len(str(v)) > 50
+                            else 'NULL' if v is None
+                            else str(v)
+                            for v in row
+                        ))
+                    parts.append("")
+            except sqlite3.Error:
+                pass
 
     conn.close()
     return '\n'.join(parts)
@@ -674,14 +679,14 @@ Output ONLY the corrected SQL query in a ```sql code block. No explanation neede
 
 def build_system_prompt(schema_context):
     """Build the system prompt with schema context and few-shot examples."""
-    return f"""You are a SQLite expert assisting a forensic analyst. This is a READ-ONLY environment — never output INSERT, UPDATE, DELETE, DROP, or any modification commands.
+    return f"""You are a SQLite expert assisting a forensic analyst. READ-ONLY environment — never output INSERT, UPDATE, DELETE, DROP, or any modification commands.
 
 Rules:
-- If the question can be answered from the schema alone (structure, relationships, column descriptions), respond in plain language. Do NOT generate SQL.
-- If the question requires retrieving or analyzing actual data, briefly explain your approach (1-2 sentences), then output exactly ONE SQL query in a ```sql code block.
-- Use only tables and columns that exist in the schema below. SQLite syntax only.
-- For direct requests ("show me [table]", "pull [data]"), write the query immediately — no confirmation needed.
-- If genuinely ambiguous, ask one short clarifying question.
+- Schema-only questions (structure, relationships): respond in plain text, no SQL.
+- Data questions: brief explanation (1-2 sentences), then exactly ONE ```sql block. SQLite syntax only.
+- Use only tables/columns from the schema below.
+- Direct requests ("show me X"): write the query immediately, no confirmation.
+- If ambiguous, ask one clarifying question.
 
 Example 1 — Data retrieval:
 User: "Show me the 10 most recent entries in the logs table"
@@ -690,13 +695,9 @@ Assistant: "I'll query the most recent 10 log entries by timestamp."
 SELECT * FROM logs ORDER BY timestamp DESC LIMIT 10;
 ```
 
-Example 2 — Structural/conversational question:
-User: "How are the tables in this database related?"
-Assistant: "Based on the schema, here are the relationships:
-- **orders** links to **customers** via CustomerId (foreign key)
-- **order_items** links to **orders** via OrderId
-- **order_items** links to **products** via ProductId
-These form a standard e-commerce data model."
+Example 2 — Structural question:
+User: "How are the tables related?"
+Assistant: "Based on the schema, **orders** links to **customers** via CustomerId, and **order_items** connects to both **orders** and **products** via foreign keys."
 
 {schema_context}"""
 
@@ -883,9 +884,14 @@ def chat_stream():
         "id": str(uuid.uuid4())
     })
 
-    # Build messages for LLM
+    # Build messages for LLM (strip metadata, cap history length)
+    MAX_HISTORY_MESSAGES = 20
     system_prompt = build_system_prompt(schema_context)
-    messages_to_send = [{"role": "system", "content": system_prompt}] + chat_history
+    recent_history = chat_history[-MAX_HISTORY_MESSAGES:]
+    messages_to_send = [{"role": "system", "content": system_prompt}] + [
+        {"role": msg["role"], "content": msg["content"]}
+        for msg in recent_history
+    ]
     logger.info(f"Messages to send count: {len(messages_to_send)}")
 
     # Stream based on provider
@@ -993,7 +999,7 @@ def execute_sql():
 
         # Attempt auto-correction via LLM (max 1 retry)
         try:
-            schema_context = build_schema_context(db_filepath)
+            schema_context = build_schema_context(db_filepath, include_samples=False)
             correction_prompt = build_error_correction_prompt(str(e), sql_query, schema_context)
 
             provider = session.get('llm_provider', LLM_PROVIDER)

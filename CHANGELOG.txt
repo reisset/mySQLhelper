@@ -1,5 +1,13 @@
 CHANGELOG
 
+### v3.6.1 - LLM Prompt Optimization (Feb 2026)
+
+#### Optimized
+- **Compact schema sample data:** Sample rows now use pipe-delimited format instead of verbose Python tuples. Long text values truncated at 50 characters.
+- **Tighter system prompt:** Compressed instruction rules and few-shot examples to reduce token overhead on every request.
+- **Lightweight error correction:** Auto-retry prompts now send schema DDL + foreign keys only, skipping sample data that isn't needed for fixing SQL errors.
+- **Chat history cleanup:** Only `role` and `content` fields are sent to the LLM — metadata like query result previews, UUIDs, and token usage stats are stripped. History capped at 20 messages to prevent unbounded context growth.
+
 ### v3.6.0 - UX Improvements (Feb 2026)
 
 #### Features
