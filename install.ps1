@@ -1,78 +1,98 @@
 # yourSQLfriend installer for Windows
 # Usage: irm https://raw.githubusercontent.com/reisset/yourSQLfriend/main/install.ps1 | iex
-#
-# Environment variables:
-#   INSTALL_DIR  - Installation directory (default: $HOME\yourSQLfriend)
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "reisset/yourSQLfriend"
-$Branch = "main"
-$ArchiveUrl = "https://github.com/$Repo/archive/refs/heads/$Branch.zip"
-$InstallDir = if ($env:INSTALL_DIR) { $env:INSTALL_DIR } else { Join-Path $HOME "yourSQLfriend" }
+$Package = "yoursqlfriend"
+$MinPythonMajor = 3
+$MinPythonMinor = 10
 
-# --- Prerequisite checks ---
-Write-Host "==> Checking prerequisites..." -ForegroundColor Green
+# --- Find Python 3.10+ ---
+Write-Host "==> Checking for Python ${MinPythonMajor}.${MinPythonMinor}+..." -ForegroundColor Green
 
-# Python 3
 $Python = $null
-try {
-    $ver = & python3 --version 2>&1
-    if ($ver -match "Python 3") { $Python = "python3" }
-} catch {}
-
-if (-not $Python) {
+foreach ($cmd in @("python3", "python", "py")) {
     try {
-        $ver = & python --version 2>&1
-        if ($ver -match "Python 3") { $Python = "python" }
+        $ver = & $cmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>&1
+        if ($ver -match "^(\d+)\.(\d+)$") {
+            $major = [int]$Matches[1]
+            $minor = [int]$Matches[2]
+            if ($major -eq $MinPythonMajor -and $minor -ge $MinPythonMinor) {
+                $Python = $cmd
+                break
+            }
+        }
     } catch {}
 }
 
 if (-not $Python) {
-    Write-Host "Error: Python 3 is required. Install from https://python.org" -ForegroundColor Red
+    Write-Host "Error: Python ${MinPythonMajor}.${MinPythonMinor}+ is required." -ForegroundColor Red
+    Write-Host "  Install from https://python.org or via:"
+    Write-Host "    winget install Python.Python.3.12"
     exit 1
 }
 
-# Python version check (3.10+)
-$pyMinor = & $Python -c "import sys; print(sys.version_info.minor)" 2>&1
-if ([int]$pyMinor -lt 10) {
-    Write-Host "Error: Python 3.10+ is required (found $(& $Python --version 2>&1))" -ForegroundColor Red
-    exit 1
-}
 Write-Host "==> Found $(& $Python --version 2>&1)" -ForegroundColor Green
 
-# --- Handle existing installation ---
-if (Test-Path $InstallDir) {
-    Write-Host "Warning: Directory already exists: $InstallDir" -ForegroundColor Yellow
-    if (Test-Path (Join-Path $InstallDir "app.py")) {
-        Write-Host ""
-        Write-Host "  To update, remove the directory first:" -ForegroundColor Yellow
-        Write-Host "    Remove-Item -Recurse -Force '$InstallDir'"
-        Write-Host "  Then re-run this installer."
-        Write-Host ""
+# --- Install pipx if needed ---
+$pipxAvailable = $false
+try { pipx --version 2>&1 | Out-Null; $pipxAvailable = $true } catch {}
+
+if (-not $pipxAvailable) {
+    Write-Host "==> Installing pipx..." -ForegroundColor Green
+
+    try {
+        & $Python -m pip install --user pipx 2>&1 | Out-Null
+        & $Python -m pipx ensurepath 2>&1 | Out-Null
+    } catch {
+        Write-Host "Error: Could not install pipx." -ForegroundColor Red
+        Write-Host "  Install manually: https://pipx.pypa.io/stable/installation/"
+        exit 1
     }
-    exit 1
+
+    # Refresh PATH for this session
+    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH
+
+    # Verify pipx is available
+    try { pipx --version 2>&1 | Out-Null; $pipxAvailable = $true } catch {}
+
+    if (-not $pipxAvailable) {
+        try {
+            & $Python -m pipx --version 2>&1 | Out-Null
+            # Use module form for install
+            Write-Host "==> Installing $Package..." -ForegroundColor Green
+            & $Python -m pipx install $Package
+            Write-Host ""
+            Write-Host "============================================" -ForegroundColor Green
+            Write-Host "  yourSQLfriend installed successfully!     " -ForegroundColor Green
+            Write-Host "============================================" -ForegroundColor Green
+            Write-Host ""
+            Write-Host "  Close and reopen your terminal, then type:"
+            Write-Host "    yoursqlfriend" -ForegroundColor White
+            exit 0
+        } catch {
+            Write-Host "Error: pipx installed but not available." -ForegroundColor Red
+            Write-Host "  Close and reopen your terminal, then run:"
+            Write-Host "    pipx install $Package"
+            exit 1
+        }
+    }
 }
 
-# --- Download and extract ---
-Write-Host "==> Downloading yourSQLfriend..." -ForegroundColor Green
+Write-Host "==> Using pipx $(pipx --version 2>&1)" -ForegroundColor Green
 
-$TmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "yourSQLfriend-install-$(Get-Random)"
-New-Item -ItemType Directory -Path $TmpDir -Force | Out-Null
+# --- Install yoursqlfriend ---
+Write-Host "==> Installing $Package..." -ForegroundColor Green
 
 try {
-    $Archive = Join-Path $TmpDir "yourSQLfriend.zip"
-
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -Uri $ArchiveUrl -OutFile $Archive -UseBasicParsing
-
-    Write-Host "==> Extracting to $InstallDir..." -ForegroundColor Green
-    Expand-Archive -Path $Archive -DestinationPath $TmpDir -Force
-
-    $ExtractedDir = Join-Path $TmpDir "yourSQLfriend-$Branch"
-    Move-Item -Path $ExtractedDir -Destination $InstallDir
-} finally {
-    Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
+    pipx install $Package 2>&1
+} catch {
+    try {
+        pipx upgrade $Package 2>&1
+    } catch {
+        Write-Host "Error: Failed to install $Package" -ForegroundColor Red
+        exit 1
+    }
 }
 
 # --- Success ---
@@ -81,14 +101,13 @@ Write-Host "============================================" -ForegroundColor Green
 Write-Host "  yourSQLfriend installed successfully!     " -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  To get started:"
+Write-Host "  Type 'yoursqlfriend' to launch the app."
 Write-Host ""
-Write-Host "    cd $InstallDir" -ForegroundColor White
-Write-Host "    .\run.bat" -ForegroundColor White
-Write-Host ""
-Write-Host "  This will set up a Python venv, install"
-Write-Host "  dependencies, and open the app in your browser."
+Write-Host "  Options:"
+Write-Host "    yoursqlfriend                    # default (port 5000)"
+Write-Host "    yoursqlfriend --port 8080        # custom port"
+Write-Host "    yoursqlfriend --no-browser       # don't auto-open browser"
 Write-Host ""
 Write-Host "  You also need a local LLM running (Ollama or LM Studio)."
-Write-Host "  See: https://github.com/$Repo#llm-setup"
+Write-Host "  See: https://github.com/reisset/yourSQLfriend#llm-setup"
 Write-Host ""

@@ -14,6 +14,9 @@ instance/
 # Build artifacts
 build/
 dist/
+*.egg-info/
+*.egg
+*.whl
 
 # Project Specific
 flask_session/

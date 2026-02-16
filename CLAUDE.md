@@ -5,29 +5,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running the App
 
 ```bash
-# Launcher script (recommended — handles venv + deps + browser open)
-./run.sh                   # Linux/macOS
-run.bat                    # Windows
+# End users (installed via pipx)
+yoursqlfriend                   # Launch on default port 5000
+yoursqlfriend --port 8080       # Custom port
+yoursqlfriend --no-browser      # Don't auto-open browser
+
+# Developer (from git clone)
+./run.sh                        # Linux/macOS
+run.bat                         # Windows
 
 # Or manually
 source venv/bin/activate
-python app.py              # Auto-opens browser at http://127.0.0.1:5000
-python app.py --port 8080  # Custom port
-python app.py --no-browser # Don't auto-open browser
+pip install -e .
+python -m yoursqlfriend.app
 ```
 
 ## Architecture
 
-**Single-page Flask app** with vanilla JS frontend. No build step, no bundler, no framework. Installable as a PWA from Chrome/Edge/Brave.
+**Single-page Flask app** with vanilla JS frontend. No build step, no bundler, no framework. Installable as a PWA from Chrome/Edge/Brave. Distributed via PyPI (`pipx install yoursqlfriend`).
 
-- `app.py` — All backend logic: routes, SQL validation, LLM streaming (SSE), file upload handling, security features (hashing, audit logging, read-only enforcement)
-- `static/js/` — ES modules: `app.js` (entry), `state.js`, `ui.js`, `chat.js`, `sql.js`, `charts.js`, `upload.js`, `providers.js`, `search.js`, `notes.js`, `erdiagram.js`
-- `static/style.css` — Dark/light forensic terminal theme
-- `templates/index.html` — Jinja2 single-page template, loads vendored libs from `static/lib/`
-- `static/manifest.json` — PWA manifest (standalone display, app icons)
-- `static/service-worker.js` — Service worker for PWA installability + static asset caching
-- `run.sh` / `run.bat` — Launcher scripts (venv setup, dep install, app launch)
-- `install.sh` — One-line curl installer for Linux/macOS (no git required)
+- `src/yoursqlfriend/app.py` — All backend logic: routes, SQL validation, LLM streaming (SSE), file upload handling, security features (hashing, audit logging, read-only enforcement)
+- `src/yoursqlfriend/static/js/` — ES modules: `app.js` (entry), `state.js`, `ui.js`, `chat.js`, `sql.js`, `charts.js`, `upload.js`, `providers.js`, `search.js`, `notes.js`, `erdiagram.js`
+- `src/yoursqlfriend/static/style.css` — Dark/light forensic terminal theme
+- `src/yoursqlfriend/templates/index.html` — Jinja2 single-page template, loads vendored libs from `static/lib/`
+- `src/yoursqlfriend/static/manifest.json` — PWA manifest (standalone display, app icons)
+- `src/yoursqlfriend/static/service-worker.js` — Service worker for PWA installability + static asset caching
+- `pyproject.toml` — Package metadata, dependencies, entry point
+- `run.sh` / `run.bat` — Dev launcher scripts (venv setup, editable install, app launch)
+- `install.sh` / `install.ps1` — One-line installers (pipx-based, no git required)
 
 ### Request Flow
 
@@ -42,7 +47,7 @@ python app.py --no-browser # Don't auto-open browser
 - **Read-only databases**: All connections use `mode=ro` + `PRAGMA query_only = ON`
 - **SQL validation** (`validate_sql()`): Strips string literals and comments first, then checks allowed statement starts (SELECT/WITH/EXPLAIN/PRAGMA) and blocks 13 forbidden keywords. Multi-statement queries rejected
 - **PRAGMA table names must be double-quoted**: `PRAGMA table_info("table_name")` — not single quotes
-- **Version**: `app.py` `VERSION` is the single source of truth. Template cache-bust `?v=` and service worker `CACHE_NAME` are injected automatically. Only update `app.py` and `CHANGELOG.txt` on release.
+- **Version**: `src/yoursqlfriend/app.py` `VERSION` is the single source of truth. On release, also update `pyproject.toml` `version`. Template cache-bust `?v=` and service worker `CACHE_NAME` are injected automatically. Update `CHANGELOG.txt` as well.
 - **User data**: stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows)
 - **Session state**: Server-side filesystem sessions — set `session.modified = True` after updates
 - **Grid.js table limit**: 2000 rows max for performance
@@ -53,14 +58,14 @@ Supports LM Studio (OpenAI-compatible API at `localhost:1234`) and Ollama (`loca
 
 ## Dependencies
 
-Python: Flask, pandas, requests, Flask-Session
+Python: Flask, pandas, requests, Flask-Session (declared in `pyproject.toml`)
 
-Frontend (vendored in `static/lib/`): Grid.js, Highlight.js, Marked.js, DOMPurify, Chart.js
+Frontend (vendored in `src/yoursqlfriend/static/lib/`): Grid.js, Highlight.js, Marked.js, DOMPurify, Chart.js
 
 ## Tests
 
 ```bash
-source venv/bin/activate
+pip install -e .
 python -m pytest tests/ -v
 ```
 

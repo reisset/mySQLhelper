@@ -1379,7 +1379,7 @@ def unhandled_exception(e):
     logger.error(f"Unhandled Exception: {e}", exc_info=True)
     return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='yourSQLfriend — SQLite forensic analysis tool')
     parser.add_argument('--port', type=int, default=5000, help='Port to run on (default: 5000)')
     parser.add_argument('--host', default='127.0.0.1', help='Host to bind to (default: 127.0.0.1)')
@@ -1395,3 +1395,6 @@ if __name__ == '__main__':
         port=args.port,
         debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     )
+
+if __name__ == '__main__':
+    main()

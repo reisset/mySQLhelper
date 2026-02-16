@@ -1,5 +1,6 @@
 #!/bin/bash
-# yourSQLfriend Launcher — Linux/macOS
+# yourSQLfriend Dev Launcher — for local development from git clone
+# End users: install via 'pipx install yoursqlfriend' instead.
 
 set -e
 
@@ -9,13 +10,13 @@ cd "$SCRIPT_DIR"
 PORT="${1:-5000}"
 
 # Display ASCII art if terminal is wide enough
-if [ -f ascii.txt ] && [ "$(tput cols 2>/dev/null || echo 80)" -ge 145 ]; then
-    cat ascii.txt
+if [ -f src/yoursqlfriend/ascii.txt ] && [ "$(tput cols 2>/dev/null || echo 80)" -ge 145 ]; then
+    cat src/yoursqlfriend/ascii.txt
     echo ""
 fi
 
 echo "==================================="
-echo "  yourSQLfriend v3.5.0"
+echo "  yourSQLfriend (dev mode)"
 echo "==================================="
 echo ""
 
@@ -41,9 +42,9 @@ fi
 # Activate venv
 source venv/bin/activate
 
-# Install/update deps (quiet if already satisfied)
+# Install in editable mode (development)
 echo "Checking dependencies..."
-pip install -q -r requirements.txt
+pip install -q -e .
 
 echo ""
 echo "Starting yourSQLfriend on http://127.0.0.1:$PORT"
@@ -52,4 +53,4 @@ echo ""
 
 # Run with auto-browser-open; clean shutdown on Ctrl+C
 trap 'echo ""; echo "Server stopped."; exit 0' INT TERM
-python app.py --port "$PORT"
+python -m yoursqlfriend.app --port "$PORT"

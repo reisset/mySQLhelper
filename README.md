@@ -36,24 +36,39 @@ Built for offline analysis on a single workstation.
 
 ## 🚀 Quick Start
 
-### Linux 
+**Prerequisite:** [Python 3.10+](https://python.org) must be installed.
+
+### Linux / macOS
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/reisset/yourSQLfriend/main/install.sh | sh
-cd ~/yourSQLfriend
-./run.sh
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
 irm https://raw.githubusercontent.com/reisset/yourSQLfriend/main/install.ps1 | iex
-cd ~\yourSQLfriend
-.\run.bat
 ```
 
+Then launch from any terminal:
+
+```
+yoursqlfriend
+```
+
+Options: `yoursqlfriend --port 8080`, `--no-browser`, `--host 0.0.0.0`
+
 <details>
-<summary><strong>With Git (alternative)</strong></summary>
+<summary><strong>Install with pipx (manual)</strong></summary>
+
+```bash
+pipx install yoursqlfriend
+```
+
+</details>
+
+<details>
+<summary><strong>From source (developers)</strong></summary>
 
 ```bash
 git clone https://github.com/reisset/yourSQLfriend.git
@@ -63,10 +78,6 @@ run.bat           # Windows
 ```
 
 </details>
-
-The launcher creates a virtual environment, installs dependencies, and opens the app in your browser.
-
-Custom port: `./run.sh 8080` or `run.bat 8080`
 
 ---
 

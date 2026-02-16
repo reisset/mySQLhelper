@@ -2,18 +2,14 @@
 # yourSQLfriend installer
 # Usage: curl -fsSL https://raw.githubusercontent.com/reisset/yourSQLfriend/main/install.sh | sh
 #
-# Environment variables:
-#   INSTALL_DIR  - Installation directory (default: $HOME/yourSQLfriend)
-#
 # Options:
-#   --update     - Remove existing installation and re-download
+#   --update     Upgrade to latest version
 
 set -e
 
-REPO="reisset/yourSQLfriend"
-BRANCH="main"
-ARCHIVE_URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.tar.gz"
-INSTALL_DIR="${INSTALL_DIR:-$HOME/yourSQLfriend}"
+PACKAGE="yoursqlfriend"
+MIN_PYTHON_MAJOR=3
+MIN_PYTHON_MINOR=10
 
 # --- Terminal colors ---
 if [ -t 1 ]; then
@@ -35,96 +31,110 @@ for arg in "$@"; do
         --help|-h)
             printf "Usage: curl -fsSL <url> | sh\n"
             printf "       curl -fsSL <url> | sh -s -- --update\n"
-            printf "\nInstalls yourSQLfriend to \$HOME/yourSQLfriend\n"
-            printf "Set INSTALL_DIR env var to change location.\n"
+            printf "\nInstalls yourSQLfriend via pipx.\n"
+            printf "Requires Python %s.%s+\n" "$MIN_PYTHON_MAJOR" "$MIN_PYTHON_MINOR"
             exit 0
             ;;
         *) warn "Unknown argument: $arg" ;;
     esac
 done
 
-# --- Prerequisite checks ---
-info "Checking prerequisites..."
+# --- Find Python 3.10+ ---
+info "Checking for Python ${MIN_PYTHON_MAJOR}.${MIN_PYTHON_MINOR}+..."
 
-# Python 3
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON=python3
-elif command -v python >/dev/null 2>&1 && python --version 2>&1 | grep -q "Python 3"; then
-    PYTHON=python
-else
-    error "Python 3 is required. Install from https://python.org"
+PYTHON=""
+for cmd in python3 python; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+        py_version=$("$cmd" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null) || continue
+        py_major=$(echo "$py_version" | cut -d. -f1)
+        py_minor=$(echo "$py_version" | cut -d. -f2)
+        if [ "$py_major" -eq "$MIN_PYTHON_MAJOR" ] && [ "$py_minor" -ge "$MIN_PYTHON_MINOR" ]; then
+            PYTHON="$cmd"
+            break
+        fi
+    fi
+done
+
+if [ -z "$PYTHON" ]; then
+    error "Python ${MIN_PYTHON_MAJOR}.${MIN_PYTHON_MINOR}+ is required but not found.
+  Install from https://python.org or your system package manager:
+    Ubuntu/Debian: sudo apt install python3
+    Fedora:        sudo dnf install python3
+    Arch:          sudo pacman -S python
+    macOS:         brew install python3"
 fi
 
-# Python version check (3.10+)
-py_minor=$($PYTHON -c "import sys; print(sys.version_info.minor)")
-if [ "$py_minor" -lt 10 ] 2>/dev/null; then
-    error "Python 3.10+ is required (found $($PYTHON --version 2>&1))"
-fi
 info "Found $($PYTHON --version 2>&1)"
 
-# Download tool
-if command -v curl >/dev/null 2>&1; then
-    DOWNLOAD="curl"
-elif command -v wget >/dev/null 2>&1; then
-    DOWNLOAD="wget"
-else
-    error "curl or wget is required but neither was found"
-fi
+# --- Install pipx if needed ---
+if ! command -v pipx >/dev/null 2>&1; then
+    info "Installing pipx..."
 
-# tar
-command -v tar >/dev/null 2>&1 || error "tar is required but not found"
-
-# --- Handle existing installation ---
-if [ -d "$INSTALL_DIR" ]; then
-    if [ "$UPDATE_MODE" = true ]; then
-        info "Removing existing installation for update..."
-        rm -rf "$INSTALL_DIR"
+    if "$PYTHON" -m pip install --user pipx 2>/dev/null; then
+        "$PYTHON" -m pipx ensurepath 2>/dev/null || true
+    elif command -v apt >/dev/null 2>&1; then
+        warn "pip install failed, trying apt..."
+        sudo apt install -y pipx 2>/dev/null || error "Could not install pipx. Install it manually: https://pipx.pypa.io/stable/installation/"
+    elif command -v dnf >/dev/null 2>&1; then
+        warn "pip install failed, trying dnf..."
+        sudo dnf install -y pipx 2>/dev/null || error "Could not install pipx. Install it manually."
+    elif command -v pacman >/dev/null 2>&1; then
+        warn "pip install failed, trying pacman..."
+        sudo pacman -S --noconfirm python-pipx 2>/dev/null || error "Could not install pipx. Install it manually."
+    elif command -v brew >/dev/null 2>&1; then
+        warn "pip install failed, trying brew..."
+        brew install pipx 2>/dev/null || error "Could not install pipx. Install it manually."
     else
-        warn "Directory already exists: $INSTALL_DIR"
-        if [ -f "$INSTALL_DIR/app.py" ]; then
-            printf "\n  To update, re-run with --update:\n"
-            printf "    curl -fsSL https://raw.githubusercontent.com/%s/main/install.sh | sh -s -- --update\n\n" "$REPO"
-            printf "  Or remove it manually:\n"
-            printf "    rm -rf %s\n\n" "$INSTALL_DIR"
+        error "Could not install pipx. Install it manually:
+  https://pipx.pypa.io/stable/installation/"
+    fi
+
+    # Add pipx bin dir to PATH for this session
+    export PATH="$HOME/.local/bin:$PATH"
+
+    if ! command -v pipx >/dev/null 2>&1; then
+        if "$PYTHON" -m pipx --version >/dev/null 2>&1; then
+            # pipx works as a module — create alias for this session
+            pipx() { "$PYTHON" -m pipx "$@"; }
+        else
+            error "pipx installed but not found on PATH.
+  Close and reopen your terminal, then run:
+    pipx install $PACKAGE"
         fi
-        exit 1
     fi
 fi
 
-# --- Download and extract ---
-info "Downloading yourSQLfriend..."
+info "Using pipx $(pipx --version 2>&1)"
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
-
-ARCHIVE="$TMPDIR/yourSQLfriend.tar.gz"
-
-if [ "$DOWNLOAD" = "curl" ]; then
-    curl -fsSL "$ARCHIVE_URL" -o "$ARCHIVE"
+# --- Install or upgrade yoursqlfriend ---
+if [ "$UPDATE_MODE" = true ]; then
+    info "Upgrading $PACKAGE..."
+    pipx upgrade "$PACKAGE" 2>/dev/null || pipx install "$PACKAGE" --force
 else
-    wget -q "$ARCHIVE_URL" -O "$ARCHIVE"
+    info "Installing $PACKAGE..."
+    pipx install "$PACKAGE" 2>/dev/null || pipx upgrade "$PACKAGE"
 fi
 
-info "Extracting to $INSTALL_DIR..."
-tar -xzf "$ARCHIVE" -C "$TMPDIR"
-mv "$TMPDIR/yourSQLfriend-${BRANCH}" "$INSTALL_DIR"
-
-chmod +x "$INSTALL_DIR/run.sh"
-
-# --- Success ---
-printf "\n"
-printf "${GREEN}============================================${NC}\n"
-printf "${GREEN}  yourSQLfriend installed successfully!     ${NC}\n"
-printf "${GREEN}============================================${NC}\n"
-printf "\n"
-printf "  To get started:\n"
-printf "\n"
-printf "    ${BOLD}cd %s${NC}\n" "$INSTALL_DIR"
-printf "    ${BOLD}./run.sh${NC}\n"
-printf "\n"
-printf "  This will set up a Python venv, install\n"
-printf "  dependencies, and open the app in your browser.\n"
-printf "\n"
-printf "  You also need a local LLM running (Ollama or LM Studio).\n"
-printf "  See: https://github.com/%s#llm-setup\n" "$REPO"
-printf "\n"
+# --- Verify installation ---
+if command -v yoursqlfriend >/dev/null 2>&1; then
+    printf "\n"
+    printf "${GREEN}============================================${NC}\n"
+    printf "${GREEN}  yourSQLfriend installed successfully!     ${NC}\n"
+    printf "${GREEN}============================================${NC}\n"
+    printf "\n"
+    printf "  Type ${BOLD}yoursqlfriend${NC} to launch the app.\n"
+    printf "\n"
+    printf "  Options:\n"
+    printf "    yoursqlfriend                    # default (port 5000)\n"
+    printf "    yoursqlfriend --port 8080        # custom port\n"
+    printf "    yoursqlfriend --no-browser       # don't auto-open browser\n"
+    printf "\n"
+    printf "  You also need a local LLM running (Ollama or LM Studio).\n"
+    printf "  See: https://github.com/reisset/yourSQLfriend#llm-setup\n"
+    printf "\n"
+else
+    warn "Installation completed but 'yoursqlfriend' not found on PATH."
+    printf "  You may need to restart your terminal or run:\n"
+    printf "    pipx ensurepath\n"
+    printf "  Then try: yoursqlfriend\n"
+fi

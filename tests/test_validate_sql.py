@@ -1,11 +1,7 @@
 # Tests for validate_sql() and strip_strings_and_comments()
 # These functions are the security boundary between user input and database execution.
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from app import validate_sql, strip_strings_and_comments
+from yoursqlfriend.app import validate_sql, strip_strings_and_comments
 
 
 # ==========================================================================

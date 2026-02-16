@@ -1,4 +1,7 @@
 @echo off
+REM yourSQLfriend Dev Launcher — for local development from git clone
+REM End users: install via 'pipx install yoursqlfriend' instead.
+
 setlocal
 
 cd /d "%~dp0"
@@ -7,7 +10,7 @@ set PORT=%1
 if "%PORT%"=="" set PORT=5000
 
 echo ===================================
-echo   yourSQLfriend v3.5.0
+echo   yourSQLfriend (dev mode)
 echo ===================================
 echo.
 
@@ -36,13 +39,13 @@ if not exist "venv" (
 REM Activate venv
 call venv\Scripts\activate.bat
 
-REM Install/update deps
+REM Install in editable mode (development)
 echo Checking dependencies...
-pip install -q -r requirements.txt
+pip install -q -e .
 
 echo.
 echo Starting yourSQLfriend on http://127.0.0.1:%PORT%
 echo Press Ctrl+C to stop
 echo.
 
-python app.py --port %PORT%
+python -m yoursqlfriend.app --port %PORT%
