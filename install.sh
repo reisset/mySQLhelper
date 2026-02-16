@@ -112,7 +112,7 @@ if [ "$UPDATE_MODE" = true ]; then
     pipx upgrade "$PACKAGE" 2>/dev/null || pipx install "$PACKAGE" --force
 else
     info "Installing $PACKAGE..."
-    pipx install "$PACKAGE" 2>/dev/null || pipx upgrade "$PACKAGE"
+    pipx install "$PACKAGE" 2>/dev/null || pipx install "$PACKAGE" --force
 fi
 
 # --- Verify installation ---

@@ -1,5 +1,16 @@
 CHANGELOG
 
+### v3.8.2 - Installer Fix (Feb 2026)
+
+#### Fixes
+- **Fixed `install.sh` fallback logic:** Normal install mode incorrectly fell back to `pipx upgrade` (which fails on fresh installs). Changed to `pipx install --force`, matching the `--update` mode behavior.
+
+#### Testing Audit
+- Full test suite: 106/106 passing.
+- Package build: sdist + wheel build verified, all 42 files present in wheel (Python modules, static assets, templates, fonts, icons, vendored libs).
+- Clean venv install: imports, entry point, SQL validation, and static file paths all verified.
+- pipx install: entry point, CLI flags, and HTTP integration tested (index, CSS/JS, service worker, manifest, vendored libs, API error handling).
+
 ### v3.8.1 - Internal Cleanup & Test Coverage (Feb 2026)
 
 #### Backend
