@@ -1,6 +1,6 @@
 // SQL execution, result table rendering, CSV export
 
-import { escapeHtml } from './ui.js';
+import { escapeHtml, downloadBlob } from './ui.js';
 import { chartIconSVG, toggleChart } from './charts.js';
 
 export async function executeSqlAndRender(fullText, contentContainer) {
@@ -176,13 +176,5 @@ function downloadCSV(queryResults) {
     const csv = header + '\n' + rows.join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'query_results.csv';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    URL.revokeObjectURL(url);
-    a.remove();
+    downloadBlob(blob, 'query_results.csv');
 }

@@ -1622,10 +1622,10 @@ input.gridjs-search-input::placeholder {
 }
 
 /* ==========================================================================
-   Search All Tables Modal
+   Shared Modal Overlay Base
    ========================================================================== */
 
-.search-modal-overlay {
+.modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -1639,6 +1639,10 @@ input.gridjs-search-input::placeholder {
     z-index: 1000;
     animation: fadeIn 0.2s ease;
 }
+
+/* ==========================================================================
+   Search All Tables Modal
+   ========================================================================== */
 
 @keyframes fadeIn {
     from { opacity: 0; }
@@ -2190,18 +2194,7 @@ input.gridjs-search-input::placeholder {
    ========================================================================== */
 
 .confirm-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
     z-index: 1001;
-    animation: fadeIn 0.2s ease;
 }
 
 .confirm-modal {
@@ -2393,18 +2386,7 @@ input.gridjs-search-input::placeholder {
    ========================================================================== */
 
 .er-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(6px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    animation: fadeIn 0.2s ease;
 }
 
 .er-modal {

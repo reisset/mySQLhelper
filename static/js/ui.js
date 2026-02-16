@@ -7,77 +7,104 @@ export function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// --- Custom Confirmation Modal ---
-export function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', cancelText = 'Cancel') {
-    const existing = document.getElementById('confirm-modal');
+// --- Modal Factory ---
+/**
+ * Create and show a modal overlay with standard close behavior.
+ * @param {string} id - Element ID for the modal overlay
+ * @param {string} overlayClass - CSS class(es) for the overlay div
+ * @param {string} contentHTML - Inner HTML for the modal
+ * @param {object} [options] - { closeSelector, onClose, focusSelector }
+ * @returns {{ modal: HTMLElement, close: Function }}
+ */
+export function createModal(id, overlayClass, contentHTML, options = {}) {
+    const existing = document.getElementById(id);
     if (existing) existing.remove();
 
     const modal = document.createElement('div');
-    modal.id = 'confirm-modal';
-    modal.className = 'confirm-modal-overlay';
-
-    const modalContent = document.createElement('div');
-    modalContent.className = 'confirm-modal';
-    modalContent.setAttribute('role', 'dialog');
-    modalContent.setAttribute('aria-modal', 'true');
-    modalContent.setAttribute('aria-labelledby', 'confirm-modal-title');
-
-    const header = document.createElement('div');
-    header.className = 'confirm-modal-header';
-    const h3 = document.createElement('h3');
-    h3.id = 'confirm-modal-title';
-    h3.textContent = title;
-    header.appendChild(h3);
-
-    const body = document.createElement('div');
-    body.className = 'confirm-modal-body';
-    const p = document.createElement('p');
-    p.textContent = message;
-    body.appendChild(p);
-
-    const footer = document.createElement('div');
-    footer.className = 'confirm-modal-footer';
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'confirm-modal-cancel';
-    cancelBtn.textContent = cancelText;
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.className = 'confirm-modal-confirm';
-    confirmBtn.textContent = confirmText;
-
-    footer.appendChild(cancelBtn);
-    footer.appendChild(confirmBtn);
-
-    modalContent.appendChild(header);
-    modalContent.appendChild(body);
-    modalContent.appendChild(footer);
-    modal.appendChild(modalContent);
+    modal.id = id;
+    modal.className = `modal-overlay ${overlayClass}`;
+    modal.innerHTML = contentHTML;
 
     document.body.appendChild(modal);
 
-    const closeModal = () => {
+    const close = () => {
         document.removeEventListener('keydown', escHandler);
         modal.remove();
+        if (options.onClose) options.onClose();
     };
 
-    cancelBtn.addEventListener('click', closeModal);
+    // Close on overlay background click
     modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
+        if (e.target === modal) close();
     });
 
-    confirmBtn.addEventListener('click', () => {
-        closeModal();
-        if (onConfirm) onConfirm();
-    });
+    // Close button (if selector provided)
+    if (options.closeSelector) {
+        const closeBtn = modal.querySelector(options.closeSelector);
+        if (closeBtn) closeBtn.addEventListener('click', close);
+    }
 
     // Escape key closes modal
     const escHandler = (e) => {
-        if (e.key === 'Escape') closeModal();
+        if (e.key === 'Escape') close();
     };
     document.addEventListener('keydown', escHandler);
 
-    // Focus trap and initial focus
+    // Focus initial element
+    if (options.focusSelector) {
+        const focusEl = modal.querySelector(options.focusSelector);
+        if (focusEl) focusEl.focus();
+    }
+
+    return { modal, close };
+}
+
+// --- Download Blob Utility ---
+export function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    a.remove();
+}
+
+// --- Custom Confirmation Modal ---
+export function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', cancelText = 'Cancel') {
+    const contentHTML = `
+        <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+            <div class="confirm-modal-header">
+                <h3 id="confirm-modal-title"></h3>
+            </div>
+            <div class="confirm-modal-body">
+                <p></p>
+            </div>
+            <div class="confirm-modal-footer">
+                <button class="confirm-modal-cancel"></button>
+                <button class="confirm-modal-confirm"></button>
+            </div>
+        </div>`;
+
+    const { modal, close } = createModal('confirm-modal', 'confirm-modal-overlay', contentHTML);
+
+    // Set text content safely (no innerHTML for user-provided strings)
+    modal.querySelector('#confirm-modal-title').textContent = title;
+    modal.querySelector('.confirm-modal-body p').textContent = message;
+    modal.querySelector('.confirm-modal-cancel').textContent = cancelText;
+    modal.querySelector('.confirm-modal-confirm').textContent = confirmText;
+
+    const cancelBtn = modal.querySelector('.confirm-modal-cancel');
+    const confirmBtn = modal.querySelector('.confirm-modal-confirm');
+
+    cancelBtn.addEventListener('click', close);
+    confirmBtn.addEventListener('click', () => {
+        close();
+        if (onConfirm) onConfirm();
+    });
+
     confirmBtn.focus();
 }
 

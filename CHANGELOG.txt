@@ -1,5 +1,24 @@
 CHANGELOG
 
+### v3.7.1 - Codebase Consolidation (Feb 2026)
+
+#### Backend
+- **Module-level constants:** Extracted `FORBIDDEN_QUERY_KEYWORDS`, `FORBIDDEN_SQL_FILE_KEYWORDS`, `MAX_UPLOAD_SIZE_BYTES`, `MAX_HISTORY_MESSAGES`, `MAX_STORED_MESSAGES`, `MAX_RESULT_ROWS` from inline definitions scattered across routes. Single source of truth for each value.
+- **SQL execution helper:** Extracted `execute_and_parse_query()` and `update_chat_history_with_results()` — the `/execute_sql` route's initial and retry paths now share the same logic instead of duplicating it.
+- **Unified LLM streaming:** Merged `stream_lmstudio_response()` and `stream_ollama_response()` into a single `stream_llm_response(messages, provider, model)`. Provider-specific config (URL, payload, timeout, JSON parsing) is handled via conditionals; shared logic (streaming loop, response accumulation, END_OF_STREAM, error handling) is written once.
+
+#### Frontend
+- **Modal factory:** Added `createModal(id, overlayClass, contentHTML, options)` to `ui.js` — handles remove-existing, overlay click, Escape key, close button, and initial focus. `showConfirmModal()`, `showSearchModal()`, and `showERDiagramModal()` refactored to use it.
+- **Download utility:** Added `downloadBlob(blob, filename)` to `ui.js`. CSV export and chat export both use it instead of duplicating the objectURL/anchor/click/revoke pattern.
+- **Chart cleanup export:** Added `destroyAllCharts()` to `charts.js`. `upload.js` imports it instead of inlining the Chart.js instance teardown.
+- **Async/await consistency:** Converted `.then()/.catch()` chains in `upload.js` (`doUpload`), `notes.js` (save handler), and `app.js` (export chat) to `async/await`.
+
+#### CSS
+- **Shared modal overlay:** Added `.modal-overlay` base class with the 10 common positioning/backdrop properties. `.confirm-modal-overlay`, `.search-modal-overlay`, and `.er-modal-overlay` reduced to overrides only.
+
+#### Fixes
+- **Service worker stale cache:** Changed fetch strategy for app CSS/JS from cache-first to network-first with cache fallback. Vendored libs, fonts, and icons remain cache-first. Prevents stale JS modules from being served after code changes within the same version, which previously caused ES module import failures that broke the entire app.
+
 ### v3.7.0 - Architecture Overhaul (Feb 2026)
 
 #### Security

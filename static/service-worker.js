@@ -50,13 +50,32 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Immutable assets: vendored libs, fonts, images — safe to cache-first
+const IMMUTABLE_PREFIXES = ['/static/lib/', '/static/fonts/', '/static/icons/', '/static/favicon.ico'];
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   if (url.pathname.startsWith('/static/')) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
-    );
+    const isImmutable = IMMUTABLE_PREFIXES.some((p) => url.pathname.startsWith(p));
+
+    if (isImmutable) {
+      // Cache-first for vendored libs, fonts, icons (never change without version bump)
+      event.respondWith(
+        caches.match(event.request).then((cached) => cached || fetch(event.request))
+      );
+    } else {
+      // Network-first for app CSS/JS (may change during development)
+      event.respondWith(
+        fetch(event.request)
+          .then((response) => {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            return response;
+          })
+          .catch(() => caches.match(event.request))
+      );
+    }
   } else {
     event.respondWith(fetch(event.request));
   }

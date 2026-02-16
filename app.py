@@ -98,6 +98,22 @@ LLM_API_URL = os.environ.get('LLM_API_URL', "http://localhost:1234/v1/chat/compl
 OLLAMA_URL = os.environ.get('OLLAMA_URL', "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.2')
 
+# --- Constants ---
+FORBIDDEN_QUERY_KEYWORDS = [
+    "DROP", "DELETE", "INSERT", "UPDATE", "ALTER",
+    "TRUNCATE", "EXEC", "GRANT", "REVOKE", "CREATE",
+    "ATTACH", "DETACH", "REPLACE", "VACUUM",
+    "SAVEPOINT", "RELEASE", "REINDEX"
+]
+FORBIDDEN_SQL_FILE_KEYWORDS = [
+    "DROP DATABASE", "DROP SCHEMA", "TRUNCATE DATABASE",
+    "ATTACH", "LOAD_EXTENSION",
+]
+MAX_UPLOAD_SIZE_BYTES = 1024 * 1024 * 1024
+MAX_HISTORY_MESSAGES = 20
+MAX_STORED_MESSAGES = 100
+MAX_RESULT_ROWS = 2000
+
 def strip_strings_and_comments(sql):
     """
     Remove string literals and comments from SQL for security analysis.
@@ -201,14 +217,8 @@ def validate_sql(sql):
     # Rule 3: Strict blocklist of modification keywords
     # Check against stripped SQL (sql_for_analysis) to avoid false positives
     # from keywords inside string literals or comments
-    forbidden_keywords = [
-        "DROP", "DELETE", "INSERT", "UPDATE", "ALTER",
-        "TRUNCATE", "EXEC", "GRANT", "REVOKE", "CREATE",
-        "ATTACH", "DETACH", "REPLACE", "VACUUM",
-        "SAVEPOINT", "RELEASE", "REINDEX"
-    ]
     sql_for_analysis_upper = sql_for_analysis.upper()
-    for keyword in forbidden_keywords:
+    for keyword in FORBIDDEN_QUERY_KEYWORDS:
         if re.search(r'\b' + keyword + r'\b', sql_for_analysis_upper):
             return False, f"Security Warning: Query contains forbidden keyword '{keyword}'."
 
@@ -239,6 +249,31 @@ def get_readonly_connection(db_filepath):
     return conn
 
 
+def execute_and_parse_query(db_filepath, sql_query):
+    """Execute a read-only SQL query and return results as list of dicts.
+
+    Strips trailing semicolons, opens a readonly connection, fetches up to
+    MAX_RESULT_ROWS rows. Returns list of dicts.
+    """
+    cleaned = sql_query.rstrip(';').strip()
+    with get_readonly_connection(db_filepath) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(cleaned)
+        results = cursor.fetchmany(MAX_RESULT_ROWS + 1)
+        return [dict(row) for row in results[:MAX_RESULT_ROWS]]
+
+
+def update_chat_history_with_results(chat_history, sql_query, results_dict):
+    """Attach SQL query and result preview to the last assistant message in history."""
+    if chat_history:
+        last_msg = chat_history[-1]
+        if last_msg['role'] == 'assistant':
+            last_msg['sql_query'] = sql_query
+            last_msg['query_results_preview'] = results_dict[:5]
+            last_msg['total_results'] = len(results_dict)
+
+
 def calculate_file_hash(filepath):
     """
     Calculate SHA256 hash of file for evidence integrity verification.
@@ -253,7 +288,7 @@ def calculate_file_hash(filepath):
             sha256.update(chunk)
     return sha256.hexdigest()
 
-def validate_upload_file(file, max_size_bytes=1024 * 1024 * 1024):
+def validate_upload_file(file, max_size_bytes=MAX_UPLOAD_SIZE_BYTES):
     """
     Validate uploaded file meets security and forensic requirements.
 
@@ -345,12 +380,8 @@ def execute_sql_file(sql_filepath, db_filepath):
             sql_content = f.read()
 
         # Security check: block destructive and dangerous operations
-        forbidden = [
-            'DROP DATABASE', 'DROP SCHEMA', 'TRUNCATE DATABASE',
-            'ATTACH', 'LOAD_EXTENSION',
-        ]
         sql_upper = sql_content.upper()
-        for keyword in forbidden:
+        for keyword in FORBIDDEN_SQL_FILE_KEYWORDS:
             if keyword in sql_upper:
                 raise ValueError(f"SQL file contains forbidden keyword: {keyword}")
         # Block trigger creation (triggers can execute arbitrary SQL on read)
@@ -512,7 +543,7 @@ def upload_file():
         return jsonify({'error': 'No selected file'}), 400
 
     # Validate file (extension, size, emptiness)
-    is_valid, error_msg, file_ext = validate_upload_file(file, max_size_bytes=1024 * 1024 * 1024)
+    is_valid, error_msg, file_ext = validate_upload_file(file)
     if not is_valid:
         logger.warning(f"File validation failed: {error_msg}")
         return jsonify({'error': error_msg}), 400
@@ -762,79 +793,45 @@ def call_llm_non_streaming(messages, provider='lmstudio', model=None):
         return ''
 
 
-def stream_lmstudio_response(messages_to_send):
-    """Stream response from LM Studio (OpenAI-compatible API)."""
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "messages": messages_to_send,
-        "mode": "chat",
-        "temperature": 0.1,
-        "stream": True,
-        "stream_options": {"include_usage": True}
-    }
+def stream_llm_response(messages_to_send, provider, model=None):
+    """Stream response from LLM provider (LM Studio or Ollama)."""
+    if provider == 'ollama':
+        url = f"{OLLAMA_URL}/api/chat"
+        payload = {
+            "model": model or OLLAMA_MODEL,
+            "messages": messages_to_send,
+            "stream": True,
+            "options": {"temperature": 0.1}
+        }
+        headers = None
+        timeout = (3.05, 120)
+        provider_label = "Ollama"
+        conn_hint = "Is Ollama running? (ollama serve)"
+    else:
+        url = LLM_API_URL
+        payload = {
+            "messages": messages_to_send,
+            "mode": "chat",
+            "temperature": 0.1,
+            "stream": True,
+            "stream_options": {"include_usage": True}
+        }
+        headers = {"Content-Type": "application/json"}
+        timeout = (3.05, 60)
+        provider_label = "LM Studio"
+        conn_hint = "Is the server running at http://localhost:1234?"
 
     full_response = ""
     token_usage = None
 
     try:
-        with requests.post(LLM_API_URL, headers=headers, json=payload, stream=True, timeout=(3.05, 60)) as r:
+        with requests.post(url, headers=headers, json=payload, stream=True, timeout=timeout) as r:
             r.raise_for_status()
             for line in r.iter_lines():
-                if line:
-                    decoded_line = line.decode('utf-8')
-                    if decoded_line.startswith('data: '):
-                        if decoded_line.strip() == 'data: [DONE]':
-                            continue
+                if not line:
+                    continue
 
-                        try:
-                            json_data = json.loads(decoded_line[6:])
-
-                            if 'usage' in json_data:
-                                token_usage = json_data['usage']
-
-                            if 'choices' in json_data and json_data['choices']:
-                                delta = json_data['choices'][0].get('delta', {})
-                                content_chunk = delta.get('content', '')
-                                if content_chunk:
-                                    full_response += content_chunk
-                                    yield content_chunk
-                        except json.JSONDecodeError:
-                            continue
-
-        if token_usage:
-            logger.info(f"LM Studio Response Complete. Tokens: {token_usage}")
-            yield f"<|END_OF_STREAM|>{full_response}<|TOKEN_USAGE|>{json.dumps(token_usage)}"
-        else:
-            logger.info("LM Studio Response Complete (No token usage data)")
-            yield f"<|END_OF_STREAM|>{full_response}"
-
-    except requests.exceptions.Timeout:
-        logger.error("LM Studio request timed out")
-        yield "Error: LM Studio request timed out. Is the server running?"
-    except requests.exceptions.ConnectionError:
-        logger.error("Cannot connect to LM Studio")
-        yield "Error: Cannot connect to LM Studio. Is the server running at http://localhost:1234?"
-    except requests.exceptions.RequestException as e:
-        logger.error(f"LM Studio Stream Error: {str(e)}")
-        yield f"LM Studio Error: {str(e)}"
-
-def stream_ollama_response(messages_to_send, model):
-    """Stream response from Ollama API."""
-    # Convert messages to Ollama format (same structure, just different endpoint)
-    ollama_payload = {
-        "model": model,
-        "messages": messages_to_send,
-        "stream": True,
-        "options": {"temperature": 0.1}
-    }
-
-    full_response = ""
-
-    try:
-        with requests.post(f"{OLLAMA_URL}/api/chat", json=ollama_payload, stream=True, timeout=(3.05, 120)) as r:
-            r.raise_for_status()
-            for line in r.iter_lines():
-                if line:
+                if provider == 'ollama':
                     try:
                         data = json.loads(line)
                         content = data.get('message', {}).get('content', '')
@@ -843,26 +840,51 @@ def stream_ollama_response(messages_to_send, model):
                             yield content
 
                         if data.get('done', False):
-                            # Build token usage from Ollama metrics
                             token_usage = {
                                 'prompt_tokens': data.get('prompt_eval_count', 0),
                                 'completion_tokens': data.get('eval_count', 0),
                                 'total_tokens': data.get('prompt_eval_count', 0) + data.get('eval_count', 0)
                             }
-                            logger.info(f"Ollama Response Complete. Tokens: {token_usage}")
-                            yield f"<|END_OF_STREAM|>{full_response}<|TOKEN_USAGE|>{json.dumps(token_usage)}"
+                    except json.JSONDecodeError:
+                        continue
+                else:
+                    decoded_line = line.decode('utf-8')
+                    if not decoded_line.startswith('data: '):
+                        continue
+                    if decoded_line.strip() == 'data: [DONE]':
+                        continue
+
+                    try:
+                        json_data = json.loads(decoded_line[6:])
+
+                        if 'usage' in json_data:
+                            token_usage = json_data['usage']
+
+                        if 'choices' in json_data and json_data['choices']:
+                            delta = json_data['choices'][0].get('delta', {})
+                            content_chunk = delta.get('content', '')
+                            if content_chunk:
+                                full_response += content_chunk
+                                yield content_chunk
                     except json.JSONDecodeError:
                         continue
 
+        if token_usage:
+            logger.info(f"{provider_label} Response Complete. Tokens: {token_usage}")
+            yield f"<|END_OF_STREAM|>{full_response}<|TOKEN_USAGE|>{json.dumps(token_usage)}"
+        else:
+            logger.info(f"{provider_label} Response Complete (No token usage data)")
+            yield f"<|END_OF_STREAM|>{full_response}"
+
     except requests.exceptions.Timeout:
-        logger.error("Ollama request timed out")
-        yield "Error: Ollama request timed out. Is Ollama running?"
+        logger.error(f"{provider_label} request timed out")
+        yield f"Error: {provider_label} request timed out. {conn_hint}"
     except requests.exceptions.ConnectionError:
-        logger.error("Cannot connect to Ollama")
-        yield "Error: Cannot connect to Ollama. Is Ollama running? (ollama serve)"
+        logger.error(f"Cannot connect to {provider_label}")
+        yield f"Error: Cannot connect to {provider_label}. {conn_hint}"
     except requests.exceptions.RequestException as e:
-        logger.error(f"Ollama Stream Error: {str(e)}")
-        yield f"Ollama Error: {str(e)}"
+        logger.error(f"{provider_label} Stream Error: {str(e)}")
+        yield f"{provider_label} Error: {str(e)}"
 
 @app.route('/chat_stream', methods=['POST'])
 def chat_stream():
@@ -918,7 +940,6 @@ def chat_stream():
     })
 
     # Build messages for LLM (strip metadata, cap history length)
-    MAX_HISTORY_MESSAGES = 20
     system_prompt = build_system_prompt(schema_context)
     recent_history = chat_history[-MAX_HISTORY_MESSAGES:]
     messages_to_send = [{"role": "system", "content": system_prompt}] + [
@@ -928,12 +949,10 @@ def chat_stream():
     logger.info(f"Messages to send count: {len(messages_to_send)}")
 
     # Stream based on provider
-    if provider == 'ollama':
-        model = session.get('ollama_model', OLLAMA_MODEL)
+    model = session.get('ollama_model', OLLAMA_MODEL) if provider == 'ollama' else None
+    if model:
         logger.info(f"Using Ollama model: {model}")
-        return Response(stream_with_context(stream_ollama_response(messages_to_send, model)), content_type='text/plain')
-    else:
-        return Response(stream_with_context(stream_lmstudio_response(messages_to_send)), content_type='text/plain')
+    return Response(stream_with_context(stream_llm_response(messages_to_send, provider, model)), content_type='text/plain')
 
 @app.route('/save_assistant_message', methods=['POST'])
 def save_assistant_message():
@@ -961,7 +980,6 @@ def save_assistant_message():
 
     chat_history.append(assistant_message)
     # Cap stored history to prevent unbounded session growth
-    MAX_STORED_MESSAGES = 100
     if len(chat_history) > MAX_STORED_MESSAGES:
         chat_history = chat_history[-MAX_STORED_MESSAGES:]
     session['chat_history'] = chat_history
@@ -994,26 +1012,11 @@ def execute_sql():
         return jsonify({'error': error_msg}), 403
 
     try:
-        # Strip trailing semicolon to prevent "multiple statement" errors
-        cleaned_query = sql_query.rstrip(';').strip()
-
-        with get_readonly_connection(db_filepath) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(cleaned_query)
-            results = cursor.fetchmany(2001)  # Fetch at most 2001 to detect overflow
-            results_dict = [dict(row) for row in results[:2000]]
-
+        results_dict = execute_and_parse_query(db_filepath, sql_query)
         logger.info(f"SQL Executed Successfully. Rows returned: {len(results_dict)}")
 
-        # Update History with Result Metadata
-        if chat_history:
-            last_msg = chat_history[-1]
-            if last_msg['role'] == 'assistant':
-                last_msg['sql_query'] = sql_query
-                last_msg['query_results_preview'] = results_dict[:5]
-                last_msg['total_results'] = len(results_dict)
-                session['chat_history'] = chat_history
+        update_chat_history_with_results(chat_history, sql_query, results_dict)
+        session['chat_history'] = chat_history
 
         return jsonify({
             'response': f"Found {len(results_dict)} results.",
@@ -1050,25 +1053,11 @@ def execute_sql():
             if not is_valid_retry:
                 raise ValueError(f"Corrected SQL failed validation: {retry_error}")
 
-            # Execute corrected query
-            cleaned_retry = corrected_sql.rstrip(';').strip()
-            with get_readonly_connection(db_filepath) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                cursor.execute(cleaned_retry)
-                results = cursor.fetchmany(2001)
-                results_dict = [dict(row) for row in results[:2000]]
-
+            results_dict = execute_and_parse_query(db_filepath, corrected_sql)
             logger.info(f"Retry SQL Executed Successfully. Rows returned: {len(results_dict)}")
 
-            # Update History with Result Metadata
-            if chat_history:
-                last_msg = chat_history[-1]
-                if last_msg['role'] == 'assistant':
-                    last_msg['sql_query'] = corrected_sql
-                    last_msg['query_results_preview'] = results_dict[:5]
-                    last_msg['total_results'] = len(results_dict)
-                    session['chat_history'] = chat_history
+            update_chat_history_with_results(chat_history, corrected_sql, results_dict)
+            session['chat_history'] = chat_history
 
             return jsonify({
                 'response': f"Found {len(results_dict)} results.",

@@ -3,6 +3,7 @@
 import { state } from './state.js';
 import { escapeHtml, showConfirmModal, showAlertModal } from './ui.js';
 import { appendMessage } from './chat.js';
+import { destroyAllCharts } from './charts.js';
 
 export function updateDatabaseStatus(filename = null) {
     const userInput = document.getElementById('user-input');
@@ -70,7 +71,7 @@ export function uploadFile() {
     // Check for existing chat history (excluding welcome screen)
     const hasHistory = chatHistory.querySelectorAll('.chat-message').length > 0;
 
-    const doUpload = () => {
+    const doUpload = async () => {
         const formData = new FormData();
         formData.append('database_file', file);
 
@@ -82,11 +83,7 @@ export function uploadFile() {
             welcomeScreen.classList.add('minimized');
         }
 
-        // Destroy Chart.js instances before clearing chat
-        document.querySelectorAll('.chart-container canvas').forEach(canvas => {
-            const inst = Chart.getChart(canvas);
-            if (inst) inst.destroy();
-        });
+        destroyAllCharts();
 
         // Remove all chat messages but keep the welcome screen if it exists
         const messages = chatHistory.querySelectorAll('.chat-message');
@@ -98,13 +95,13 @@ export function uploadFile() {
             fileNameDisplay.textContent = `Uploading ${file.name}...`;
         }
 
-        fetch('/upload', {
-            method: 'POST',
-            body: formData,
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Hide upload progress
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await response.json();
+
             if (dropZone) dropZone.classList.remove('uploading');
 
             if (data.error) {
@@ -116,15 +113,12 @@ export function uploadFile() {
                 updateDatabaseStatus(file.name);
                 fileNameDisplay.textContent = file.name;
             }
-        })
-        .catch(error => {
-            // Hide upload progress
+        } catch (error) {
             if (dropZone) dropZone.classList.remove('uploading');
             fileNameDisplay.textContent = file.name;
-
             console.error('Error:', error);
             showAlertModal('Upload Error', 'An error occurred during file upload.');
-        });
+        }
     };
 
     // Chain confirmations as needed

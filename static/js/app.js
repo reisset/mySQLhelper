@@ -5,7 +5,7 @@
 // Main entry point — imports all modules and wires up event listeners
 
 import { state } from './state.js';
-import { initTheme, toggleTheme, showConfirmModal, showAlertModal } from './ui.js';
+import { initTheme, toggleTheme, showConfirmModal, showAlertModal, downloadBlob } from './ui.js';
 import { updateChartsForTheme } from './charts.js';
 import { initProviderSelector, initModelSelector } from './providers.js';
 import { sendMessage } from './chat.js';
@@ -232,27 +232,16 @@ if (sidebarToggle) {
 
 // --- Export Chat ---
 if (exportChatButton) {
-    exportChatButton.addEventListener('click', () => {
-        fetch('/export_chat')
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.blob();
-            })
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'chat_export.html';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                a.remove();
-            })
-            .catch(error => {
-                console.error('Error exporting chat:', error);
-                showAlertModal('Export Error', 'Error exporting chat. Please try again.');
-            });
+    exportChatButton.addEventListener('click', async () => {
+        try {
+            const response = await fetch('/export_chat');
+            if (!response.ok) throw new Error('Network response was not ok');
+            const blob = await response.blob();
+            downloadBlob(blob, 'chat_export.html');
+        } catch (error) {
+            console.error('Error exporting chat:', error);
+            showAlertModal('Export Error', 'Error exporting chat. Please try again.');
+        }
     });
 }
 

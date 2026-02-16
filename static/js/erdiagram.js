@@ -1,15 +1,9 @@
 // Schema ER Diagram: modal, layout, SVG rendering, interactions
 
-import { escapeHtml } from './ui.js';
+import { escapeHtml, createModal } from './ui.js';
 
 export async function showERDiagramModal() {
-    const existing = document.getElementById('er-diagram-modal');
-    if (existing) existing.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'er-diagram-modal';
-    modal.className = 'er-modal-overlay';
-    modal.innerHTML = `
+    const contentHTML = `
         <div class="er-modal" role="dialog" aria-modal="true" aria-labelledby="er-modal-title">
             <div class="er-modal-header">
                 <h3 id="er-modal-title">Schema Diagram</h3>
@@ -21,24 +15,10 @@ export async function showERDiagramModal() {
         </div>
     `;
 
-    document.body.appendChild(modal);
-
-    const closeModal = () => {
-        document.removeEventListener('keydown', escHandler);
-        modal.remove();
-    };
-
-    modal.querySelector('.er-modal-close').addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
+    const { modal } = createModal('er-diagram-modal', 'er-modal-overlay', contentHTML, {
+        closeSelector: '.er-modal-close',
+        focusSelector: '.er-modal-close'
     });
-
-    const escHandler = (e) => {
-        if (e.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', escHandler);
-
-    modal.querySelector('.er-modal-close').focus();
 
     try {
         const response = await fetch('/api/schema/diagram');

@@ -199,6 +199,13 @@ export function renderChart(canvas, queryResults, detection, chartType) {
     new Chart(canvas, config);
 }
 
+export function destroyAllCharts() {
+    document.querySelectorAll('.chart-container canvas').forEach(canvas => {
+        const inst = Chart.getChart(canvas);
+        if (inst) inst.destroy();
+    });
+}
+
 export function updateChartsForTheme() {
     document.querySelectorAll('.chart-container').forEach(chartContainer => {
         const data = chartContainer._chartData;

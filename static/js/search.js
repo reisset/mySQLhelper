@@ -1,16 +1,9 @@
 // Search All Tables modal
 
-import { escapeHtml, showAlertModal } from './ui.js';
+import { escapeHtml, showAlertModal, createModal } from './ui.js';
 
 export function showSearchModal() {
-    // Remove existing modal if any
-    const existing = document.getElementById('search-modal');
-    if (existing) existing.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'search-modal';
-    modal.className = 'search-modal-overlay';
-    modal.innerHTML = `
+    const contentHTML = `
         <div class="search-modal" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
             <div class="search-modal-header">
                 <h3 id="search-modal-title">Search All Tables</h3>
@@ -33,24 +26,10 @@ export function showSearchModal() {
         </div>
     `;
 
-    document.body.appendChild(modal);
-
-    const closeModal = () => {
-        document.removeEventListener('keydown', escHandler);
-        modal.remove();
-    };
-
-    // Event listeners
-    modal.querySelector('.search-modal-close').addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
+    const { modal } = createModal('search-modal', 'search-modal-overlay', contentHTML, {
+        closeSelector: '.search-modal-close',
+        focusSelector: '#search-term-input'
     });
-
-    // Escape key closes modal
-    const escHandler = (e) => {
-        if (e.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', escHandler);
 
     const searchInput = modal.querySelector('#search-term-input');
     const searchBtn = modal.querySelector('#execute-search-btn');
@@ -60,8 +39,6 @@ export function showSearchModal() {
     searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') executeTableSearch(searchInput.value, caseSensitive.checked);
     });
-
-    searchInput.focus();
 }
 
 async function executeTableSearch(searchTerm, caseSensitive = false) {

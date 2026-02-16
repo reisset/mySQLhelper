@@ -44,20 +44,21 @@ function showNoteEditor(container, messageId, initialText = '') {
         container.querySelector('.add-note-btn').style.display = 'inline-block';
     };
 
-    saveBtn.onclick = () => {
+    saveBtn.onclick = async () => {
         const noteContent = textarea.value.trim();
         if (!noteContent) return;
 
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
 
-        fetch('/add_note', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message_id: messageId, note_content: noteContent })
-        })
-        .then(res => res.json())
-        .then(data => {
+        try {
+            const res = await fetch('/add_note', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message_id: messageId, note_content: noteContent })
+            });
+            const data = await res.json();
+
             if (data.status === 'success') {
                 editorDiv.remove();
                 renderNote(container, noteContent, messageId);
@@ -66,13 +67,12 @@ function showNoteEditor(container, messageId, initialText = '') {
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Save Note';
             }
-        })
-        .catch(err => {
+        } catch (err) {
             console.error(err);
             showAlertModal('Network Error', 'Failed to save note. Please try again.');
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save Note';
-        });
+        }
     };
 
     buttonsDiv.appendChild(cancelBtn);
