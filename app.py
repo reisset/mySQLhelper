@@ -119,9 +119,16 @@ def strip_strings_and_comments(sql):
         # Handle multi-line comments (/* */ style)
         if not in_single_quote and not in_double_quote and sql[i:i+2] == '/*':
             i += 2
-            while i < len(sql) - 1 and sql[i:i+2] != '*/':
+            closed = False
+            while i < len(sql) - 1:
+                if sql[i:i+2] == '*/':
+                    i += 2
+                    closed = True
+                    break
                 i += 1
-            i += 2  # Skip closing */
+            if not closed:
+                # Unclosed block comment — strip remainder as comment
+                break
             continue
 
         # Handle single quotes (with escape handling)
@@ -192,14 +199,17 @@ def validate_sql(sql):
         return False, "Security Warning: Multiple SQL statements are not allowed."
 
     # Rule 3: Strict blocklist of modification keywords
+    # Check against stripped SQL (sql_for_analysis) to avoid false positives
+    # from keywords inside string literals or comments
     forbidden_keywords = [
         "DROP", "DELETE", "INSERT", "UPDATE", "ALTER",
         "TRUNCATE", "EXEC", "GRANT", "REVOKE", "CREATE",
         "ATTACH", "DETACH", "REPLACE", "VACUUM",
         "SAVEPOINT", "RELEASE", "REINDEX"
     ]
+    sql_for_analysis_upper = sql_for_analysis.upper()
     for keyword in forbidden_keywords:
-        if re.search(r'\b' + keyword + r'\b', sql_upper):
+        if re.search(r'\b' + keyword + r'\b', sql_for_analysis_upper):
             return False, f"Security Warning: Query contains forbidden keyword '{keyword}'."
 
     # Rule 4: Validate CTEs contain SELECT
@@ -218,6 +228,16 @@ def validate_sql(sql):
                 return False, f"Security Warning: {write_pragma} is not allowed (can modify database)."
 
     return True, None
+
+def get_readonly_connection(db_filepath):
+    """Open a read-only SQLite connection with query_only pragma.
+
+    Use as a context manager: with get_readonly_connection(path) as conn:
+    """
+    conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
+    conn.execute("PRAGMA query_only = ON")
+    return conn
+
 
 def calculate_file_hash(filepath):
     """
@@ -326,12 +346,18 @@ def execute_sql_file(sql_filepath, db_filepath):
         with open(sql_filepath, 'r', encoding='utf-8') as f:
             sql_content = f.read()
 
-        # Security check: block destructive operations
-        forbidden = ['DROP DATABASE', 'DROP SCHEMA', 'TRUNCATE DATABASE']
+        # Security check: block destructive and dangerous operations
+        forbidden = [
+            'DROP DATABASE', 'DROP SCHEMA', 'TRUNCATE DATABASE',
+            'ATTACH', 'LOAD_EXTENSION',
+        ]
         sql_upper = sql_content.upper()
         for keyword in forbidden:
             if keyword in sql_upper:
                 raise ValueError(f"SQL file contains forbidden keyword: {keyword}")
+        # Block trigger creation (triggers can execute arbitrary SQL on read)
+        if re.search(r'\bCREATE\s+TRIGGER\b', sql_upper):
+            raise ValueError("SQL file contains forbidden keyword: CREATE TRIGGER")
 
         # Execute SQL file
         conn = sqlite3.connect(db_filepath)
@@ -459,7 +485,7 @@ def index():
     if os.path.exists(ascii_path):
         with open(ascii_path, 'r', encoding='utf-8') as f:
             ascii_art = f.read()
-    return render_template('index.html', ascii_art=ascii_art)
+    return render_template('index.html', ascii_art=ascii_art, version=VERSION)
 
 @app.route('/api/version')
 def get_version():
@@ -574,6 +600,8 @@ def upload_file():
         session['upload_timestamp'] = datetime.now().isoformat()
         session['file_size_bytes'] = os.path.getsize(final_filepath)
         session['chat_history'] = []  # Reset chat history
+        # Cache schema context so build_schema_context() isn't called every message
+        session['schema_context_cache'] = build_schema_context(final_filepath)
         session.modified = True
 
         logger.info(f"Database loaded successfully: {original_filename}")
@@ -606,47 +634,47 @@ def build_schema_context(db_filepath, include_samples=True):
     """
     if not db_filepath:
         return ""
-    conn = sqlite3.connect(db_filepath)
-    cursor = conn.cursor()
 
-    cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
-    tables = cursor.fetchall()
+    with sqlite3.connect(db_filepath) as conn:
+        cursor = conn.cursor()
 
-    parts = ["Database Schema:\n"]
+        cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+        tables = cursor.fetchall()
 
-    for table_name, create_sql in tables:
-        # CREATE TABLE DDL
-        if create_sql:
-            parts.append(f"{create_sql};\n")
+        parts = ["Database Schema:\n"]
 
-        # Foreign keys
-        cursor.execute(f'PRAGMA foreign_key_list("{table_name}");')
-        fks = cursor.fetchall()
-        if fks:
-            for fk in fks:
-                parts.append(f"  -- FK: {table_name}.{fk[3]} → {fk[2]}.{fk[4]}")
-            parts.append("")
+        for table_name, create_sql in tables:
+            # CREATE TABLE DDL
+            if create_sql:
+                parts.append(f"{create_sql};\n")
 
-        # Sample data (3 rows, compact pipe-delimited format)
-        if include_samples:
-            try:
-                cursor.execute(f'SELECT * FROM "{table_name}" LIMIT 3;')
-                rows = cursor.fetchall()
-                if rows:
-                    col_names = [desc[0] for desc in cursor.description]
-                    parts.append(f"-- {table_name} sample ({' | '.join(col_names)}):")
-                    for row in rows:
-                        parts.append('|'.join(
-                            str(v)[:50] + '...' if v is not None and len(str(v)) > 50
-                            else 'NULL' if v is None
-                            else str(v)
-                            for v in row
-                        ))
-                    parts.append("")
-            except sqlite3.Error:
-                pass
+            # Foreign keys
+            cursor.execute(f'PRAGMA foreign_key_list("{table_name}");')
+            fks = cursor.fetchall()
+            if fks:
+                for fk in fks:
+                    parts.append(f"  -- FK: {table_name}.{fk[3]} → {fk[2]}.{fk[4]}")
+                parts.append("")
 
-    conn.close()
+            # Sample data (3 rows, compact pipe-delimited format)
+            if include_samples:
+                try:
+                    cursor.execute(f'SELECT * FROM "{table_name}" LIMIT 3;')
+                    rows = cursor.fetchall()
+                    if rows:
+                        col_names = [desc[0] for desc in cursor.description]
+                        parts.append(f"-- {table_name} sample ({' | '.join(col_names)}):")
+                        for row in rows:
+                            parts.append('|'.join(
+                                str(v)[:50] + '...' if v is not None and len(str(v)) > 50
+                                else 'NULL' if v is None
+                                else str(v)
+                                for v in row
+                            ))
+                        parts.append("")
+                except sqlite3.Error:
+                    pass
+
     return '\n'.join(parts)
 
 
@@ -868,14 +896,18 @@ def chat_stream():
             logger.error("LLM Health Check Failed: LM Studio not reachable")
             return jsonify({'error': 'LM Studio is not running or not reachable at http://localhost:1234.'}), 503
 
-    # Build Schema Context
+    # Use cached schema context (built on upload), fall back to fresh build
     schema_context = ""
     if db_filepath:
-        try:
-            schema_context = build_schema_context(db_filepath)
-        except sqlite3.Error as e:
-            logger.error(f"Database access error during schema injection: {e}")
-            return jsonify({'error': f"Database access error: {e}"}), 500
+        schema_context = session.get('schema_context_cache', '')
+        if not schema_context:
+            try:
+                schema_context = build_schema_context(db_filepath)
+                session['schema_context_cache'] = schema_context
+                session.modified = True
+            except sqlite3.Error as e:
+                logger.error(f"Database access error during schema injection: {e}")
+                return jsonify({'error': f"Database access error: {e}"}), 500
 
     # Append user message to history
     chat_history.append({
@@ -927,6 +959,10 @@ def save_assistant_message():
         assistant_message['token_usage'] = token_usage
 
     chat_history.append(assistant_message)
+    # Cap stored history to prevent unbounded session growth
+    MAX_STORED_MESSAGES = 100
+    if len(chat_history) > MAX_STORED_MESSAGES:
+        chat_history = chat_history[-MAX_STORED_MESSAGES:]
     session['chat_history'] = chat_history
     session.modified = True  # Critical: Force session update
 
@@ -960,22 +996,12 @@ def execute_sql():
         # Strip trailing semicolon to prevent "multiple statement" errors
         cleaned_query = sql_query.rstrip(';').strip()
 
-        # Open in read-only mode for defense-in-depth
-        # Even if validation is bypassed, SQLite will reject writes
-        conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
-        conn.execute("PRAGMA query_only = ON")  # Extra safety layer
-
-        # Use a row factory to get dict-like access if needed, but list of dicts is fine
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-
-        # Execute query directly
-        cursor.execute(cleaned_query)
-        results = cursor.fetchmany(2001)  # Fetch at most 2001 to detect overflow
-
-        results_dict = [dict(row) for row in results[:2000]]
-
-        conn.close()
+        with get_readonly_connection(db_filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(cleaned_query)
+            results = cursor.fetchmany(2001)  # Fetch at most 2001 to detect overflow
+            results_dict = [dict(row) for row in results[:2000]]
 
         logger.info(f"SQL Executed Successfully. Rows returned: {len(results_dict)}")
 
@@ -984,9 +1010,8 @@ def execute_sql():
             last_msg = chat_history[-1]
             if last_msg['role'] == 'assistant':
                 last_msg['sql_query'] = sql_query
-                last_msg['query_results_preview'] = results_dict[:20]
+                last_msg['query_results_preview'] = results_dict[:5]
                 last_msg['total_results'] = len(results_dict)
-                # We do NOT overwrite 'content' here anymore, preserving the LLM's explanation.
                 session['chat_history'] = chat_history
 
         return jsonify({
@@ -1026,14 +1051,12 @@ def execute_sql():
 
             # Execute corrected query
             cleaned_retry = corrected_sql.rstrip(';').strip()
-            conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
-            conn.execute("PRAGMA query_only = ON")
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(cleaned_retry)
-            results = cursor.fetchmany(2001)
-            results_dict = [dict(row) for row in results[:2000]]
-            conn.close()
+            with get_readonly_connection(db_filepath) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute(cleaned_retry)
+                results = cursor.fetchmany(2001)
+                results_dict = [dict(row) for row in results[:2000]]
 
             logger.info(f"Retry SQL Executed Successfully. Rows returned: {len(results_dict)}")
 
@@ -1042,7 +1065,7 @@ def execute_sql():
                 last_msg = chat_history[-1]
                 if last_msg['role'] == 'assistant':
                     last_msg['sql_query'] = corrected_sql
-                    last_msg['query_results_preview'] = results_dict[:20]
+                    last_msg['query_results_preview'] = results_dict[:5]
                     last_msg['total_results'] = len(results_dict)
                     session['chat_history'] = chat_history
 
@@ -1080,68 +1103,66 @@ def search_all_tables():
     logger.info(f"Search All Tables: '{search_term}' (case_sensitive={case_sensitive})")
 
     try:
-        conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
-        cursor = conn.cursor()
+        with get_readonly_connection(db_filepath) as conn:
+            cursor = conn.cursor()
 
-        # Get all tables (skip internal SQLite tables)
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-        tables = [row[0] for row in cursor.fetchall()]
+            # Get all tables (skip internal SQLite tables)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            tables = [row[0] for row in cursor.fetchall()]
 
-        results = {}
+            results = {}
 
-        for table in tables:
-            # Get column info for this table
-            cursor.execute(f'PRAGMA table_info("{table}")')
-            columns = cursor.fetchall()
+            for table in tables:
+                # Get column info for this table
+                cursor.execute(f'PRAGMA table_info("{table}")')
+                columns = cursor.fetchall()
 
-            # Get all column names (SQLite is dynamically typed, search everything)
-            all_columns = [col[1] for col in columns]
+                # Get all column names (SQLite is dynamically typed, search everything)
+                all_columns = [col[1] for col in columns]
 
-            if not all_columns:
-                continue
-
-            table_matches = {'total_matches': 0, 'columns': {}}
-
-            for col in all_columns:
-                try:
-                    # Build query based on case sensitivity
-                    if case_sensitive:
-                        query = f'SELECT DISTINCT "{col}" FROM "{table}" WHERE "{col}" LIKE ? AND "{col}" GLOB ?'
-                        # GLOB is case-sensitive, LIKE finds candidates
-                        params = [f'%{search_term}%', f'*{search_term}*']
-                    else:
-                        query = f'SELECT DISTINCT "{col}" FROM "{table}" WHERE "{col}" LIKE ?'
-                        params = [f'%{search_term}%']
-
-                    cursor.execute(query, params)
-                    rows = cursor.fetchall()
-
-                    # Filter and collect matched values
-                    matched_values = []
-                    for row in rows:
-                        val = row[0]
-                        if val is not None:
-                            val_str = str(val)
-                            if case_sensitive:
-                                if search_term in val_str:
-                                    matched_values.append(val_str)
-                            else:
-                                if search_term.lower() in val_str.lower():
-                                    matched_values.append(val_str)
-
-                    if matched_values:
-                        # Store first 3 unique values for display, plus total count
-                        table_matches['columns'][col] = matched_values[:3]
-                        table_matches['total_matches'] += len(matched_values)
-
-                except sqlite3.Error as e:
-                    logger.warning(f"Search error in {table}.{col}: {e}")
+                if not all_columns:
                     continue
 
-            if table_matches['total_matches'] > 0:
-                results[table] = table_matches
+                table_matches = {'total_matches': 0, 'columns': {}}
 
-        conn.close()
+                for col in all_columns:
+                    try:
+                        # Build query based on case sensitivity
+                        if case_sensitive:
+                            query = f'SELECT DISTINCT "{col}" FROM "{table}" WHERE "{col}" LIKE ? AND "{col}" GLOB ?'
+                            # GLOB is case-sensitive, LIKE finds candidates
+                            params = [f'%{search_term}%', f'*{search_term}*']
+                        else:
+                            query = f'SELECT DISTINCT "{col}" FROM "{table}" WHERE "{col}" LIKE ?'
+                            params = [f'%{search_term}%']
+
+                        cursor.execute(query, params)
+                        rows = cursor.fetchall()
+
+                        # Filter and collect matched values
+                        matched_values = []
+                        for row in rows:
+                            val = row[0]
+                            if val is not None:
+                                val_str = str(val)
+                                if case_sensitive:
+                                    if search_term in val_str:
+                                        matched_values.append(val_str)
+                                else:
+                                    if search_term.lower() in val_str.lower():
+                                        matched_values.append(val_str)
+
+                        if matched_values:
+                            # Store first 3 unique values for display, plus total count
+                            table_matches['columns'][col] = matched_values[:3]
+                            table_matches['total_matches'] += len(matched_values)
+
+                    except sqlite3.Error as e:
+                        logger.warning(f"Search error in {table}.{col}: {e}")
+                        continue
+
+                if table_matches['total_matches'] > 0:
+                    results[table] = table_matches
 
         total = sum(t['total_matches'] for t in results.values())
         logger.info(f"Search complete: {total} matches in {len(results)} tables")
@@ -1164,42 +1185,40 @@ def schema_diagram():
         return jsonify({'error': 'No database loaded'}), 400
 
     try:
-        conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
-        cursor = conn.cursor()
+        with get_readonly_connection(db_filepath) as conn:
+            cursor = conn.cursor()
 
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
-        table_names = [row[0] for row in cursor.fetchall()]
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+            table_names = [row[0] for row in cursor.fetchall()]
 
-        tables = []
-        relationships = []
+            tables = []
+            relationships = []
 
-        for table_name in table_names:
-            cursor.execute(f'PRAGMA table_info("{table_name}");')
-            columns_raw = cursor.fetchall()
-            columns = []
-            for col in columns_raw:
-                columns.append({
-                    'name': col[1],
-                    'type': col[2] or 'TEXT',
-                    'pk': bool(col[5])
+            for table_name in table_names:
+                cursor.execute(f'PRAGMA table_info("{table_name}");')
+                columns_raw = cursor.fetchall()
+                columns = []
+                for col in columns_raw:
+                    columns.append({
+                        'name': col[1],
+                        'type': col[2] or 'TEXT',
+                        'pk': bool(col[5])
+                    })
+
+                tables.append({
+                    'name': table_name,
+                    'columns': columns
                 })
 
-            tables.append({
-                'name': table_name,
-                'columns': columns
-            })
-
-            cursor.execute(f'PRAGMA foreign_key_list("{table_name}");')
-            fks = cursor.fetchall()
-            for fk in fks:
-                relationships.append({
-                    'from_table': table_name,
-                    'from_column': fk[3],
-                    'to_table': fk[2],
-                    'to_column': fk[4]
-                })
-
-        conn.close()
+                cursor.execute(f'PRAGMA foreign_key_list("{table_name}");')
+                fks = cursor.fetchall()
+                for fk in fks:
+                    relationships.append({
+                        'from_table': table_name,
+                        'from_column': fk[3],
+                        'to_table': fk[2],
+                        'to_column': fk[4]
+                    })
 
         return jsonify({
             'tables': tables,

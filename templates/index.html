@@ -6,12 +6,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="yourSQLfriend — SQLite forensic analysis tool powered by local LLMs. Query databases with natural language, visualize schemas, and export forensic reports.">
     <title>yourSQLfriend</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#f0a030">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.5.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ version }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
 </head>
 <body>
@@ -115,12 +116,6 @@
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/chart.umd.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='script.js') }}?v=3.5.0" defer></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
-                .catch(err => console.warn('SW registration failed:', err));
-        }
-    </script>
+    <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}"></script>
 </body>
 </html>

@@ -54,6 +54,23 @@ async function fetchVersion() {
 
 fetchVersion();
 
+// Configure marked.js once at init (not on every render call)
+if (typeof marked !== 'undefined') {
+    marked.setOptions({
+        highlight: function(code, lang) {
+            if (typeof hljs !== 'undefined') {
+                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                return hljs.highlight(code, { language }).value;
+            }
+            return code;
+        },
+        langPrefix: 'hljs language-'
+    });
+}
+
+// Track active stream AbortController for cleanup on rapid sends
+let activeStreamController = null;
+
 // --- Custom Confirmation Modal ---
 function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', cancelText = 'Cancel') {
     const existing = document.getElementById('confirm-modal');
@@ -802,7 +819,12 @@ async function sendMessage() {
     const pText = document.createElement('p');
     contentContainer.appendChild(pText);
 
+    // Abort previous stream if still active (rapid send protection)
+    if (activeStreamController) {
+        activeStreamController.abort();
+    }
     const controller = new AbortController();
+    activeStreamController = controller;
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s watchdog
 
     try {
@@ -968,6 +990,9 @@ async function sendMessage() {
     } finally {
         clearTimeout(timeoutId); // Ensure cleanup
         clearInterval(shimmerInterval);
+        if (activeStreamController === controller) {
+            activeStreamController = null;
+        }
         statusBar.classList.remove('active');
         userInput.disabled = false;
         sendButton.disabled = false;
@@ -979,19 +1004,6 @@ async function sendMessage() {
 
 function renderText(element, text) {
     if (typeof marked !== 'undefined') {
-        // Configure marked with highlight.js
-        marked.setOptions({
-            highlight: function(code, lang) {
-                if (typeof hljs !== 'undefined') {
-                    // Attempt to detect language, default to plaintext if not found
-                    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-                    return hljs.highlight(code, { language }).value;
-                }
-                return code;
-            },
-            langPrefix: 'hljs language-'
-        });
-
         let html = marked.parse(text);
         if (typeof DOMPurify !== 'undefined') {
             html = DOMPurify.sanitize(html);
@@ -2301,4 +2313,10 @@ function highlightERTable(svg, tableName) {
 function clearERHighlight(svg) {
     svg.querySelectorAll('.er-dimmed').forEach(el => el.classList.remove('er-dimmed'));
     svg.querySelectorAll('.er-highlighted').forEach(el => el.classList.remove('er-highlighted'));
+}
+
+// --- Service Worker Registration ---
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+        .catch(err => console.warn('SW registration failed:', err));
 }

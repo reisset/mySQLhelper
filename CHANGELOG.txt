@@ -1,5 +1,34 @@
 CHANGELOG
 
+### v3.7.0 - Architecture Overhaul (Feb 2026)
+
+#### Security
+- **Fixed forbidden keyword bypass (critical):** `validate_sql()` was checking forbidden keywords against raw SQL instead of stripped SQL, causing false positives on safe queries like `WHERE message LIKE '%DROP TABLE%'`. Now checks against the output of `strip_strings_and_comments()` as intended.
+- **Fixed unclosed block comment edge case:** `strip_strings_and_comments()` now properly handles `/*` without a closing `*/`, preventing malicious content from hiding in unterminated comments.
+- **Hardened SQL file import:** `execute_sql_file()` blocklist expanded with `ATTACH`, `LOAD_EXTENSION`, and `CREATE TRIGGER` to prevent filesystem access and trigger-based attacks from uploaded `.sql` files.
+
+#### Architecture
+- **ES module split:** Monolithic `script.js` (2,305 lines) split into 11 ES modules under `static/js/`: `app.js` (entry point), `state.js`, `ui.js`, `chat.js`, `sql.js`, `charts.js`, `upload.js`, `providers.js`, `search.js`, `notes.js`, `erdiagram.js`. No bundler — uses native `<script type="module">`. Each feature is independently readable and replaceable.
+- **Self-hosted fonts:** Replaced Google Fonts `@import` with 7 vendored woff2 files in `static/fonts/` (JetBrains Mono 400–700, IBM Plex Sans 400–600). Eliminates render-blocking network request, Google tracking vector, and offline font failure. Uses `@font-face` with `font-display: swap`.
+- **Test suite:** Added 63 pytest test cases for `validate_sql()` and `strip_strings_and_comments()` — the security boundary between user input and database execution. Covers allowed queries, all forbidden keywords, keywords in strings/comments, multi-statement detection, PRAGMA safety, and edge cases.
+
+#### Performance
+- **Schema context caching:** `build_schema_context()` result cached in session on upload, reused for all subsequent chat messages. Eliminates N redundant database connections per conversation.
+- **`marked.setOptions()` called once:** Moved from per-render to init-time configuration.
+- **Chat history cap:** Stored session history capped at 100 messages. Query result preview reduced from 20 to 5 rows for session storage.
+- **CSS containment:** Added `contain: layout style` to `.sidebar` and `.main-chat` for paint performance.
+- **Scan-line z-index:** Lowered from 9999 to 10 to reduce compositing overhead.
+
+#### Reliability
+- **`get_readonly_connection()` helper:** Extracted duplicated `sqlite3.connect(mode=ro)` + `PRAGMA query_only` pattern into single reusable function. Four call sites consolidated.
+- **Context managers for all connections:** All database connections now use `with` statements, ensuring `conn.close()` on any exception type.
+- **AbortController cleanup:** Rapid sends now abort the previous stream before starting a new one, preventing orphaned fetch connections.
+
+#### Maintenance
+- **Version injection via Jinja2:** Template cache-bust strings (`?v=`) now use `{{ version }}` from Flask instead of hardcoded values. Reduces manual version locations from 6 to 4.
+- **Firefox scrollbar fix:** Changed `*` scrollbar selector to `html` — inherited anyway, avoids performance hit on deep DOM trees.
+- **Service worker updated:** Cache list includes all ES module files and self-hosted font files.
+
 ### v3.6.1 - LLM Prompt Optimization (Feb 2026)
 
 #### Optimized
