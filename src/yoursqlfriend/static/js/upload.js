@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { escapeHtml, showConfirmModal, showAlertModal } from './ui.js';
 import { appendMessage } from './chat.js';
 import { destroyAllCharts } from './charts.js';
+import { destroyAllGrids } from './sql.js';
 
 export function updateDatabaseStatus(filename = null) {
     const userInput = document.getElementById('user-input');
@@ -84,6 +85,7 @@ export function uploadFile() {
         }
 
         destroyAllCharts();
+        destroyAllGrids();
 
         // Remove all chat messages but keep the welcome screen if it exists
         const messages = chatHistory.querySelectorAll('.chat-message');

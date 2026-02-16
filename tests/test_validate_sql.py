@@ -1,7 +1,7 @@
 # Tests for validate_sql() and strip_strings_and_comments()
 # These functions are the security boundary between user input and database execution.
 
-from yoursqlfriend.app import validate_sql, strip_strings_and_comments
+from yoursqlfriend.validation import validate_sql, strip_strings_and_comments
 
 
 # ==========================================================================

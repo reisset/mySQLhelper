@@ -1,6 +1,6 @@
 // Search All Tables modal
 
-import { escapeHtml, showAlertModal, createModal } from './ui.js';
+import { escapeHtml, showAlertModal, createModal, fetchJson } from './ui.js';
 
 export function showSearchModal() {
     const contentHTML = `
@@ -51,18 +51,7 @@ async function executeTableSearch(searchTerm, caseSensitive = false) {
     resultsContainer.innerHTML = '<div class="search-loading">Searching...</div>';
 
     try {
-        const response = await fetch('/search_all_tables', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ search_term: searchTerm, case_sensitive: caseSensitive })
-        });
-
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.error || 'Search failed');
-        }
-
-        const data = await response.json();
+        const data = await fetchJson('/search_all_tables', { search_term: searchTerm, case_sensitive: caseSensitive });
         renderSearchResults(data, searchTerm, resultsContainer, caseSensitive);
 
     } catch (error) {

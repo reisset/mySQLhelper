@@ -6,10 +6,8 @@
 import sqlite3
 import os
 import sys
-import hashlib
 import logging
 import re
-import json
 import uuid
 import socket
 import argparse
@@ -19,17 +17,24 @@ from datetime import datetime
 
 from html import escape as html_escape
 
-# Third-party
-import requests
-import pandas as pd
-
 # Flask
 from flask import Flask, render_template, request, jsonify, session, make_response, Response, stream_with_context
 from flask_session import Session
 from werkzeug.utils import secure_filename
 
-# --- Version ---
-VERSION = "3.7.0"
+# Internal modules
+from yoursqlfriend import __version__ as VERSION
+from yoursqlfriend.validation import validate_sql, strip_strings_and_comments
+from yoursqlfriend.database import (
+    get_readonly_connection, execute_and_parse_query, calculate_file_hash,
+    validate_upload_file, convert_csv_to_sqlite, execute_sql_file,
+)
+from yoursqlfriend.llm import (
+    LLM_API_URL, OLLAMA_URL, OLLAMA_MODEL,
+    check_llm_available, check_ollama_available,
+    build_schema_context, build_system_prompt, build_error_correction_prompt,
+    call_llm_non_streaming, stream_llm_response,
+)
 
 # --- Paths ---
 
@@ -94,174 +99,10 @@ Session(app)
 
 # LLM Provider Configuration
 LLM_PROVIDER = os.environ.get('LLM_PROVIDER', 'lmstudio')  # 'lmstudio' or 'ollama'
-LLM_API_URL = os.environ.get('LLM_API_URL', "http://localhost:1234/v1/chat/completions")
-OLLAMA_URL = os.environ.get('OLLAMA_URL', "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.2')
 
 # --- Constants ---
-FORBIDDEN_QUERY_KEYWORDS = [
-    "DROP", "DELETE", "INSERT", "UPDATE", "ALTER",
-    "TRUNCATE", "EXEC", "GRANT", "REVOKE", "CREATE",
-    "ATTACH", "DETACH", "REPLACE", "VACUUM",
-    "SAVEPOINT", "RELEASE", "REINDEX"
-]
-FORBIDDEN_SQL_FILE_KEYWORDS = [
-    "DROP DATABASE", "DROP SCHEMA", "TRUNCATE DATABASE",
-    "ATTACH", "LOAD_EXTENSION",
-]
-MAX_UPLOAD_SIZE_BYTES = 1024 * 1024 * 1024
 MAX_HISTORY_MESSAGES = 20
 MAX_STORED_MESSAGES = 100
-MAX_RESULT_ROWS = 2000
-
-def strip_strings_and_comments(sql):
-    """
-    Remove string literals and comments from SQL for security analysis.
-    This prevents false positives from content inside strings/comments.
-    """
-    result = []
-    i = 0
-    in_single_quote = False
-    in_double_quote = False
-
-    while i < len(sql):
-        # Handle single-line comments (-- style)
-        if not in_single_quote and not in_double_quote and sql[i:i+2] == '--':
-            # Skip to end of line
-            while i < len(sql) and sql[i] != '\n':
-                i += 1
-            continue
-
-        # Handle multi-line comments (/* */ style)
-        if not in_single_quote and not in_double_quote and sql[i:i+2] == '/*':
-            i += 2
-            closed = False
-            while i < len(sql) - 1:
-                if sql[i:i+2] == '*/':
-                    i += 2
-                    closed = True
-                    break
-                i += 1
-            if not closed:
-                # Unclosed block comment — strip remainder as comment
-                break
-            continue
-
-        # Handle single quotes (with escape handling)
-        if sql[i] == "'" and not in_double_quote:
-            if in_single_quote:
-                # Check for escaped quote ('')
-                if i + 1 < len(sql) and sql[i+1] == "'":
-                    i += 2
-                    continue
-                in_single_quote = False
-            else:
-                in_single_quote = True
-            i += 1
-            continue
-
-        # Handle double quotes
-        if sql[i] == '"' and not in_single_quote:
-            if in_double_quote:
-                if i + 1 < len(sql) and sql[i+1] == '"':
-                    i += 2
-                    continue
-                in_double_quote = False
-            else:
-                in_double_quote = True
-            i += 1
-            continue
-
-        # Only include characters outside of strings
-        if not in_single_quote and not in_double_quote:
-            result.append(sql[i])
-
-        i += 1
-
-    return ''.join(result)
-
-
-def validate_sql(sql):
-    """
-    Validates that SQL queries are read-only and safe for forensic analysis.
-
-    Allowed: SELECT, WITH (CTEs), EXPLAIN, read-only PRAGMAs
-    Blocked: Any data modification commands
-    """
-    sql_stripped = sql.strip()
-
-    # Skip leading SQL comments (-- style) to find the actual query start
-    lines = sql_stripped.split('\n')
-    first_code_line = ''
-    for line in lines:
-        stripped_line = line.strip()
-        if stripped_line and not stripped_line.startswith('--'):
-            first_code_line = stripped_line
-            break
-
-    sql_upper = sql_stripped.upper()
-    first_code_upper = first_code_line.upper()
-
-    # Rule 1: Allow read-only query patterns
-    allowed_starts = ["SELECT", "WITH", "EXPLAIN", "PRAGMA"]
-    if not any(first_code_upper.startswith(start) for start in allowed_starts):
-        return False, f"Query must start with: {', '.join(allowed_starts)}"
-
-    # Rule 2: No multiple statements
-    # Strip strings and comments first to avoid false positives
-    sql_for_analysis = strip_strings_and_comments(sql)
-    sql_trimmed = sql_for_analysis.rstrip().rstrip(';').rstrip()
-    if ';' in sql_trimmed:
-        return False, "Security Warning: Multiple SQL statements are not allowed."
-
-    # Rule 3: Strict blocklist of modification keywords
-    # Check against stripped SQL (sql_for_analysis) to avoid false positives
-    # from keywords inside string literals or comments
-    sql_for_analysis_upper = sql_for_analysis.upper()
-    for keyword in FORBIDDEN_QUERY_KEYWORDS:
-        if re.search(r'\b' + keyword + r'\b', sql_for_analysis_upper):
-            return False, f"Security Warning: Query contains forbidden keyword '{keyword}'."
-
-    # Rule 4: Validate CTEs contain SELECT
-    if sql_upper.startswith("WITH"):
-        if "SELECT" not in sql_upper:
-            return False, "CTE (WITH clause) must contain a SELECT statement."
-
-    # Rule 5: PRAGMA safety check - block write-capable PRAGMAs
-    if sql_upper.startswith("PRAGMA"):
-        write_pragmas = [
-            "PRAGMA JOURNAL_MODE", "PRAGMA LOCKING_MODE", "PRAGMA WRITABLE_SCHEMA",
-            "PRAGMA AUTO_VACUUM", "PRAGMA INCREMENTAL_VACUUM"
-        ]
-        for write_pragma in write_pragmas:
-            if write_pragma in sql_upper:
-                return False, f"Security Warning: {write_pragma} is not allowed (can modify database)."
-
-    return True, None
-
-def get_readonly_connection(db_filepath):
-    """Open a read-only SQLite connection with query_only pragma.
-
-    Use as a context manager: with get_readonly_connection(path) as conn:
-    """
-    conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
-    conn.execute("PRAGMA query_only = ON")
-    return conn
-
-
-def execute_and_parse_query(db_filepath, sql_query):
-    """Execute a read-only SQL query and return results as list of dicts.
-
-    Strips trailing semicolons, opens a readonly connection, fetches up to
-    MAX_RESULT_ROWS rows. Returns list of dicts.
-    """
-    cleaned = sql_query.rstrip(';').strip()
-    with get_readonly_connection(db_filepath) as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute(cleaned)
-        results = cursor.fetchmany(MAX_RESULT_ROWS + 1)
-        return [dict(row) for row in results[:MAX_RESULT_ROWS]]
 
 
 def update_chat_history_with_results(chat_history, sql_query, results_dict):
@@ -273,173 +114,6 @@ def update_chat_history_with_results(chat_history, sql_query, results_dict):
             last_msg['query_results_preview'] = results_dict[:5]
             last_msg['total_results'] = len(results_dict)
 
-
-def calculate_file_hash(filepath):
-    """
-    Calculate SHA256 hash of file for evidence integrity verification.
-    Uses chunked reading to handle large files efficiently.
-
-    Returns:
-        str: Hexadecimal SHA256 hash
-    """
-    sha256 = hashlib.sha256()
-    with open(filepath, 'rb') as f:
-        for chunk in iter(lambda: f.read(8192), b''):
-            sha256.update(chunk)
-    return sha256.hexdigest()
-
-def validate_upload_file(file, max_size_bytes=MAX_UPLOAD_SIZE_BYTES):
-    """
-    Validate uploaded file meets security and forensic requirements.
-
-    Args:
-        file: Werkzeug FileStorage object
-        max_size_bytes: Maximum allowed file size (default 1GB)
-
-    Returns:
-        tuple: (is_valid: bool, error_message: str or None, file_type: str)
-    """
-    # Check file extension
-    allowed_extensions = {'.db', '.sqlite', '.sqlite3', '.sql', '.csv'}
-    file_ext = os.path.splitext(file.filename)[1].lower()
-
-    if file_ext not in allowed_extensions:
-        return False, f'Invalid file type. Allowed: {", ".join(allowed_extensions)}', None
-
-    # Check file size
-    file.seek(0, os.SEEK_END)
-    file_size = file.tell()
-    file.seek(0)
-
-    if file_size > max_size_bytes:
-        return False, f'File too large: {file_size / (1024*1024*1024):.2f}GB. Maximum is {max_size_bytes / (1024*1024*1024):.0f}GB.', None
-
-    if file_size == 0:
-        return False, 'File is empty.', None
-
-    logger.info(f"File validation passed: {file.filename} ({file_size / (1024*1024):.2f}MB)")
-
-    return True, None, file_ext
-
-def convert_csv_to_sqlite(csv_filepath, db_filepath):
-    """
-    Convert CSV file to SQLite database for querying.
-
-    Args:
-        csv_filepath: Path to source CSV file
-        db_filepath: Path to target SQLite database
-
-    Returns:
-        dict: Schema dictionary (table_name -> [columns])
-
-    Raises:
-        Exception: If conversion fails
-    """
-    try:
-        # Read CSV with pandas (handles encoding, delimiters automatically)
-        df = pd.read_csv(csv_filepath, encoding_errors='replace')
-
-        # Sanitize column names (remove special chars, spaces)
-        df.columns = [re.sub(r'[^\w]', '_', col) for col in df.columns]
-
-        # Create SQLite database and insert data
-        with sqlite3.connect(db_filepath) as conn:
-            table_name = 'csv_data'  # Default table name
-            df.to_sql(table_name, conn, if_exists='replace', index=False)
-
-            # Extract schema
-            cursor = conn.cursor()
-            cursor.execute(f'PRAGMA table_info("{table_name}");')
-            columns = cursor.fetchall()
-            schema = {table_name: [column[1] for column in columns]}
-        logger.info(f"CSV converted to SQLite: {len(df)} rows, {len(df.columns)} columns")
-
-        return schema
-
-    except Exception as e:
-        logger.error(f"CSV conversion failed: {str(e)}")
-        raise
-
-def execute_sql_file(sql_filepath, db_filepath):
-    """
-    Execute SQL file to create database schema and load data.
-    Supports CREATE TABLE, INSERT statements (blocks destructive commands).
-
-    Args:
-        sql_filepath: Path to .sql file
-        db_filepath: Path to target SQLite database
-
-    Returns:
-        dict: Schema dictionary (table_name -> [columns])
-
-    Raises:
-        Exception: If SQL execution fails or contains forbidden commands
-    """
-    try:
-        with open(sql_filepath, 'r', encoding='utf-8') as f:
-            sql_content = f.read()
-
-        # Security check: block destructive and dangerous operations
-        sql_upper = sql_content.upper()
-        for keyword in FORBIDDEN_SQL_FILE_KEYWORDS:
-            if keyword in sql_upper:
-                raise ValueError(f"SQL file contains forbidden keyword: {keyword}")
-        # Block trigger creation (triggers can execute arbitrary SQL on read)
-        if re.search(r'\bCREATE\s+TRIGGER\b', sql_upper):
-            raise ValueError("SQL file contains forbidden keyword: CREATE TRIGGER")
-
-        # Execute SQL file
-        with sqlite3.connect(db_filepath) as conn:
-            cursor = conn.cursor()
-            cursor.executescript(sql_content)
-
-            # Extract schema
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-            tables = cursor.fetchall()
-            schema = {}
-            for table_name in tables:
-                table_name = table_name[0]
-                cursor.execute(f'PRAGMA table_info("{table_name}");')
-                columns = cursor.fetchall()
-                schema[table_name] = [column[1] for column in columns]
-        logger.info(f"SQL file executed: {len(schema)} tables created")
-
-        return schema
-
-    except Exception as e:
-        logger.error(f"SQL file execution failed: {str(e)}")
-        raise
-
-def check_llm_available():
-    """
-    Check if LM Studio is running and responsive.
-
-    Returns:
-        bool: True if LM Studio is accessible
-    """
-    try:
-        test_url = LLM_API_URL.replace('/chat/completions', '/models')
-        response = requests.get(test_url, timeout=2)
-        return response.status_code == 200
-    except Exception:
-        return False
-
-def check_ollama_available():
-    """
-    Check if Ollama is running and return available models.
-
-    Returns:
-        tuple: (available: bool, models: list)
-    """
-    try:
-        response = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
-        if response.status_code == 200:
-            data = response.json()
-            models = [m['name'] for m in data.get('models', [])]
-            return True, models
-    except requests.exceptions.RequestException:
-        pass
-    return False, []
 
 @app.route('/api/ollama/status', methods=['GET'])
 def ollama_status():
@@ -658,234 +332,6 @@ def upload_file():
         return jsonify({'error': f'Upload processing failed: {str(e)}'}), 500
 
 
-def build_schema_context(db_filepath, include_samples=True):
-    """Build schema context string from database file for LLM prompts.
-
-    Includes CREATE TABLE DDL, foreign key relationships, and optionally
-    sample data. Set include_samples=False for error correction prompts.
-    """
-    if not db_filepath:
-        return ""
-
-    with sqlite3.connect(db_filepath) as conn:
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
-        tables = cursor.fetchall()
-
-        parts = ["Database Schema:\n"]
-
-        for table_name, create_sql in tables:
-            # CREATE TABLE DDL
-            if create_sql:
-                parts.append(f"{create_sql};\n")
-
-            # Foreign keys
-            cursor.execute(f'PRAGMA foreign_key_list("{table_name}");')
-            fks = cursor.fetchall()
-            if fks:
-                for fk in fks:
-                    parts.append(f"  -- FK: {table_name}.{fk[3]} → {fk[2]}.{fk[4]}")
-                parts.append("")
-
-            # Sample data (3 rows, compact pipe-delimited format)
-            if include_samples:
-                try:
-                    cursor.execute(f'SELECT * FROM "{table_name}" LIMIT 3;')
-                    rows = cursor.fetchall()
-                    if rows:
-                        col_names = [desc[0] for desc in cursor.description]
-                        parts.append(f"-- {table_name} sample ({' | '.join(col_names)}):")
-                        for row in rows:
-                            parts.append('|'.join(
-                                str(v)[:50] + '...' if v is not None and len(str(v)) > 50
-                                else 'NULL' if v is None
-                                else str(v)
-                                for v in row
-                            ))
-                        parts.append("")
-                except sqlite3.Error:
-                    pass
-
-    return '\n'.join(parts)
-
-
-def build_error_correction_prompt(error_msg, failed_sql, schema_context):
-    """Build a prompt to ask the LLM to correct a failed SQL query."""
-    # Classify error type for targeted guidance
-    error_upper = str(error_msg).upper()
-    if "NO SUCH COLUMN" in error_upper:
-        hint = "Check column names against the schema — the column may be misspelled or belong to a different table."
-    elif "NO SUCH TABLE" in error_upper:
-        hint = "Check table names against the schema — the table may be misspelled."
-    elif "SYNTAX ERROR" in error_upper or "NEAR" in error_upper:
-        hint = "Fix the SQLite syntax error."
-    else:
-        hint = "Fix the error based on the message below."
-
-    return f"""The following SQL query failed. {hint}
-
-Error: {error_msg}
-
-Failed query:
-```sql
-{failed_sql}
-```
-
-{schema_context}
-
-Output ONLY the corrected SQL query in a ```sql code block. No explanation needed."""
-
-
-def build_system_prompt(schema_context):
-    """Build the system prompt with schema context and few-shot examples."""
-    return f"""You are a SQLite expert assisting a forensic analyst. READ-ONLY environment — never output INSERT, UPDATE, DELETE, DROP, or any modification commands.
-
-Rules:
-- Schema-only questions (structure, relationships): respond in plain text, no SQL.
-- Data questions: brief explanation (1-2 sentences), then exactly ONE ```sql block. SQLite syntax only.
-- Use only tables/columns from the schema below.
-- Direct requests ("show me X"): write the query immediately, no confirmation.
-- If ambiguous, ask one clarifying question.
-
-Example 1 — Data retrieval:
-User: "Show me the 10 most recent entries in the logs table"
-Assistant: "I'll query the most recent 10 log entries by timestamp."
-```sql
-SELECT * FROM logs ORDER BY timestamp DESC LIMIT 10;
-```
-
-Example 2 — Structural question:
-User: "How are the tables related?"
-Assistant: "Based on the schema, **orders** links to **customers** via CustomerId, and **order_items** connects to both **orders** and **products** via foreign keys."
-
-{schema_context}"""
-
-def call_llm_non_streaming(messages, provider='lmstudio', model=None):
-    """Make a non-streaming LLM call and return the response text. Used for SQL retry."""
-    try:
-        if provider == 'ollama':
-            model = model or OLLAMA_MODEL
-            payload = {
-                "model": model,
-                "messages": messages,
-                "stream": False,
-                "options": {"temperature": 0.1}
-            }
-            r = requests.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=30)
-            r.raise_for_status()
-            return r.json().get('message', {}).get('content', '')
-        else:
-            headers = {"Content-Type": "application/json"}
-            payload = {
-                "messages": messages,
-                "temperature": 0.1,
-                "stream": False
-            }
-            r = requests.post(LLM_API_URL, headers=headers, json=payload, timeout=30)
-            r.raise_for_status()
-            data = r.json()
-            if 'choices' in data and data['choices']:
-                return data['choices'][0].get('message', {}).get('content', '')
-            return ''
-    except Exception as e:
-        logger.error(f"Non-streaming LLM call failed: {e}")
-        return ''
-
-
-def stream_llm_response(messages_to_send, provider, model=None):
-    """Stream response from LLM provider (LM Studio or Ollama)."""
-    if provider == 'ollama':
-        url = f"{OLLAMA_URL}/api/chat"
-        payload = {
-            "model": model or OLLAMA_MODEL,
-            "messages": messages_to_send,
-            "stream": True,
-            "options": {"temperature": 0.1}
-        }
-        headers = None
-        timeout = (3.05, 120)
-        provider_label = "Ollama"
-        conn_hint = "Is Ollama running? (ollama serve)"
-    else:
-        url = LLM_API_URL
-        payload = {
-            "messages": messages_to_send,
-            "mode": "chat",
-            "temperature": 0.1,
-            "stream": True,
-            "stream_options": {"include_usage": True}
-        }
-        headers = {"Content-Type": "application/json"}
-        timeout = (3.05, 60)
-        provider_label = "LM Studio"
-        conn_hint = "Is the server running at http://localhost:1234?"
-
-    full_response = ""
-    token_usage = None
-
-    try:
-        with requests.post(url, headers=headers, json=payload, stream=True, timeout=timeout) as r:
-            r.raise_for_status()
-            for line in r.iter_lines():
-                if not line:
-                    continue
-
-                if provider == 'ollama':
-                    try:
-                        data = json.loads(line)
-                        content = data.get('message', {}).get('content', '')
-                        if content:
-                            full_response += content
-                            yield content
-
-                        if data.get('done', False):
-                            token_usage = {
-                                'prompt_tokens': data.get('prompt_eval_count', 0),
-                                'completion_tokens': data.get('eval_count', 0),
-                                'total_tokens': data.get('prompt_eval_count', 0) + data.get('eval_count', 0)
-                            }
-                    except json.JSONDecodeError:
-                        continue
-                else:
-                    decoded_line = line.decode('utf-8')
-                    if not decoded_line.startswith('data: '):
-                        continue
-                    if decoded_line.strip() == 'data: [DONE]':
-                        continue
-
-                    try:
-                        json_data = json.loads(decoded_line[6:])
-
-                        if 'usage' in json_data:
-                            token_usage = json_data['usage']
-
-                        if 'choices' in json_data and json_data['choices']:
-                            delta = json_data['choices'][0].get('delta', {})
-                            content_chunk = delta.get('content', '')
-                            if content_chunk:
-                                full_response += content_chunk
-                                yield content_chunk
-                    except json.JSONDecodeError:
-                        continue
-
-        if token_usage:
-            logger.info(f"{provider_label} Response Complete. Tokens: {token_usage}")
-            yield f"<|END_OF_STREAM|>{full_response}<|TOKEN_USAGE|>{json.dumps(token_usage)}"
-        else:
-            logger.info(f"{provider_label} Response Complete (No token usage data)")
-            yield f"<|END_OF_STREAM|>{full_response}"
-
-    except requests.exceptions.Timeout:
-        logger.error(f"{provider_label} request timed out")
-        yield f"Error: {provider_label} request timed out. {conn_hint}"
-    except requests.exceptions.ConnectionError:
-        logger.error(f"Cannot connect to {provider_label}")
-        yield f"Error: Cannot connect to {provider_label}. {conn_hint}"
-    except requests.exceptions.RequestException as e:
-        logger.error(f"{provider_label} Stream Error: {str(e)}")
-        yield f"{provider_label} Error: {str(e)}"
-
 @app.route('/chat_stream', methods=['POST'])
 def chat_stream():
     logger.info("--- Chat Request Start ---")
@@ -971,7 +417,7 @@ def save_assistant_message():
     # Build assistant message with optional token usage
     msg_id = str(uuid.uuid4())
     assistant_message = {
-        "role": "assistant", 
+        "role": "assistant",
         "content": content,
         "id": msg_id
     }
@@ -1230,9 +676,9 @@ def add_note():
 
     if not message_id or note_content is None:
         return jsonify({'error': 'Missing message_id or note_content'}), 400
-        
+
     chat_history = session.get('chat_history', [])
-    
+
     # Find message by ID
     msg_found = False
     for msg in chat_history:
@@ -1240,13 +686,13 @@ def add_note():
             msg['note'] = note_content
             msg_found = True
             break
-            
+
     if not msg_found:
         return jsonify({'error': 'Message not found'}), 404
-        
+
     session['chat_history'] = chat_history
     session.modified = True
-    
+
     return jsonify({'status': 'success'})
 
 def _get_css_content():
@@ -1308,7 +754,7 @@ def _generate_chat_html(chat_history):
 @app.route('/export_chat', methods=['GET'])
 def export_chat():
     chat_history = session.get('chat_history', [])
-    
+
     # Gather Metadata (escape user-provided values for XSS prevention)
     original_filename = html_escape(session.get('original_filename', 'Unknown'))
     db_hash = session.get('db_hash', 'N/A')
@@ -1355,7 +801,7 @@ def export_chat():
     </div>
 </body>
 </html>"""
-    
+
     # Generate timestamped filename for the download
     safe_date = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"Analysis_Report_{safe_date}.html"

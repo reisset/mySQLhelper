@@ -1,6 +1,6 @@
 // SQL execution, result table rendering, CSV export
 
-import { escapeHtml, downloadBlob } from './ui.js';
+import { escapeHtml, downloadBlob, fetchJson } from './ui.js';
 import { chartIconSVG, toggleChart } from './charts.js';
 
 export async function executeSqlAndRender(fullText, contentContainer) {
@@ -12,18 +12,7 @@ export async function executeSqlAndRender(fullText, contentContainer) {
     const sqlQuery = match[1].trim();
 
     try {
-        const response = await fetch('/execute_sql', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sql_query: sqlQuery }),
-        });
-
-        if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || 'SQL Execution Failed');
-        }
-
-        const data = await response.json();
+        const data = await fetchJson('/execute_sql', { sql_query: sqlQuery });
 
         // Show auto-corrected badge if retry happened
         if (data.retried) {
@@ -126,8 +115,8 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
     tableWrapper.className = 'results-table-container';
     container.appendChild(tableWrapper);
 
-    // Render Grid.js with built-in search
-    new gridjs.Grid({
+    // Render Grid.js with built-in search (store reference for cleanup)
+    const grid = new gridjs.Grid({
         columns: Object.keys(queryResults[0]),
         data: queryResults.map(row => Object.values(row)),
         pagination: { limit: 10, summary: true },
@@ -142,6 +131,7 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
         },
         className: { table: 'custom-grid-table', th: 'custom-grid-th', td: 'custom-grid-td', container: 'custom-grid-container' }
     }).render(tableWrapper);
+    tableWrapper._gridInstance = grid;
 
     // Reset scroll on pagination to prevent sticky header clipping
     tableWrapper.addEventListener('click', (e) => {
@@ -177,4 +167,14 @@ function downloadCSV(queryResults) {
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     downloadBlob(blob, 'query_results.csv');
+}
+
+// --- Grid.js Cleanup ---
+export function destroyAllGrids() {
+    document.querySelectorAll('.results-table-container').forEach(wrapper => {
+        if (wrapper._gridInstance) {
+            wrapper._gridInstance.destroy();
+            wrapper._gridInstance = null;
+        }
+    });
 }

@@ -1,6 +1,6 @@
 // Forensic annotations: add/edit notes on bot messages
 
-import { showAlertModal } from './ui.js';
+import { showAlertModal, fetchJson } from './ui.js';
 
 export function enableAnnotation(container, messageId) {
     const controlsDiv = document.createElement('div');
@@ -52,12 +52,7 @@ function showNoteEditor(container, messageId, initialText = '') {
         saveBtn.textContent = 'Saving...';
 
         try {
-            const res = await fetch('/add_note', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message_id: messageId, note_content: noteContent })
-            });
-            const data = await res.json();
+            const data = await fetchJson('/add_note', { message_id: messageId, note_content: noteContent });
 
             if (data.status === 'success') {
                 editorDiv.remove();

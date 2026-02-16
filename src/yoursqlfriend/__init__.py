@@ -1,6 +1,11 @@
 """yourSQLfriend — SQLite forensic analysis with local LLMs."""
 
-from yoursqlfriend.app import VERSION, main
+from importlib.metadata import version
 
-__version__ = VERSION
-__all__ = ["main", "__version__"]
+__version__ = version("yoursqlfriend")
+__all__ = ["__version__"]
+
+
+def main():
+    from yoursqlfriend.app import main as _main
+    _main()

@@ -1,12 +1,11 @@
 // LLM provider management: status polling, model selection
 
 import { state } from './state.js';
-import { showAlertModal } from './ui.js';
+import { showAlertModal, fetchJson } from './ui.js';
 
 export async function checkProviderStatus() {
     try {
-        const response = await fetch(`/api/provider/status?provider=${state.currentProvider}`);
-        const data = await response.json();
+        const data = await fetchJson(`/api/provider/status?provider=${state.currentProvider}`);
 
         if (state.currentProvider === 'ollama') {
             state.ollamaAvailable = data.available;
@@ -105,16 +104,9 @@ function updateProviderStatusUI(available, models) {
 
 async function setOllamaModel(model) {
     try {
-        const response = await fetch('/api/ollama/model', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: model })
-        });
-
-        if (response.ok) {
-            state.selectedOllamaModel = model;
-            console.log('Ollama model set to:', model);
-        }
+        await fetchJson('/api/ollama/model', { model: model });
+        state.selectedOllamaModel = model;
+        console.log('Ollama model set to:', model);
     } catch (error) {
         console.error('Failed to set model:', error);
         showAlertModal('Error', 'Failed to set Ollama model.');
@@ -128,10 +120,11 @@ export function initProviderSelector() {
     // Check status on page load for default provider
     checkProviderStatus();
 
-    // Start polling for status
-    if (!state.statusCheckInterval) {
-        state.statusCheckInterval = setInterval(checkProviderStatus, 30000);
+    // Clear existing interval before creating a new one
+    if (state.statusCheckInterval) {
+        clearInterval(state.statusCheckInterval);
     }
+    state.statusCheckInterval = setInterval(checkProviderStatus, 30000);
 
     providerSelect.addEventListener('change', async (e) => {
         state.currentProvider = e.target.value;
@@ -139,6 +132,14 @@ export function initProviderSelector() {
         await checkProviderStatus();
     });
 }
+
+// Clean up interval on page unload
+window.addEventListener('beforeunload', () => {
+    if (state.statusCheckInterval) {
+        clearInterval(state.statusCheckInterval);
+        state.statusCheckInterval = null;
+    }
+});
 
 export function initModelSelector() {
     const modelSelect = document.getElementById('ollama-model-select');

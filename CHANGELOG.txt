@@ -1,5 +1,24 @@
 CHANGELOG
 
+### v3.8.1 - Internal Cleanup & Test Coverage (Feb 2026)
+
+#### Backend
+- **Split monolithic `app.py`:** Extracted `validation.py` (SQL validation), `llm.py` (LLM provider abstraction, prompts, streaming), and `database.py` (read-only connections, query execution, file hashing, upload handling). `app.py` reduced from ~1,400 lines to ~850 lines of Flask routes and session management.
+- **LLM provider abstraction:** Replaced 4 inline `if provider == 'ollama'` branches with `get_provider_config()`, `_build_llm_payload()`, and `_extract_llm_content()` helpers. Adding a new LLM provider now means adding one config dict instead of editing every branch.
+
+#### Frontend
+- **Fixed `setInterval` memory leak in `providers.js`:** Provider status polling interval was never cleared when re-initialized. Now clears existing interval before creating a new one, with `beforeunload` cleanup as a safety net.
+- **Fixed Grid.js instance leak in `sql.js`:** Grid.js instances were created without destroying previous ones. Now tracks instances on DOM elements and exposes `destroyAllGrids()` for cleanup on new DB upload.
+- **Added `fetchJson()` utility in `ui.js`:** Replaced duplicated `fetch` + JSON parse + error handling pattern across 6 modules (`chat.js`, `sql.js`, `search.js`, `providers.js`, `notes.js`, `app.js`).
+
+#### Tests
+- **43 new test cases (63 -> 106 total):** Added `test_routes.py` (24 route-level tests via Flask test client covering upload, SQL execution, search, schema diagram, notes, chat export, and chat stream) and `test_llm.py` (19 tests for provider config, payload building, content extraction, schema context, prompts, and mocked API calls).
+
+#### Housekeeping
+- **Single source of truth for version:** `pyproject.toml` is now the only place the version string is defined. `__init__.py` reads it at runtime via `importlib.metadata`, and `app.py` imports from there. On release, only `pyproject.toml` and `CHANGELOG.txt` need updating.
+- Deleted obsolete `build/` and `dist/` directories (PyInstaller/build leftovers).
+- Updated `CLAUDE.md` to reflect new module structure and test counts.
+
 ### v3.8.0 - PyPI Package Distribution (Feb 2026)
 
 #### Architecture

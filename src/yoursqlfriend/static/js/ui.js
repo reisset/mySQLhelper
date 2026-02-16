@@ -72,6 +72,19 @@ export function downloadBlob(blob, filename) {
     a.remove();
 }
 
+// --- Fetch JSON Utility ---
+export async function fetchJson(url, body) {
+    const options = body !== undefined
+        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+        : {};
+    const response = await fetch(url, options);
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+    }
+    return data;
+}
+
 // --- Custom Confirmation Modal ---
 export function showConfirmModal(title, message, onConfirm, confirmText = 'Continue', cancelText = 'Cancel') {
     const contentHTML = `

@@ -24,7 +24,10 @@ python -m yoursqlfriend.app
 
 **Single-page Flask app** with vanilla JS frontend. No build step, no bundler, no framework. Installable as a PWA from Chrome/Edge/Brave. Distributed via PyPI (`pipx install yoursqlfriend`).
 
-- `src/yoursqlfriend/app.py` — All backend logic: routes, SQL validation, LLM streaming (SSE), file upload handling, security features (hashing, audit logging, read-only enforcement)
+- `src/yoursqlfriend/app.py` — Flask routes, session management, HTML export
+- `src/yoursqlfriend/validation.py` — `validate_sql()`, `strip_strings_and_comments()` (SQL security boundary)
+- `src/yoursqlfriend/llm.py` — LLM provider abstraction, prompts, streaming/non-streaming calls
+- `src/yoursqlfriend/database.py` — Read-only connections, query execution, file hashing, upload handling
 - `src/yoursqlfriend/static/js/` — ES modules: `app.js` (entry), `state.js`, `ui.js`, `chat.js`, `sql.js`, `charts.js`, `upload.js`, `providers.js`, `search.js`, `notes.js`, `erdiagram.js`
 - `src/yoursqlfriend/static/style.css` — Dark/light forensic terminal theme
 - `src/yoursqlfriend/templates/index.html` — Jinja2 single-page template, loads vendored libs from `static/lib/`
@@ -47,7 +50,7 @@ python -m yoursqlfriend.app
 - **Read-only databases**: All connections use `mode=ro` + `PRAGMA query_only = ON`
 - **SQL validation** (`validate_sql()`): Strips string literals and comments first, then checks allowed statement starts (SELECT/WITH/EXPLAIN/PRAGMA) and blocks 13 forbidden keywords. Multi-statement queries rejected
 - **PRAGMA table names must be double-quoted**: `PRAGMA table_info("table_name")` — not single quotes
-- **Version**: `src/yoursqlfriend/app.py` `VERSION` is the single source of truth. On release, also update `pyproject.toml` `version`. Template cache-bust `?v=` and service worker `CACHE_NAME` are injected automatically. Update `CHANGELOG.txt` as well.
+- **Version**: `pyproject.toml` `version` is the single source of truth. Read at runtime via `importlib.metadata` in `__init__.py`. On release, update `pyproject.toml` version and add a `CHANGELOG.txt` entry. Template cache-bust `?v=` and service worker `CACHE_NAME` are injected automatically.
 - **User data**: stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows)
 - **Session state**: Server-side filesystem sessions — set `session.modified = True` after updates
 - **Grid.js table limit**: 2000 rows max for performance
@@ -69,4 +72,4 @@ pip install -e .
 python -m pytest tests/ -v
 ```
 
-63 pytest cases covering `validate_sql()` and `strip_strings_and_comments()` — the SQL security boundary. No linter configured.
+106 pytest cases: SQL validation (63), Flask route tests (24), LLM module tests (19). No linter configured.

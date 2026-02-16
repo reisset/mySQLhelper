@@ -1,7 +1,7 @@
 // Chat messaging: send, stream, render, token tracking
 
 import { state } from './state.js';
-import { renderText } from './ui.js';
+import { renderText, fetchJson } from './ui.js';
 import { executeSqlAndRender } from './sql.js';
 import { enableAnnotation } from './notes.js';
 
@@ -175,15 +175,10 @@ export async function sendMessage() {
         }
 
         // SAVE THE ASSISTANT MESSAGE TO SESSION (with token usage)
-        const saveResponse = await fetch('/save_assistant_message', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                content: fullResponse,
-                token_usage: tokenUsage  // Include token data
-            }),
+        const saveData = await fetchJson('/save_assistant_message', {
+            content: fullResponse,
+            token_usage: tokenUsage
         });
-        const saveData = await saveResponse.json();
 
         // Enable annotation if message ID is returned
         if (saveData.message_id) {

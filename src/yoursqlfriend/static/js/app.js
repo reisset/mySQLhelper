@@ -5,7 +5,7 @@
 // Main entry point — imports all modules and wires up event listeners
 
 import { state } from './state.js';
-import { initTheme, toggleTheme, showConfirmModal, showAlertModal, downloadBlob } from './ui.js';
+import { initTheme, toggleTheme, showConfirmModal, showAlertModal, downloadBlob, fetchJson } from './ui.js';
 import { updateChartsForTheme } from './charts.js';
 import { initProviderSelector, initModelSelector } from './providers.js';
 import { sendMessage } from './chat.js';
@@ -20,12 +20,9 @@ initTheme();
 const appVersion = document.getElementById('app-version');
 (async function fetchVersion() {
     try {
-        const response = await fetch('/api/version');
-        if (response.ok) {
-            const data = await response.json();
-            if (appVersion) {
-                appVersion.textContent = `yourSQLfriend v${data.version}`;
-            }
+        const data = await fetchJson('/api/version');
+        if (appVersion) {
+            appVersion.textContent = `yourSQLfriend v${data.version}`;
         }
     } catch (error) {
         console.warn('Could not fetch version:', error);
