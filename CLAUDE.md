@@ -21,7 +21,7 @@ python app.py --no-browser # Don't auto-open browser
 **Single-page Flask app** with vanilla JS frontend. No build step, no bundler, no framework. Installable as a PWA from Chrome/Edge/Brave.
 
 - `app.py` — All backend logic: routes, SQL validation, LLM streaming (SSE), file upload handling, security features (hashing, audit logging, read-only enforcement)
-- `static/script.js` — Chat UI, SQL execution, Grid.js table rendering, chart visualization, ER diagram, LLM provider management, theme toggle
+- `static/js/` — ES modules: `app.js` (entry), `state.js`, `ui.js`, `chat.js`, `sql.js`, `charts.js`, `upload.js`, `providers.js`, `search.js`, `notes.js`, `erdiagram.js`
 - `static/style.css` — Dark/light forensic terminal theme
 - `templates/index.html` — Jinja2 single-page template, loads vendored libs from `static/lib/`
 - `static/manifest.json` — PWA manifest (standalone display, app icons)
@@ -42,7 +42,7 @@ python app.py --no-browser # Don't auto-open browser
 - **Read-only databases**: All connections use `mode=ro` + `PRAGMA query_only = ON`
 - **SQL validation** (`validate_sql()`): Strips string literals and comments first, then checks allowed statement starts (SELECT/WITH/EXPLAIN/PRAGMA) and blocks 13 forbidden keywords. Multi-statement queries rejected
 - **PRAGMA table names must be double-quoted**: `PRAGMA table_info("table_name")` — not single quotes
-- **Version tracked in 6 places**: `app.py` (`VERSION`), `templates/index.html` (CSS/JS cache bust `?v=` x2), `README.md` (badge), `static/service-worker.js` (`CACHE_NAME`), `run.sh`, `run.bat`
+- **Version**: `app.py` `VERSION` is the single source of truth. Template cache-bust `?v=` and service worker `CACHE_NAME` are injected automatically. Only update `app.py` and `CHANGELOG.txt` on release.
 - **User data**: stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows)
 - **Session state**: Server-side filesystem sessions — set `session.modified = True` after updates
 - **Grid.js table limit**: 2000 rows max for performance
@@ -57,6 +57,11 @@ Python: Flask, pandas, requests, Flask-Session
 
 Frontend (vendored in `static/lib/`): Grid.js, Highlight.js, Marked.js, DOMPurify, Chart.js
 
-## No Test Suite or Linter
+## Tests
 
-There is currently no automated testing infrastructure or linting/formatting configuration.
+```bash
+source venv/bin/activate
+python -m pytest tests/ -v
+```
+
+63 pytest cases covering `validate_sql()` and `strip_strings_and_comments()` — the SQL security boundary. No linter configured.

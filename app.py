@@ -29,7 +29,7 @@ from flask_session import Session
 from werkzeug.utils import secure_filename
 
 # --- Version ---
-VERSION = "3.5.0"
+VERSION = "3.7.0"
 
 # --- Paths ---
 
@@ -308,17 +308,15 @@ def convert_csv_to_sqlite(csv_filepath, db_filepath):
         df.columns = [re.sub(r'[^\w]', '_', col) for col in df.columns]
 
         # Create SQLite database and insert data
-        conn = sqlite3.connect(db_filepath)
-        table_name = 'csv_data'  # Default table name
-        df.to_sql(table_name, conn, if_exists='replace', index=False)
+        with sqlite3.connect(db_filepath) as conn:
+            table_name = 'csv_data'  # Default table name
+            df.to_sql(table_name, conn, if_exists='replace', index=False)
 
-        # Extract schema
-        cursor = conn.cursor()
-        cursor.execute(f'PRAGMA table_info("{table_name}");')
-        columns = cursor.fetchall()
-        schema = {table_name: [column[1] for column in columns]}
-
-        conn.close()
+            # Extract schema
+            cursor = conn.cursor()
+            cursor.execute(f'PRAGMA table_info("{table_name}");')
+            columns = cursor.fetchall()
+            schema = {table_name: [column[1] for column in columns]}
         logger.info(f"CSV converted to SQLite: {len(df)} rows, {len(df.columns)} columns")
 
         return schema
@@ -360,21 +358,19 @@ def execute_sql_file(sql_filepath, db_filepath):
             raise ValueError("SQL file contains forbidden keyword: CREATE TRIGGER")
 
         # Execute SQL file
-        conn = sqlite3.connect(db_filepath)
-        cursor = conn.cursor()
-        cursor.executescript(sql_content)
+        with sqlite3.connect(db_filepath) as conn:
+            cursor = conn.cursor()
+            cursor.executescript(sql_content)
 
-        # Extract schema
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        schema = {}
-        for table_name in tables:
-            table_name = table_name[0]
-            cursor.execute(f'PRAGMA table_info("{table_name}");')
-            columns = cursor.fetchall()
-            schema[table_name] = [column[1] for column in columns]
-
-        conn.close()
+            # Extract schema
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = cursor.fetchall()
+            schema = {}
+            for table_name in tables:
+                table_name = table_name[0]
+                cursor.execute(f'PRAGMA table_info("{table_name}");')
+                columns = cursor.fetchall()
+                schema[table_name] = [column[1] for column in columns]
         logger.info(f"SQL file executed: {len(schema)} tables created")
 
         return schema
@@ -472,8 +468,15 @@ def get_provider_status():
 
 @app.route('/service-worker.js')
 def service_worker():
-    """Serve service worker from root scope for PWA support."""
-    return app.send_static_file('service-worker.js'), 200, {
+    """Serve service worker from root scope for PWA support.
+
+    Version is injected from app.py so CACHE_NAME updates automatically.
+    """
+    sw_path = os.path.join(app.static_folder, 'service-worker.js')
+    with open(sw_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    content = content.replace('%%VERSION%%', VERSION)
+    return content, 200, {
         'Content-Type': 'application/javascript',
         'Service-Worker-Allowed': '/'
     }
@@ -537,25 +540,23 @@ def upload_file():
         if file_ext in ['.db', '.sqlite', '.sqlite3']:
             # SQLite database - validate integrity
             try:
-                conn = sqlite3.connect(temp_filepath)
-                cursor = conn.cursor()
+                with sqlite3.connect(temp_filepath) as conn:
+                    cursor = conn.cursor()
 
-                # Integrity check
-                cursor.execute("PRAGMA integrity_check;")
-                integrity = cursor.fetchone()[0]
-                if integrity != 'ok':
-                    raise sqlite3.DatabaseError(f"Database integrity check failed: {integrity}")
+                    # Integrity check
+                    cursor.execute("PRAGMA integrity_check;")
+                    integrity = cursor.fetchone()[0]
+                    if integrity != 'ok':
+                        raise sqlite3.DatabaseError(f"Database integrity check failed: {integrity}")
 
-                # Extract schema
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-                tables = cursor.fetchall()
-                for table_name in tables:
-                    table_name = table_name[0]
-                    cursor.execute(f'PRAGMA table_info("{table_name}");')
-                    columns = cursor.fetchall()
-                    schema[table_name] = [column[1] for column in columns]
-
-                conn.close()
+                    # Extract schema
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+                    tables = cursor.fetchall()
+                    for table_name in tables:
+                        table_name = table_name[0]
+                        cursor.execute(f'PRAGMA table_info("{table_name}");')
+                        columns = cursor.fetchall()
+                        schema[table_name] = [column[1] for column in columns]
                 logger.info(f"SQLite validated: {len(schema)} tables found")
 
                 # Move to final location
