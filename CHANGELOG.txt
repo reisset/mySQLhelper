@@ -1,5 +1,24 @@
 CHANGELOG
 
+### v3.8.0 - PyPI Package Distribution (Feb 2026)
+
+#### Architecture
+- **PyPI package:** yourSQLfriend is now installable via `pipx install yoursqlfriend`. Users type `yoursqlfriend` from any terminal to launch — no git clone, no manual venv, no `./run.sh` needed.
+- **src/ layout:** Restructured into `src/yoursqlfriend/` Python package. All app code, static assets, templates, and ASCII art moved into the package directory. Existing `BASE_PATH` resolution via `__file__` required zero path logic changes.
+- **pyproject.toml:** Added package metadata with hatchling build backend. Dependencies declared with minimum version pins (`flask>=3.0`, `pandas>=2.0`, `requests>=2.28`, `flask-session>=0.5`). Entry point: `yoursqlfriend = "yoursqlfriend:main"`.
+- **Extracted `main()` function:** `app.py` `__main__` block extracted into a callable `main()` for use as a package entry point. `if __name__ == '__main__'` guard retained for direct execution.
+
+#### Installer Scripts
+- **Rewritten `install.sh` (Linux/macOS):** Now installs via pipx instead of downloading a tarball. Detects Python 3.10+, installs pipx if missing (pip → apt/dnf/pacman/brew fallbacks), runs `pipx install yoursqlfriend`. Supports `--update` flag for upgrades.
+- **Rewritten `install.ps1` (Windows):** Same pipx-based flow adapted for PowerShell. Checks `python3`/`python`/`py` commands, installs pipx via pip, refreshes PATH within session.
+- **Dev scripts updated:** `run.sh` and `run.bat` now use `pip install -e .` (editable install) instead of `pip install -r requirements.txt`, and launch via `python -m yoursqlfriend.app`.
+
+#### CI/CD
+- **GitHub Actions publish workflow:** `.github/workflows/publish.yml` triggers on version tags (`v*`). Builds sdist + wheel, publishes to PyPI via trusted publishers (OIDC) — no API tokens needed.
+
+#### Tests
+- **Updated imports:** Test file now imports from `yoursqlfriend.app` instead of using `sys.path.insert` hack. All 63 tests pass.
+
 ### v3.7.1 - Codebase Consolidation (Feb 2026)
 
 #### Backend
