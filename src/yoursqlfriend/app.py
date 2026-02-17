@@ -6,6 +6,8 @@
 import sqlite3
 import os
 import sys
+import gc
+import time
 import logging
 import re
 import uuid
@@ -245,7 +247,8 @@ def upload_file():
         if file_ext in ['.db', '.sqlite', '.sqlite3']:
             # SQLite database - validate integrity
             try:
-                with sqlite3.connect(temp_filepath) as conn:
+                conn = sqlite3.connect(temp_filepath)
+                try:
                     cursor = conn.cursor()
 
                     # Integrity check
@@ -262,14 +265,35 @@ def upload_file():
                         cursor.execute(f'PRAGMA table_info("{table_name}");')
                         columns = cursor.fetchall()
                         schema[table_name] = [column[1] for column in columns]
+                finally:
+                    conn.close()
+                    del cursor
+                    del conn
+                    gc.collect()
                 logger.info(f"SQLite validated: {len(schema)} tables found")
 
-                # Move to final location
-                os.replace(temp_filepath, final_filepath)
+                # Move to final location (retry for Windows file lock release)
+                for attempt in range(5):
+                    try:
+                        os.replace(temp_filepath, final_filepath)
+                        break
+                    except PermissionError:
+                        if attempt < 4:
+                            time.sleep(0.1)
+                        else:
+                            raise
 
             except sqlite3.Error as e:
-                if os.path.exists(temp_filepath):
-                    os.remove(temp_filepath)
+                for attempt in range(5):
+                    try:
+                        if os.path.exists(temp_filepath):
+                            os.remove(temp_filepath)
+                        break
+                    except PermissionError:
+                        if attempt < 4:
+                            time.sleep(0.1)
+                        else:
+                            logger.warning(f"Could not remove temp file: {temp_filepath}")
                 logger.error(f"SQLite validation failed: {str(e)}")
                 return jsonify({'error': f'Invalid SQLite database: {str(e)}'}), 400
 
@@ -325,9 +349,17 @@ def upload_file():
         })
 
     except Exception as e:
-        # Clean up on any error
-        if os.path.exists(temp_filepath):
-            os.remove(temp_filepath)
+        # Clean up on any error (retry for Windows file lock release)
+        for attempt in range(5):
+            try:
+                if os.path.exists(temp_filepath):
+                    os.remove(temp_filepath)
+                break
+            except PermissionError:
+                if attempt < 4:
+                    time.sleep(0.1)
+                else:
+                    logger.warning(f"Could not remove temp file: {temp_filepath}")
         logger.error(f"Upload failed: {str(e)}", exc_info=True)
         return jsonify({'error': f'Upload processing failed: {str(e)}'}), 500
 

@@ -658,6 +658,11 @@ body::before {
     line-height: 1.1;
     white-space: pre;
     overflow: hidden;
+    text-align: left;
+    letter-spacing: 0;
+    font-kerning: none;
+    text-rendering: optimizeSpeed;
+    padding: 0 1ch;
     /* Animated gradient */
     background: linear-gradient(
         90deg,

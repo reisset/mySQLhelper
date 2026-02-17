@@ -1,5 +1,15 @@
 CHANGELOG
 
+### v3.8.3 - Windows Compatibility (Feb 2026)
+
+#### Fixes
+- **Fixed file upload crash on Windows:** `PermissionError: [WinError 32]` when uploading SQLite databases. Windows holds file locks after `sqlite3.connect()` even after `close()`. Now explicitly releases connection objects with `gc.collect()` and retries file operations with backoff.
+- **Fixed garbled ASCII art on Windows:** Bundled JetBrains Mono woff2 fonts were Latin-only subsets (229 glyphs) missing Unicode block characters. Replaced with full official JetBrains Mono woff2 (1363 glyphs) from JetBrains v2.304 release.
+- **Fixed ASCII art "y" descender clipping:** Welcome screen `pre` inherited `text-align: center` causing shorter descender lines to shift right. Added `text-align: left` to keep all lines flush-left within the centered block.
+
+#### CSS Hardening
+- Added `font-kerning: none`, `text-rendering: optimizeSpeed`, `letter-spacing: 0` to ASCII art `pre` for consistent monospace rendering across platforms.
+
 ### v3.8.2 - Installer Fix (Feb 2026)
 
 #### Fixes
