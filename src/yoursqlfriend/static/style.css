@@ -145,11 +145,14 @@ a { color: var(--accent-2); }
 ::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
 
 /* ─────────── wordmark ─────────── */
+/* A1: accent reserved for selection/focus — wordmark uses ink-family only,
+   so the burnt-umber moment is saved for when the user actually selects
+   something. */
 .wm { display: inline-flex; align-items: baseline; gap: 0; font-family: var(--serif); font-weight: 500; letter-spacing: -.01em; line-height: 1; }
 .wm .wm-your { font-style: italic; color: var(--ink-3); font-weight: 400; }
 .wm .wm-sql { font-weight: 600; color: var(--ink); }
-.wm .wm-friend { color: var(--accent); font-style: italic; font-weight: 400; }
-.wm .wm-dot { color: var(--accent); margin: 0 1px; }
+.wm .wm-friend { color: var(--ink-2); font-style: italic; font-weight: 400; }
+.wm .wm-dot { color: var(--ink-3); margin: 0 1px; }
 
 /* ─────────── app frame ─────────── */
 .app-container {
@@ -199,6 +202,71 @@ body.db-loaded .app-main { display: grid; }
 .app-header .grow { flex: 1; min-width: 0; }
 .app-header .header-actions { display: flex; align-items: center; gap: 8px; }
 
+/* B1: top-right instrument cluster — model pill + ctx bar | theme + settings */
+.app-header .cp-model {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--bg);
+  font-family: var(--mono); font-size: 10.5px;
+  max-width: 220px;
+  color: var(--ink-2);
+}
+.app-header .cp-model .dot {
+  width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--ink-4);
+  transition: background .15s;
+}
+.app-header .cp-model .dot.online { background: var(--ok); }
+.app-header .cp-model .dot.offline { background: var(--err); }
+.app-header .cp-model .dot.checking { background: var(--warn); }
+.app-header .cp-model .name {
+  color: var(--ink); font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 160px;
+}
+.app-header .cp-model.off .name { color: var(--ink-4); font-style: italic; font-weight: 400; }
+
+.app-header .cp-context {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 3px 10px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--bg);
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-3);
+}
+.app-header .cp-context .label { color: var(--ink-4); }
+.app-header .cp-context .bar {
+  width: 64px; height: 5px;
+  background: var(--bg-3);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.app-header .cp-context .fill {
+  display: block; height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--ok) 0%, var(--amber) 60%, var(--err) 95%);
+  transition: width .25s ease;
+}
+.app-header .cp-context .count {
+  color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums;
+  min-width: 32px; text-align: right;
+}
+.app-header .hdr-pipe {
+  width: 1px; height: 18px; background: var(--line-2);
+  margin: 0 2px;
+}
+.app-header .hdr-icon-btn {
+  width: 26px; height: 26px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--bg); color: var(--ink-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.app-header .hdr-icon-btn:hover { background: var(--bg-2); color: var(--ink); border-color: var(--ink-3); }
+.app-header .hdr-icon-btn[aria-expanded="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
 .app-main {
   display: grid;
   grid-template-columns: var(--left) minmax(0, 1fr) var(--right);
@@ -210,13 +278,20 @@ body.db-loaded .app-main { display: grid; }
 .pane + .pane { border-left: 1px solid var(--line); }
 
 .app-footer {
-  display: flex; align-items: center; gap: 14px;
-  padding: 0 12px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px;
   border-top: 1px solid var(--line);
   background: var(--bg-2);
   font-family: var(--mono); font-size: 10px; color: var(--ink-3);
+  letter-spacing: .02em;
 }
-.app-footer .ft-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.app-footer .ft-status { color: var(--ink-2); font-weight: 500; }
+.app-footer .ft-sep { width: 1px; height: 11px; background: var(--line-2); }
+.app-footer .ft-metric { font-variant-numeric: tabular-nums; }
+.app-footer .ft-metric[hidden] { display: none; }
+.app-footer .ft-metric::before { content: "· "; color: var(--ink-4); margin-right: 2px; }
+.app-footer .ft-metric:first-of-type::before { content: ""; margin: 0; }
+.app-footer #ft-hash { font-variant-numeric: tabular-nums; }
 
 /* ─────────── left pane: file + actions + schema ─────────── */
 .lp-head {
@@ -336,8 +411,8 @@ input[type="file"]#database-file { display: none; }
 .tbl-cols .c { display: flex; gap: 8px; padding: 2px 0; }
 .tbl-cols .c .n { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tbl-cols .c .t { color: var(--ink-4); font-size: 10px; margin-left: auto; flex-shrink: 0; }
-.tbl-cols .c.pk .n { color: var(--accent-2); font-weight: 600; }
-.tbl-cols .c.pk .n::before { content: "★  "; color: var(--accent); }
+.tbl-cols .c.pk .n { color: var(--ink-2); font-weight: 600; }
+.tbl-cols .c.pk .n::before { content: "★  "; color: var(--ink-3); }
 .tbl-cols .c.fk .n::before { content: "↗  "; color: var(--ink-3); }
 .sample-btn {
   margin-top: 6px;
@@ -480,8 +555,10 @@ input[type="file"]#database-file { display: none; }
   color: var(--ink-3); font-weight: 600;
   margin-right: 4px;
 }
+/* C2: example queries are real buttons. Subtle "→" on hover signals
+   the click-to-composer affordance. */
 .example-query {
-  display: inline-block;
+  display: inline-flex; align-items: center; gap: 4px;
   padding: 4px 10px;
   background: var(--bg-2); color: var(--ink-2);
   border: 1px solid var(--line-2); border-radius: 999px;
@@ -489,9 +566,17 @@ input[type="file"]#database-file { display: none; }
   cursor: pointer;
   transition: background .12s, color .12s, border-color .12s;
 }
+.example-query::after {
+  content: "→";
+  color: var(--ink-4);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity .12s, transform .12s, color .12s;
+}
 .example-query:hover {
   background: var(--accent-wash); color: var(--accent-2); border-color: var(--accent);
 }
+.example-query:hover::after { opacity: 1; transform: translateX(0); color: var(--accent-2); }
 #welcome-screen pre {
   display: none; /* ASCII art hidden in new design */
 }
@@ -514,13 +599,17 @@ input[type="file"]#database-file { display: none; }
   font-family: var(--serif); font-weight: 600; font-size: 13px;
   color: var(--ink);
 }
+/* C1: "A" for Analyst (user) stays — forensic framing.
+   Assistant avatar is the brand glyph "y" so every reply is visibly tied
+   to yourSQLfriend. Alternative considered: "&" (editorial, partnership). */
 .chat-message.user-message::before {
   content: "A";
   background: var(--ink); color: var(--bg); border-color: var(--ink);
 }
 .chat-message.bot-message::before {
-  content: "S";
-  background: var(--bg-2); color: var(--ink); border-color: var(--line);
+  content: "y";
+  font-style: italic;
+  background: var(--bg-2); color: var(--ink); border-color: var(--line-2);
 }
 .chat-message.user-message p {
   font-family: var(--serif);
@@ -792,7 +881,7 @@ table.gridjs-table tr.row-selected td.gridjs-td {
 
 /* header controls */
 #sidebar-toggle { display: none; }
-#theme-toggle, #refresh-btn {
+#theme-toggle {
   width: 26px; height: 26px;
   border: 1px solid var(--line-2); border-radius: var(--r-sm);
   background: var(--bg); color: var(--ink-2);
@@ -800,9 +889,8 @@ table.gridjs-table tr.row-selected td.gridjs-td {
   cursor: pointer;
   transition: background .12s, color .12s, border-color .12s;
 }
-#theme-toggle:hover, #refresh-btn:hover { background: var(--bg-2); color: var(--ink); border-color: var(--ink-3); }
+#theme-toggle:hover { background: var(--bg-2); color: var(--ink); border-color: var(--ink-3); }
 #theme-toggle svg { width: 14px; height: 14px; }
-#refresh-btn { font-size: 14px; }
 
 /* ─────────── right pane: row inspector ─────────── */
 .right-pane { background: var(--bg); }
@@ -1225,4 +1313,132 @@ table.gridjs-table tr.row-selected td.gridjs-td {
 @media (max-width: 880px) {
   .app-main { grid-template-columns: 1fr; }
   .pane.left-pane, .pane.right-pane { display: none; }
+}
+
+/* ─────────── B2: sidebar search row (replaces twin-button grid) ─────────── */
+.lp-search-row {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.lp-search-btn {
+  width: 100%;
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 28px; padding: 0 10px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--bg); color: var(--ink-2);
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.lp-search-btn:hover:not(:disabled) { background: var(--bg-2); color: var(--ink); border-color: var(--ink-3); }
+.lp-search-btn:disabled { opacity: .45; cursor: not-allowed; }
+.lp-search-btn .ic { font-size: 14px; line-height: 1; color: var(--ink-3); }
+.lp-search-btn .lbl { flex: 1; text-align: left; }
+.lp-search-btn .kbd { margin-left: auto; font-size: 9px; padding: 1px 4px; }
+
+/* ─────────── C3: composer keyboard hints ─────────── */
+.composer-hints {
+  flex: 0 0 auto;
+  display: flex; gap: 14px;
+  padding: 4px 16px 8px;
+  background: var(--bg-2);
+  font-family: var(--mono); font-size: 10px; color: var(--ink-4);
+  letter-spacing: .02em;
+  border-top: 1px solid transparent;
+}
+.composer-hints .kbd {
+  font-size: 9px; padding: 0 4px;
+  border-bottom-width: 1px;
+  color: var(--ink-3);
+}
+
+/* ─────────── D: query history panel (bottom-left) ─────────── */
+.lp-history {
+  flex: 0 0 auto;
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px 12px 8px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.lp-history[hidden] { display: none; }
+.lp-history .lp-sec-head { margin-bottom: 6px; }
+.lp-history-clear {
+  font-size: 10px !important; color: var(--ink-4) !important;
+  padding: 0 4px !important; height: 18px !important;
+}
+.lp-history-clear:hover { color: var(--ink) !important; background: transparent !important; }
+.lp-history-list {
+  display: flex; flex-direction: column; gap: 1px;
+}
+.lp-hist-entry {
+  display: flex; gap: 6px; align-items: baseline;
+  padding: 4px 6px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-2);
+  transition: background .12s, color .12s;
+}
+.lp-hist-entry:hover { background: var(--bg); color: var(--ink); }
+.lp-hist-entry .ts {
+  flex: 0 0 auto;
+  color: var(--ink-4);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+}
+.lp-hist-entry .q {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ─────────── B1: settings popover ─────────── */
+.settings-popover {
+  position: fixed;
+  top: 44px; right: 14px;
+  z-index: 150;
+  width: 280px;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  padding: 4px 0;
+  animation: settingsPop .12s ease;
+}
+.settings-popover[hidden] { display: none; }
+.settings-popover .settings-arrow {
+  position: absolute; top: -6px; right: 32px;
+  width: 10px; height: 10px;
+  background: var(--bg);
+  border-left: 1px solid var(--line-2);
+  border-top: 1px solid var(--line-2);
+  transform: rotate(45deg);
+}
+.settings-section {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-section:last-child { border-bottom: none; }
+.settings-sec-head { margin-bottom: 6px; }
+.settings-section .llm-provider-status { display: flex; flex-direction: column; gap: 6px; }
+.settings-section .ollama-status { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+.settings-section .sidebar-button { width: 100%; justify-content: space-between; }
+@keyframes settingsPop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─────────── Landing hero polish (B3) ─────────── */
+.landing-hero h1 {
+  font-variation-settings: "SOFT" 50, "opsz" 144;
+}
+
+/* Narrow viewport: hide the ctx bar first, then the model pill */
+@media (max-width: 980px) {
+  .app-header .cp-context { display: none; }
+}
+@media (max-width: 820px) {
+  .app-header .cp-model { display: none; }
 }

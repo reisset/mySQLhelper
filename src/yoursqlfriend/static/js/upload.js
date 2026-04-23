@@ -123,6 +123,13 @@ export function uploadFile() {
         if (fill) fill.style.width = '0%';
         if (count) count.textContent = '0';
 
+        // Replacing the DB wipes the visible query history panel
+        state.queryHistory.length = 0;
+        const histPanel = document.getElementById('lp-history');
+        const histList = document.getElementById('lp-history-list');
+        if (histPanel) histPanel.setAttribute('hidden', '');
+        if (histList) histList.innerHTML = '';
+
         // Remove all chat messages but keep the welcome screen if it exists
         const messages = chatHistory.querySelectorAll('.chat-message');
         messages.forEach(msg => msg.remove());

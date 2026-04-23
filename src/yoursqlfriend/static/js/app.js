@@ -5,7 +5,7 @@
 // Main entry point — imports all modules and wires up event listeners
 
 import { state } from './state.js';
-import { initTheme, toggleTheme, showConfirmModal, showAlertModal, downloadBlob, fetchJson } from './ui.js';
+import { initTheme, toggleTheme, showConfirmModal, showAlertModal, downloadBlob, fetchJson, toggleSettingsPopover, renderQueryHistory } from './ui.js';
 import { initProviderSelector, initModelSelector } from './providers.js';
 import { sendMessage } from './chat.js';
 import { uploadFile, handleFiles, handleDrop } from './upload.js';
@@ -50,7 +50,7 @@ const dropZone = document.getElementById('drop-zone');
 const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const themeToggle = document.getElementById('theme-toggle');
-const refreshBtn = document.getElementById('refresh-btn');
+const settingsBtn = document.getElementById('settings-btn');
 const uploadForm = document.getElementById('upload-form');
 const exportChatButton = document.getElementById('export-chat-button');
 const searchAllTablesButton = document.getElementById('search-all-tables-button');
@@ -64,17 +64,11 @@ if (themeToggle) {
     });
 }
 
-// --- Refresh Button ---
-if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => {
-        const hasChat = document.querySelectorAll('.chat-message').length > 0;
-        if (hasChat) {
-            showConfirmModal('Reload Page', 'This will clear your current session. Continue?', () => {
-                window.location.reload();
-            });
-        } else {
-            window.location.reload();
-        }
+// --- Settings popover ---
+if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSettingsPopover();
     });
 }
 
@@ -91,6 +85,14 @@ document.addEventListener('keydown', (e) => {
     if (e.key === '/' && !isTyping && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         userInput.focus();
+    }
+
+    // ⌘K / Ctrl+K: open the search-all-tables modal (only when a DB is loaded)
+    if (e.key === 'k' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        if (state.databaseLoaded) {
+            e.preventDefault();
+            showSearchModal();
+        }
     }
 
     // Escape to blur chat input
@@ -119,6 +121,15 @@ document.querySelectorAll('.example-query').forEach(el => {
         userInput.focus();
     });
 });
+
+// --- Query history panel: clear button ---
+const historyClearBtn = document.getElementById('lp-history-clear');
+if (historyClearBtn) {
+    historyClearBtn.addEventListener('click', () => {
+        state.queryHistory.length = 0;
+        renderQueryHistory(state.queryHistory);
+    });
+}
 
 // --- Send Button ---
 if (sendButton) {

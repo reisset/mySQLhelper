@@ -35,12 +35,20 @@
             </div>
             <span class="grow"></span>
             <div class="header-actions">
-                <div id="ollama-status" class="ollama-status" aria-live="polite">
-                    <span class="status-indicator offline" id="status-indicator"></span>
-                    <span class="status-text" id="status-text">Checking…</span>
+                <div id="cp-model" class="cp-model off" aria-live="polite" title="Active LLM provider / model">
+                    <span class="dot" id="status-indicator" aria-hidden="true"></span>
+                    <span class="name" id="cp-model-name">—</span>
                 </div>
-                <button id="theme-toggle" title="Toggle Theme" aria-label="Switch theme"></button>
-                <button id="refresh-btn" title="Reload page" aria-label="Reload page">↻</button>
+                <div id="cp-context" class="cp-context" title="Cumulative tokens this session">
+                    <span class="label micro">ctx</span>
+                    <div class="bar"><span class="fill" id="cp-context-fill"></span></div>
+                    <span class="count" id="cp-context-count">0</span>
+                </div>
+                <span class="hdr-pipe" aria-hidden="true"></span>
+                <button id="theme-toggle" title="Toggle theme" aria-label="Switch theme"></button>
+                <button id="settings-btn" class="hdr-icon-btn" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
             </div>
         </header>
 
@@ -119,42 +127,12 @@
 
             <!-- ── Left pane ── -->
             <aside class="pane left-pane" id="sidebar" aria-label="Database & schema">
-                <div class="lp-head">
-                    <span class="file" id="lp-filename">no database</span>
-                </div>
-                <div class="lp-actions">
-                    <button id="search-all-tables-button" class="sidebar-button" disabled>Search</button>
-                    <button id="export-chat-button" class="sidebar-button">Export</button>
-                </div>
-
-                <div class="lp-section">
-                    <div class="lp-sec-head"><span class="micro">Source</span></div>
-                    <button type="button" id="replace-db-button" class="sidebar-button replace-db">
-                        <span>Replace database</span>
-                        <span class="kbd">⇪</span>
+                <div class="lp-search-row">
+                    <button id="search-all-tables-button" class="lp-search-btn" disabled>
+                        <span class="ic" aria-hidden="true">⌕</span>
+                        <span class="lbl">Search all tables</span>
+                        <span class="kbd">⌘K</span>
                     </button>
-                    <div class="file-types-hint" style="margin-top:6px">.db · .sqlite · .csv · .sql</div>
-                </div>
-
-                <div class="lp-section" id="provider-section">
-                    <div class="lp-sec-head">
-                        <span class="micro">Provider</span>
-                    </div>
-                    <div class="llm-provider-status">
-                        <div class="provider-selector">
-                            <label for="llm-provider-select" class="visually-hidden">LLM Provider</label>
-                            <select id="llm-provider-select" class="provider-select">
-                                <option value="lmstudio">LM Studio</option>
-                                <option value="ollama">Ollama</option>
-                            </select>
-                        </div>
-                        <div id="model-selector" class="model-selector" style="display: none;">
-                            <label for="ollama-model-select" class="visually-hidden">Ollama Model</label>
-                            <select id="ollama-model-select" class="model-select" disabled>
-                                <option value="">Select model…</option>
-                            </select>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="lp-section lp-scroll">
@@ -167,6 +145,14 @@
                     </div>
                 </div>
 
+                <div class="lp-section lp-history" id="lp-history" hidden>
+                    <div class="lp-sec-head">
+                        <span class="micro">Query history</span>
+                        <button class="lp-history-clear btn ghost sm" id="lp-history-clear" aria-label="Clear query history">clear</button>
+                    </div>
+                    <div class="lp-history-list" id="lp-history-list" role="list"></div>
+                </div>
+
                 <div class="sidebar-version">
                     <span id="app-version">yourSQLfriend</span>
                 </div>
@@ -177,15 +163,6 @@
                 <div class="cp-head">
                     <div class="cp-title"><em>the</em> Forensic Workbench</div>
                     <span class="grow"></span>
-                    <div class="cp-model" id="cp-model" aria-live="polite">
-                        <span class="label micro">model</span>
-                        <span class="name" id="cp-model-name">—</span>
-                    </div>
-                    <div class="cp-context" id="cp-context" title="Cumulative tokens this session">
-                        <span class="label micro">context</span>
-                        <div class="bar"><span class="fill" id="cp-context-fill"></span></div>
-                        <span class="count" id="cp-context-count">0</span>
-                    </div>
                 </div>
                 <div class="chat-container">
                     <div class="chat-history" id="chat-history">
@@ -193,9 +170,9 @@
                             <div class="workbench-intro">
                                 <p class="serif">Ready. Ask anything about <span id="intro-db-name">this database</span>, or pick a starter:</p>
                                 <div class="example-queries">
-                                    <span class="example-query">"Show me all tables"</span>
-                                    <span class="example-query">"What are the most recent 10 entries?"</span>
-                                    <span class="example-query">"Find all records containing 'error'"</span>
+                                    <button type="button" class="example-query">"Show me all tables"</button>
+                                    <button type="button" class="example-query">"What are the most recent 10 entries?"</button>
+                                    <button type="button" class="example-query">"Find all records containing 'error'"</button>
                                 </div>
                             </div>
                         </div>
@@ -206,6 +183,12 @@
                         <label for="user-input" class="visually-hidden">Ask a question about your database</label>
                         <textarea id="user-input" rows="1" placeholder="Load a database to start chatting…" disabled aria-label="Ask a question about your database"></textarea>
                         <button id="send-button" aria-label="Send message" disabled>Send</button>
+                    </div>
+                    <div class="composer-hints" aria-hidden="true">
+                        <span><span class="kbd">Enter</span> send</span>
+                        <span><span class="kbd">Shift</span>+<span class="kbd">Enter</span> newline</span>
+                        <span><span class="kbd">⌘K</span> search</span>
+                        <span><span class="kbd">↑</span> recall</span>
                     </div>
                 </div>
             </section>
@@ -226,13 +209,55 @@
 
         </div>
 
-        <!-- ─────────── Footer ─────────── -->
+        <!-- ─────────── Footer (instrument strip) ─────────── -->
         <footer class="app-footer">
-            <span class="ft-dot" id="ft-dot"></span>
-            <span id="ft-status">ready</span>
+            <span id="ft-status" class="ft-status">ready</span>
+            <span class="ft-sep" aria-hidden="true"></span>
+            <span id="ft-timing" class="ft-metric dim" hidden></span>
+            <span id="ft-rows" class="ft-metric dim" hidden></span>
             <span class="grow" style="flex:1"></span>
             <span id="ft-hash" class="dim"></span>
         </footer>
+
+        <!-- ─────────── Settings popover (opened by #settings-btn) ─────────── -->
+        <div id="settings-popover" class="settings-popover" role="dialog" aria-label="Settings" hidden>
+            <div class="settings-arrow" aria-hidden="true"></div>
+
+            <div id="provider-section" class="settings-section">
+                <div class="settings-sec-head"><span class="micro">Provider</span></div>
+                <div class="llm-provider-status">
+                    <div class="provider-selector">
+                        <label for="llm-provider-select" class="visually-hidden">LLM Provider</label>
+                        <select id="llm-provider-select" class="provider-select">
+                            <option value="lmstudio">LM Studio</option>
+                            <option value="ollama">Ollama</option>
+                        </select>
+                    </div>
+                    <div id="model-selector" class="model-selector" style="display: none;">
+                        <label for="ollama-model-select" class="visually-hidden">Ollama Model</label>
+                        <select id="ollama-model-select" class="model-select" disabled>
+                            <option value="">Select model…</option>
+                        </select>
+                    </div>
+                    <div class="ollama-status" id="ollama-status" aria-live="polite">
+                        <span class="status-text" id="status-text">Checking…</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-sec-head"><span class="micro">Database</span></div>
+                <button type="button" id="replace-db-button" class="sidebar-button replace-db">
+                    <span>Replace database</span>
+                    <span class="kbd">⇪</span>
+                </button>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-sec-head"><span class="micro">Session</span></div>
+                <button id="export-chat-button" class="sidebar-button">Export conversation</button>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='lib/marked.min.js') }}"></script>

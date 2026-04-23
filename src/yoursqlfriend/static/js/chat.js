@@ -1,7 +1,7 @@
 // Chat messaging: send, stream, render, token tracking
 
 import { state } from './state.js';
-import { renderText, fetchJson } from './ui.js';
+import { renderText, fetchJson, renderQueryHistory, setFooterMetrics } from './ui.js';
 import { executeSqlAndRender } from './sql.js';
 
 export async function sendMessage() {
@@ -21,10 +21,14 @@ export async function sendMessage() {
         welcomeScreen.classList.add('minimized');
     }
 
-    // Save to input history
+    // Save to input history (arrow-key recall) + visible query history panel
     state.inputHistory.push(message);
     state.historyIndex = -1;
     state.currentDraft = '';
+
+    const userMsgIndex = document.querySelectorAll('.chat-message.user-message').length;
+    state.queryHistory.push({ q: message, ts: Date.now(), msgIndex: userMsgIndex });
+    renderQueryHistory(state.queryHistory);
 
     appendMessage(message, 'user');
     userInput.value = '';
@@ -179,8 +183,16 @@ export async function sendMessage() {
             token_usage: tokenUsage
         });
 
-        // Execute SQL if present
-        await executeSqlAndRender(fullResponse, contentContainer);
+        // Execute SQL if present; capture timing + row count for the footer.
+        const sqlStart = Date.now();
+        const sqlResult = await executeSqlAndRender(fullResponse, contentContainer);
+        if (sqlResult && sqlResult.ran) {
+            setFooterMetrics({
+                status: sqlResult.error ? 'error' : 'ready',
+                timingMs: Date.now() - sqlStart,
+                rows: sqlResult.rowCount,
+            });
+        }
 
     } catch (error) {
         console.error('Chat Error:', error);

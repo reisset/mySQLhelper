@@ -161,6 +161,100 @@ export function toggleTheme() {
     updateThemeIcon(theme);
 }
 
+// --- Settings popover ---
+export function toggleSettingsPopover(force) {
+    const pop = document.getElementById('settings-popover');
+    const btn = document.getElementById('settings-btn');
+    if (!pop || !btn) return;
+    const willOpen = force != null ? force : pop.hasAttribute('hidden');
+    if (willOpen) {
+        pop.removeAttribute('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+        // Close on outside click / escape
+        setTimeout(() => document.addEventListener('click', outsideHandler), 0);
+        document.addEventListener('keydown', escHandler);
+    } else {
+        pop.setAttribute('hidden', '');
+        btn.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('click', outsideHandler);
+        document.removeEventListener('keydown', escHandler);
+    }
+}
+function outsideHandler(e) {
+    const pop = document.getElementById('settings-popover');
+    const btn = document.getElementById('settings-btn');
+    if (!pop || !btn) return;
+    if (pop.contains(e.target) || btn.contains(e.target)) return;
+    toggleSettingsPopover(false);
+}
+function escHandler(e) {
+    if (e.key === 'Escape') toggleSettingsPopover(false);
+}
+
+// --- Query history panel ---
+function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+function fmtTime(d) {
+    const pad = (x) => String(x).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+export function renderQueryHistory(entries) {
+    const panel = document.getElementById('lp-history');
+    const list = document.getElementById('lp-history-list');
+    if (!panel || !list) return;
+    if (!entries || entries.length === 0) {
+        panel.setAttribute('hidden', '');
+        list.innerHTML = '';
+        return;
+    }
+    panel.removeAttribute('hidden');
+    list.innerHTML = '';
+    // newest on top
+    entries.slice().reverse().forEach((entry) => {
+        const row = document.createElement('div');
+        row.className = 'lp-hist-entry';
+        row.setAttribute('role', 'listitem');
+        row.setAttribute('data-msg-index', String(entry.msgIndex));
+        row.title = entry.q;
+
+        const ts = document.createElement('span');
+        ts.className = 'ts';
+        ts.textContent = fmtTime(new Date(entry.ts));
+
+        const q = document.createElement('span');
+        q.className = 'q';
+        q.textContent = truncate(entry.q, 60);
+
+        row.appendChild(ts);
+        row.appendChild(q);
+        row.addEventListener('click', () => {
+            const msgs = document.querySelectorAll('.chat-message.user-message');
+            const target = msgs[entry.msgIndex];
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        list.appendChild(row);
+    });
+}
+
+// --- Footer metric helpers ---
+export function setFooterMetrics({ status, timingMs, rows } = {}) {
+    const ftStatus = document.getElementById('ft-status');
+    const ftTiming = document.getElementById('ft-timing');
+    const ftRows = document.getElementById('ft-rows');
+    if (status != null && ftStatus) ftStatus.textContent = status;
+    if (ftTiming) {
+        if (timingMs != null) {
+            ftTiming.textContent = `${timingMs} ms`;
+            ftTiming.removeAttribute('hidden');
+        }
+    }
+    if (ftRows) {
+        if (rows != null) {
+            ftRows.textContent = `${rows.toLocaleString()} row${rows === 1 ? '' : 's'}`;
+            ftRows.removeAttribute('hidden');
+        }
+    }
+}
+
 // --- Markdown / Text Rendering ---
 export function renderText(element, text) {
     if (typeof marked !== 'undefined') {

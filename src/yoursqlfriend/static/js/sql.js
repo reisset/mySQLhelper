@@ -14,7 +14,7 @@ export async function executeSqlAndRender(fullText, contentContainer) {
     const sqlRegex = /```sql\n([\s\S]*?)\n```/;
     const match = fullText.match(sqlRegex);
 
-    if (!match) return; // No SQL to execute
+    if (!match) return { ran: false }; // No SQL to execute
 
     const sqlQuery = match[1].trim();
 
@@ -36,7 +36,8 @@ export async function executeSqlAndRender(fullText, contentContainer) {
         }
 
         // Render Result Table
-        if (data.query_results && data.query_results.length > 0) {
+        const rowCount = (data.query_results && data.query_results.length) || 0;
+        if (rowCount > 0) {
             appendResultsTable(data.query_results, contentContainer, sqlQuery);
         } else {
             const emptyState = document.createElement('div');
@@ -54,6 +55,8 @@ export async function executeSqlAndRender(fullText, contentContainer) {
             contentContainer.appendChild(emptyState);
         }
 
+        return { ran: true, rowCount };
+
     } catch (error) {
         console.error('SQL Error:', error);
         const errorDiv = document.createElement('div');
@@ -70,6 +73,7 @@ export async function executeSqlAndRender(fullText, contentContainer) {
         errorDiv.appendChild(icon);
         errorDiv.appendChild(text);
         contentContainer.appendChild(errorDiv);
+        return { ran: true, error: true, rowCount: 0 };
     }
 }
 
