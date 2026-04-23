@@ -24,12 +24,14 @@ python -m yoursqlfriend.app
 
 **Single-page Flask app** with vanilla JS frontend. No build step, no bundler, no framework. Installable as a PWA from Chrome/Edge/Brave. Distributed via PyPI (`pipx install yoursqlfriend`).
 
+UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + in-session query history, center = conversation (chat + inline SQL + result tables), right = Row Inspector. Header carries the instrument cluster (model pill + ctx bar + theme toggle + settings gear). The settings popover hosts Provider/Model selectors, Replace DB, and Export. Charts, schema-diagram, and notes features were removed in the redesign.
+
 - `src/yoursqlfriend/app.py` — Flask routes, session management, HTML export
 - `src/yoursqlfriend/validation.py` — `validate_sql()`, `strip_strings_and_comments()` (SQL security boundary)
 - `src/yoursqlfriend/llm.py` — LLM provider abstraction, prompts, streaming/non-streaming calls
 - `src/yoursqlfriend/database.py` — Read-only connections, query execution, file hashing, upload handling
-- `src/yoursqlfriend/static/js/` — ES modules: `app.js` (entry), `state.js`, `ui.js`, `chat.js`, `sql.js`, `upload.js`, `providers.js`, `search.js`
-- `src/yoursqlfriend/static/style.css` — Dark/light forensic terminal theme
+- `src/yoursqlfriend/static/js/` — ES modules: `app.js` (entry), `state.js`, `ui.js`, `chat.js`, `sql.js`, `upload.js`, `providers.js`, `search.js`, `inspector.js` (Row Inspector: expands selected result row, renders FK links)
+- `src/yoursqlfriend/static/style.css` — Forensic Atelier theme (warm cream paper + burnt umber accent, with dark-mode variants)
 - `src/yoursqlfriend/templates/index.html` — Jinja2 single-page template, loads vendored libs from `static/lib/`
 - `src/yoursqlfriend/static/manifest.json` — PWA manifest (standalone display, app icons)
 - `src/yoursqlfriend/static/service-worker.js` — Service worker for PWA installability + static asset caching

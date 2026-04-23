@@ -1,5 +1,47 @@
 CHANGELOG
 
+### v3.9.0 - Forensic Atelier redesign (Apr 2026)
+
+The UI was rebuilt as a three-pane forensic workbench. Charts, schema
+diagram, and notes features were removed to sharpen the focus on
+"ask → SQL → inspect rows".
+
+#### New
+- **Three-pane workbench:** schema browser (left) · conversation (center) ·
+  Row Inspector (right). Click any result row to expand it; foreign keys
+  become clickable links.
+- **Query history panel:** per-session list of every question asked in the
+  left pane; click an entry to scroll the chat back to that turn.
+- **Header instrument cluster:** model pill + ctx bar + theme toggle +
+  settings gear moved to the top-right. Settings popover hosts
+  Provider/Model selectors, Replace DB, and Export.
+- **Instrument footer:** status · last query ms · row count · sha256
+  prefix.
+- **⌘K / Ctrl+K:** opens the Search-all-tables modal when a DB is loaded.
+- **Editorial landing hero:** warm cream paper, serif display with italic
+  accent, numbered four-step intro, dashed drop zone.
+- **Composer hints row:** Enter / Shift+Enter / ⌘K / ↑ visible under the
+  textarea.
+- **Example-query chips:** real buttons with a hover → indicator; click
+  inserts into the composer.
+
+#### Changed
+- **Forensic Atelier palette:** cream (#f4efe4) + burnt umber (#c1522b) +
+  editorial serif. Accent reserved for selection/focus/primary CTA only.
+- **Chat avatars:** assistant glyph changed from `S` (ambiguous) to
+  italic brand `y`, tying every reply to the yourSQLfriend wordmark.
+  User avatar stays `A` (Analyst).
+- **Typography:** IBM Plex Sans (UI), Fraunces/Newsreader (display), JetBrains
+  Mono (data). Self-hosted woff2.
+- **Sidebar pruned:** provider section and twin Search/Export grid removed.
+  Sidebar is now Schema + Search row + Query history.
+
+#### Removed
+- **Charts feature:** bar/line/pie/scatter chart rendering on result tables.
+- **Schema diagram feature:** interactive ER diagram with drag/zoom/pan.
+- **Notes feature:** per-session notes panel.
+- **Refresh button:** browser reload is sufficient.
+
 ### v3.8.3 - Windows Compatibility (Feb 2026)
 
 #### Fixes
