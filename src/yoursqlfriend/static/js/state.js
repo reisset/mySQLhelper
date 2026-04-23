@@ -11,4 +11,6 @@ export const state = {
     inputHistory: [],
     historyIndex: -1,
     currentDraft: '',
+    richSchema: {},
+    lastTableName: null,
 };

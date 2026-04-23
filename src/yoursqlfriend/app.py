@@ -30,6 +30,7 @@ from yoursqlfriend.validation import validate_sql, strip_strings_and_comments
 from yoursqlfriend.database import (
     get_readonly_connection, execute_and_parse_query, calculate_file_hash,
     validate_upload_file, convert_csv_to_sqlite, execute_sql_file,
+    build_rich_schema,
 )
 from yoursqlfriend.llm import (
     LLM_API_URL, OLLAMA_URL, OLLAMA_MODEL,
@@ -338,8 +339,17 @@ def upload_file():
         logger.info(f"Final path: {final_filepath}")
         logger.info(f"Schema: {len(schema)} tables")
 
+        try:
+            rich_schema = build_rich_schema(final_filepath)
+        except sqlite3.Error as e:
+            logger.warning(f"Could not build rich schema: {e}")
+            rich_schema = {name: {"columns": [{"name": c, "type": "TEXT", "pk": False, "fk": None} for c in cols],
+                                  "foreign_keys": [], "row_count": None, "sample_rows": []}
+                           for name, cols in schema.items()}
+
         return jsonify({
             'schema': schema,
+            'rich_schema': rich_schema,
             'metadata': {
                 'filename': original_filename,
                 'hash': file_hash,
@@ -648,7 +658,7 @@ def search_all_tables():
 def _get_css_content():
     css_path = os.path.join(BASE_PATH, 'static', 'style.css')
     try:
-        with open(css_path, 'r') as f:
+        with open(css_path, 'r', encoding='utf-8') as f:
             return f.read()
     except FileNotFoundError:
         return ""
@@ -696,6 +706,53 @@ def _generate_chat_html(chat_history):
             chat_html_parts.append(f'<div class="chat-message bot-message">{content_html}</div>')
 
     return "\n".join(chat_html_parts)
+
+@app.route('/api/row/lookup', methods=['POST'])
+def row_lookup():
+    """Look up rows in `table` where `column` == `value`. Parameterized; read-only.
+
+    Used by the Row Inspector to follow foreign keys. Identifiers are
+    validated against the actual schema (not substituted from user input).
+    """
+    data = request.json or {}
+    table = data.get('table')
+    column = data.get('column')
+    value = data.get('value')
+    limit = int(data.get('limit', 25))
+
+    db_filepath = session.get('db_filepath')
+    if not db_filepath:
+        return jsonify({'error': 'No database loaded'}), 400
+    if not table or not column:
+        return jsonify({'error': 'table and column are required'}), 400
+
+    try:
+        with get_readonly_connection(db_filepath) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?;",
+                (table,),
+            )
+            if not cursor.fetchone():
+                return jsonify({'error': f'Unknown table: {table}'}), 400
+
+            cursor.execute(f'PRAGMA table_info("{table}");')
+            valid_cols = {row[1] for row in cursor.fetchall()}
+            if column not in valid_cols:
+                return jsonify({'error': f'Unknown column: {column}'}), 400
+
+            cursor.execute(
+                f'SELECT * FROM "{table}" WHERE "{column}" = ? LIMIT ?;',
+                (value, max(1, min(limit, 200))),
+            )
+            rows = [dict(r) for r in cursor.fetchall()]
+        return jsonify({'rows': rows})
+
+    except sqlite3.Error as e:
+        logger.error(f"Row lookup error: {e}")
+        return jsonify({'error': f'Database error: {e}'}), 500
 
 @app.route('/export_chat', methods=['GET'])
 def export_chat():

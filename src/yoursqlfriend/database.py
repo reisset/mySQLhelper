@@ -28,6 +28,70 @@ def get_readonly_connection(db_filepath):
     return conn
 
 
+def build_rich_schema(db_filepath, sample_rows=3):
+    """Return schema with column types, PKs, FKs, row counts, and sample rows.
+
+    Shape per table:
+        {
+          "columns": [{"name": str, "type": str, "pk": bool, "fk": {...} | None}, ...],
+          "foreign_keys": [{"column": str, "ref_table": str, "ref_column": str}, ...],
+          "row_count": int,
+          "sample_rows": [{col: val, ...}, ...]
+        }
+    """
+    out = {}
+    conn = get_readonly_connection(db_filepath)
+    try:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+        )
+        table_names = [row[0] for row in cursor.fetchall()]
+
+        for table_name in table_names:
+            cursor.execute(f'PRAGMA foreign_key_list("{table_name}");')
+            fk_raw = cursor.fetchall()
+            fk_by_col = {fk[3]: {"ref_table": fk[2], "ref_column": fk[4]} for fk in fk_raw}
+            foreign_keys = [
+                {"column": col, "ref_table": v["ref_table"], "ref_column": v["ref_column"]}
+                for col, v in fk_by_col.items()
+            ]
+
+            cursor.execute(f'PRAGMA table_info("{table_name}");')
+            columns = []
+            for col in cursor.fetchall():
+                name = col[1]
+                columns.append({
+                    "name": name,
+                    "type": (col[2] or "TEXT"),
+                    "pk": bool(col[5]),
+                    "fk": fk_by_col.get(name),
+                })
+
+            try:
+                cursor.execute(f'SELECT COUNT(*) FROM "{table_name}";')
+                row_count = cursor.fetchone()[0]
+            except sqlite3.Error:
+                row_count = None
+
+            try:
+                cursor.execute(f'SELECT * FROM "{table_name}" LIMIT ?;', (sample_rows,))
+                samples = [dict(r) for r in cursor.fetchall()]
+            except sqlite3.Error:
+                samples = []
+
+            out[table_name] = {
+                "columns": columns,
+                "foreign_keys": foreign_keys,
+                "row_count": row_count,
+                "sample_rows": samples,
+            }
+    finally:
+        conn.close()
+    return out
+
+
 def execute_and_parse_query(db_filepath, sql_query):
     """Execute a read-only SQL query and return results as list of dicts.
 

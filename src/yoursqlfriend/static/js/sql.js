@@ -1,6 +1,14 @@
 // SQL execution, result table rendering, CSV export
 
 import { escapeHtml, downloadBlob, fetchJson } from './ui.js';
+import { showRowInInspector } from './inspector.js';
+
+function inferTableName(sqlQuery) {
+    if (!sqlQuery) return null;
+    const stripped = sqlQuery.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const match = stripped.match(/\bFROM\s+["'`]?([A-Za-z_][\w]*)["'`]?/i);
+    return match ? match[1] : null;
+}
 
 export async function executeSqlAndRender(fullText, contentContainer) {
     const sqlRegex = /```sql\n([\s\S]*?)\n```/;
@@ -101,6 +109,8 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
     tableWrapper.className = 'results-table-container';
     container.appendChild(tableWrapper);
 
+    const inferredTable = inferTableName(sqlQuery);
+
     // Render Grid.js with built-in search (store reference for cleanup)
     const grid = new gridjs.Grid({
         columns: Object.keys(queryResults[0]),
@@ -118,13 +128,35 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
         className: { table: 'custom-grid-table', th: 'custom-grid-th', td: 'custom-grid-td', container: 'custom-grid-container' }
     }).render(tableWrapper);
     tableWrapper._gridInstance = grid;
+    tableWrapper._resultData = queryResults;
+    tableWrapper._tableName = inferredTable;
 
-    // Reset scroll on pagination to prevent sticky header clipping
+    // Row clicks feed the Row Inspector; pagination clicks reset scroll.
     tableWrapper.addEventListener('click', (e) => {
         if (e.target.closest('.gridjs-pagination button')) {
             const wrapper = tableWrapper.querySelector('.gridjs-wrapper');
             if (wrapper) wrapper.scrollTop = 0;
+            return;
         }
+        const tr = e.target.closest('tr.gridjs-tr');
+        if (!tr || !tr.parentElement || tr.parentElement.tagName !== 'TBODY') return;
+
+        const tbody = tr.parentElement;
+        const rowsInBody = Array.from(tbody.querySelectorAll('tr.gridjs-tr'));
+        const domIdx = rowsInBody.indexOf(tr);
+        if (domIdx < 0) return;
+
+        const cols = Object.keys(queryResults[0] || {});
+        const cells = tr.querySelectorAll('td.gridjs-td');
+        const rowObj = {};
+        cells.forEach((cell, i) => {
+            if (cols[i]) rowObj[cols[i]] = cell.textContent;
+        });
+
+        tbody.querySelectorAll('tr.row-selected').forEach(r => r.classList.remove('row-selected'));
+        tr.classList.add('row-selected');
+
+        showRowInInspector(rowObj, inferredTable);
     });
 }
 

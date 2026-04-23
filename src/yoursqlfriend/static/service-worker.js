@@ -13,6 +13,7 @@ const STATIC_ASSETS = [
   '/static/js/upload.js',
   '/static/js/providers.js',
   '/static/js/search.js',
+  '/static/js/inspector.js',
   '/static/lib/marked.min.js',
   '/static/lib/purify.min.js',
   '/static/lib/highlight.min.js',
