@@ -27,8 +27,38 @@ function updateProviderStatusUI(available, models) {
     const statusText = document.getElementById('status-text');
     const modelSelector = document.getElementById('model-selector');
     const modelSelect = document.getElementById('ollama-model-select');
+    const landingDot = document.getElementById('landing-llm-dot');
+    const landingText = document.getElementById('landing-llm-text');
 
     if (!ollamaStatus || !statusIndicator || !statusText) return;
+
+    if (landingDot) {
+        landingDot.classList.toggle('ok', !!available);
+        landingDot.classList.toggle('off', !available);
+    }
+    if (landingText) {
+        const label = state.currentProvider === 'ollama' ? 'Ollama' : 'LM Studio';
+        landingText.textContent = available ? `${label} connected` : `${label} offline`;
+    }
+
+    // Workbench header model indicator: show the active model (Ollama
+    // selected model, or provider name for LM Studio which doesn't expose it).
+    const cpModel = document.getElementById('cp-model');
+    const cpModelName = document.getElementById('cp-model-name');
+    if (cpModelName && cpModel) {
+        let name;
+        if (!available) {
+            name = 'offline';
+            cpModel.classList.add('off');
+        } else if (state.currentProvider === 'ollama') {
+            name = state.selectedOllamaModel || (models && models[0]) || 'Ollama';
+            cpModel.classList.remove('off');
+        } else {
+            name = 'LM Studio';
+            cpModel.classList.remove('off');
+        }
+        cpModelName.textContent = name;
+    }
 
     ollamaStatus.style.display = 'flex';
 
@@ -97,8 +127,14 @@ function updateProviderStatusUI(available, models) {
             `;
         }
 
-        // Insert after the ollama-status div
-        ollamaStatus.parentNode.insertBefore(guidanceDiv, ollamaStatus.nextSibling);
+        // Insert inside the left-pane provider section so offline help
+        // lives where the user is configuring the provider.
+        const providerSection = document.getElementById('provider-section');
+        if (providerSection) {
+            providerSection.appendChild(guidanceDiv);
+        } else {
+            ollamaStatus.parentNode.insertBefore(guidanceDiv, ollamaStatus.nextSibling);
+        }
     }
 }
 
@@ -106,6 +142,8 @@ async function setOllamaModel(model) {
     try {
         await fetchJson('/api/ollama/model', { model: model });
         state.selectedOllamaModel = model;
+        const cpModelName = document.getElementById('cp-model-name');
+        if (cpModelName) cpModelName.textContent = model;
         console.log('Ollama model set to:', model);
     } catch (error) {
         console.error('Failed to set model:', error);

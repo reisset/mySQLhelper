@@ -27,18 +27,92 @@
                 </span>
             </div>
             <span class="sep"></span>
-            <div class="path" id="db-path"><span class="dimmer">no database loaded</span></div>
+            <div class="path" id="db-path">
+                <span class="crumb dim">workspace</span>
+                <span class="crumb-sep dim">/</span>
+                <span class="crumb dimmer" id="db-path-name">no database loaded</span>
+                <span class="chips" id="db-chips"></span>
+            </div>
             <span class="grow"></span>
             <div class="header-actions">
-                <div id="header-llm-status" class="ollama-status" aria-live="polite">
+                <div id="ollama-status" class="ollama-status" aria-live="polite">
                     <span class="status-indicator offline" id="status-indicator"></span>
                     <span class="status-text" id="status-text">Checking…</span>
                 </div>
-                <button id="sidebar-toggle" title="Toggle Sidebar" aria-label="Toggle sidebar" aria-expanded="true" aria-controls="sidebar">☰</button>
                 <button id="theme-toggle" title="Toggle Theme" aria-label="Switch theme"></button>
                 <button id="refresh-btn" title="Reload page" aria-label="Reload page">↻</button>
             </div>
         </header>
+
+        <!-- ─────────── Landing (shown until a DB loads) ─────────── -->
+        <main class="landing" id="landing" aria-label="Load a database to begin">
+            <div class="landing-hero">
+                <div class="over">Local · Forensic · Read-Only</div>
+                <h1>Ask <em>anything</em> <span class="and">of</span> your data.</h1>
+                <p class="lead">
+                    yourSQLfriend is a local forensic workbench for SQLite.
+                    Upload a database, <em>.csv</em>, or <em>.sql</em> file and interrogate
+                    it in plain English — your local LLM translates questions into
+                    parameterised, read-only SQL and returns rows, tables, and
+                    provenance. Nothing leaves your machine.
+                </p>
+            </div>
+
+            <div class="landing-mid">
+                <ol class="landing-steps" aria-label="How it works">
+                    <li class="landing-step">
+                        <span class="n">1</span>
+                        <div>
+                            <h3>Load a database</h3>
+                            <p>Drag a .db, .sqlite, .csv, or .sql file onto the drop zone. Files stay local, on disk, read-only.</p>
+                        </div>
+                    </li>
+                    <li class="landing-step">
+                        <span class="n">2</span>
+                        <div>
+                            <h3>Ask in plain English</h3>
+                            <p>Your local LLM (LM Studio or Ollama) translates the question into SQL. No data leaves your machine.</p>
+                        </div>
+                    </li>
+                    <li class="landing-step">
+                        <span class="n">3</span>
+                        <div>
+                            <h3>Inspect the results</h3>
+                            <p>Click any row to expand it in the Row Inspector. Foreign keys become navigable links.</p>
+                        </div>
+                    </li>
+                    <li class="landing-step">
+                        <span class="n">4</span>
+                        <div>
+                            <h3>Export your session</h3>
+                            <p>When you're done, export the conversation to a self-contained HTML forensic report with hashes and timestamps.</p>
+                        </div>
+                    </li>
+                </ol>
+
+                <div class="landing-drop-wrap">
+                    <div id="drop-zone" class="landing-drop">
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="ic">⇪</div>
+                            <div class="lg">Drop a database here</div>
+                            <div class="sm">or</div>
+                            <div class="file-upload-buttons">
+                                <label for="database-file" class="custom-file-upload">Choose file</label>
+                                <input type="file" id="database-file" name="database_file" accept=".db, .sqlite, .sqlite3, .sql, .csv">
+                            </div>
+                            <div class="file-types-hint">.db · .sqlite · .csv · .sql</div>
+                            <div id="file-name-display" class="landing-file-name">No file chosen</div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="landing-status">
+                <div class="item"><span class="d" id="landing-llm-dot"></span><span id="landing-llm-text">checking provider…</span></div>
+                <div class="item"><span class="d ok"></span><span>read-only enforced</span></div>
+                <div class="item"><span class="d ok"></span><span>sessions stored locally</span></div>
+            </div>
+        </main>
 
         <!-- ─────────── Main (three panes) ─────────── -->
         <div class="app-main">
@@ -55,23 +129,14 @@
 
                 <div class="lp-section">
                     <div class="lp-sec-head"><span class="micro">Source</span></div>
-                    <div id="drop-zone" class="file-upload">
-                        <form id="upload-form" enctype="multipart/form-data">
-                            <div class="drop-zone-content">
-                                <p class="drop-text">Drag &amp; drop database</p>
-                                <p class="drop-text-small">or</p>
-                                <div class="file-upload-buttons">
-                                    <label for="database-file" class="custom-file-upload">Choose file</label>
-                                    <input type="file" id="database-file" name="database_file" accept=".db, .sqlite, .sqlite3, .sql, .csv">
-                                </div>
-                            </div>
-                        </form>
-                        <span id="file-name-display">No file chosen</span>
-                        <span class="file-types-hint">.db .sqlite .csv .sql</span>
-                    </div>
+                    <button type="button" id="replace-db-button" class="sidebar-button replace-db">
+                        <span>Replace database</span>
+                        <span class="kbd">⇪</span>
+                    </button>
+                    <div class="file-types-hint" style="margin-top:6px">.db · .sqlite · .csv · .sql</div>
                 </div>
 
-                <div class="lp-section">
+                <div class="lp-section" id="provider-section">
                     <div class="lp-sec-head">
                         <span class="micro">Provider</span>
                     </div>
@@ -112,18 +177,22 @@
                 <div class="cp-head">
                     <div class="cp-title"><em>the</em> Forensic Workbench</div>
                     <span class="grow"></span>
-                    <span class="cp-meta" id="session-meta"></span>
+                    <div class="cp-model" id="cp-model" aria-live="polite">
+                        <span class="label micro">model</span>
+                        <span class="name" id="cp-model-name">—</span>
+                    </div>
+                    <div class="cp-context" id="cp-context" title="Cumulative tokens this session">
+                        <span class="label micro">context</span>
+                        <div class="bar"><span class="fill" id="cp-context-fill"></span></div>
+                        <span class="count" id="cp-context-count">0</span>
+                    </div>
                 </div>
                 <div class="chat-container">
                     <div class="chat-history" id="chat-history">
                         <div id="welcome-screen">
-                            <pre>{{ ascii_art }}</pre>
-                            <div class="empty-hero">
-                                <div class="over">Local · Forensic · Read-Only</div>
-                                <h1>Ask <em>anything</em> <span class="and">of</span> your data.</h1>
-                                <p class="lead">Upload a SQLite database, CSV, or SQL file. Interrogate it in plain English — your local LLM translates questions into parameterised, read-only SQL and reports back with tables, context, and provenance.</p>
+                            <div class="workbench-intro">
+                                <p class="serif">Ready. Ask anything about <span id="intro-db-name">this database</span>, or pick a starter:</p>
                                 <div class="example-queries">
-                                    <span class="example-label">Try asking</span>
                                     <span class="example-query">"Show me all tables"</span>
                                     <span class="example-query">"What are the most recent 10 entries?"</span>
                                     <span class="example-query">"Find all records containing 'error'"</span>

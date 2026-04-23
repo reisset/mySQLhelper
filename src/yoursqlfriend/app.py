@@ -754,6 +754,98 @@ def row_lookup():
         logger.error(f"Row lookup error: {e}")
         return jsonify({'error': f'Database error: {e}'}), 500
 
+EXPORT_CSS = """
+:root {
+  --bg:#f4efe4; --bg-2:#ece6d6; --ink:#1a1815; --ink-2:#3b372f;
+  --ink-3:#6e6a5e; --ink-4:#a39e8e; --line:#d4ccb8; --line-2:#bdb39d;
+  --accent:#c1522b; --accent-2:#9c3f1c; --accent-wash:#f5e0d3;
+  --hilite:#fceeb0; --ok:#4a7a4a;
+  --serif: Georgia, 'Times New Roman', serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px; line-height: 1.55;
+}
+.report { max-width: 900px; margin: 0 auto; padding: 40px 32px; }
+.report-header {
+  border-left: 3px solid var(--accent);
+  background: var(--bg-2);
+  padding: 18px 22px; margin-bottom: 28px;
+  border-radius: 0 4px 4px 0;
+}
+.report-header .kicker {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--accent); font-weight: 600;
+  margin-bottom: 6px;
+}
+.report-header h1 {
+  margin: 0 0 10px;
+  font-family: var(--serif); font-weight: 500; font-size: 24px;
+  letter-spacing: -.01em; color: var(--ink);
+}
+.report-header .meta {
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: 2px 14px;
+  font-family: var(--mono); font-size: 11px; color: var(--ink-2);
+}
+.report-header .meta dt { color: var(--ink-3); }
+.report-header .meta dd { margin: 0; word-break: break-all; }
+.chat-message {
+  padding: 10px 0 16px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.chat-message:last-child { border-bottom: none; }
+.chat-message.user-message p {
+  margin: 0; font-family: var(--serif); font-size: 18px;
+  color: var(--ink); font-weight: 400; line-height: 1.4;
+}
+.chat-message.bot-message p { margin: 0 0 8px; color: var(--ink-2); }
+.chat-message.bot-message pre {
+  margin: 8px 0;
+  padding: 10px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--mono); font-size: 12px;
+  color: var(--ink); overflow-x: auto;
+}
+.token-counter { font-family: var(--mono); font-size: 10px; color: var(--ink-4); margin-bottom: 4px; }
+.results-table-container {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 8px 0 4px;
+  background: var(--bg);
+}
+.results-table-container table {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--mono); font-size: 11.5px;
+}
+.results-table-container th {
+  text-align: left; padding: 6px 10px;
+  background: var(--bg-2); color: var(--ink-3);
+  font-weight: 600; border-bottom: 1px solid var(--line);
+}
+.results-table-container td {
+  padding: 5px 10px;
+  color: var(--ink-2);
+  border-bottom: 1px solid var(--line);
+}
+.results-table-container tr:last-child td { border-bottom: none; }
+.footer-note {
+  margin-top: 40px; padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: 10px; color: var(--ink-3);
+  text-align: center;
+}
+"""
+
+
 @app.route('/export_chat', methods=['GET'])
 def export_chat():
     chat_history = session.get('chat_history', [])
@@ -761,46 +853,41 @@ def export_chat():
     # Gather Metadata (escape user-provided values for XSS prevention)
     original_filename = html_escape(session.get('original_filename', 'Unknown'))
     db_hash = session.get('db_hash', 'N/A')
-    upload_timestamp = session.get('upload_timestamp', 'N/A')
+    upload_timestamp = html_escape(session.get('upload_timestamp', 'N/A'))
     file_size_bytes = session.get('file_size_bytes', 0)
     export_timestamp = datetime.now().isoformat()
     hostname = html_escape(socket.gethostname())
-
-    # Forensic Header HTML - Compact version
     file_size_mb = file_size_bytes / (1024*1024)
-    metadata_html = f"""
-    <div class="forensic-header" style="background: #0a0a0c; padding: 12px 16px; border-bottom: 1px solid #2a2a3a; border-left: 3px solid #f0a030; margin-bottom: 16px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #8a8a9a;">
-        <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center;">
-            <span style="color: #f0a030; font-weight: 600;">// FORENSIC REPORT</span>
-            <span><b style="color: #e8e8ec;">{original_filename}</b> ({file_size_mb:.2f} MB)</span>
-            <span>SHA256: <code style="color: #40d0d0; font-size: 0.7rem;">{db_hash[:16]}...{db_hash[-8:]}</code></span>
-            <span>Uploaded: {upload_timestamp}</span>
-            <span>Exported: {export_timestamp}</span>
-            <span>Host: {hostname}</span>
-        </div>
-        <div style="margin-top: 8px; font-size: 0.7rem; color: #5a5a6a;">
-            yourSQLfriend v{VERSION} | READ-ONLY mode | <span title="{db_hash}" style="cursor: help; text-decoration: underline dotted;">Full hash on hover</span>
-        </div>
-    </div>
+    safe_hash = html_escape(db_hash)
+    hash_abbrev = (f"{db_hash[:16]}…{db_hash[-8:]}" if len(db_hash) >= 24 else db_hash)
+
+    header_html = f"""
+    <header class="report-header">
+        <div class="kicker">Forensic Report</div>
+        <h1>{original_filename}</h1>
+        <dl class="meta">
+            <dt>Size</dt><dd>{file_size_mb:.2f} MB</dd>
+            <dt>SHA-256</dt><dd title="{safe_hash}">{html_escape(hash_abbrev)}</dd>
+            <dt>Uploaded</dt><dd>{upload_timestamp}</dd>
+            <dt>Exported</dt><dd>{html_escape(export_timestamp)}</dd>
+            <dt>Host</dt><dd>{hostname}</dd>
+            <dt>Mode</dt><dd>read-only</dd>
+        </dl>
+    </header>
     """
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Forensic Report - {original_filename}</title>
-    <style>{_get_css_content()}</style>
+    <title>Forensic Report — {original_filename}</title>
+    <style>{EXPORT_CSS}</style>
 </head>
 <body>
-    <div class="app-container">
-        <div class="main-chat">
-            <div class="chat-container">
-                {metadata_html}
-                <div class="chat-history" style="padding-top: 0;">
-                    {_generate_chat_html(chat_history)}
-                </div>
-            </div>
-        </div>
+    <div class="report">
+        {header_html}
+        {_generate_chat_html(chat_history)}
+        <div class="footer-note">yourSQLfriend v{VERSION} · generated {html_escape(export_timestamp)}</div>
     </div>
 </body>
 </html>"""

@@ -120,12 +120,8 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
         sort: { multiColumn: true },
         resizable: true,
         style: {
-            table: { 'white-space': 'nowrap', 'font-size': '0.85rem', 'table-layout': 'auto', 'width': '100%' },
-            th: { 'background-color': 'var(--background-lighter)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
-            td: { 'background-color': 'var(--background-light)', 'color': 'var(--foreground)', 'border': '1px solid var(--border)' },
-            footer: { 'background-color': 'var(--card)' }
-        },
-        className: { table: 'custom-grid-table', th: 'custom-grid-th', td: 'custom-grid-td', container: 'custom-grid-container' }
+            table: { 'white-space': 'nowrap', 'table-layout': 'auto', 'width': '100%' }
+        }
     }).render(tableWrapper);
     tableWrapper._gridInstance = grid;
     tableWrapper._resultData = queryResults;

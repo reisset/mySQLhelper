@@ -6,13 +6,17 @@ import { appendMessage } from './chat.js';
 import { destroyAllGrids } from './sql.js';
 import { resetInspector } from './inspector.js';
 
-export function updateDatabaseStatus(filename = null) {
+export function updateDatabaseStatus(filename = null, meta = null) {
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
     const searchBtn = document.getElementById('search-all-tables-button');
-    const dbPath = document.getElementById('db-path');
+    const pathName = document.getElementById('db-path-name');
+    const dbChips = document.getElementById('db-chips');
     const lpFilename = document.getElementById('lp-filename');
     const ftStatus = document.getElementById('ft-status');
+    const introName = document.getElementById('intro-db-name');
+
+    document.body.classList.toggle('db-loaded', !!filename);
 
     if (filename) {
         state.databaseLoaded = true;
@@ -20,16 +24,35 @@ export function updateDatabaseStatus(filename = null) {
         userInput.placeholder = 'Ask a question about your database…';
         sendButton.disabled = false;
         if (searchBtn) searchBtn.disabled = false;
-        if (dbPath) dbPath.innerHTML = `<b>${escapeHtml(filename)}</b>`;
+        if (pathName) {
+            pathName.textContent = filename;
+            pathName.classList.remove('dimmer');
+            pathName.classList.add('on');
+        }
+        if (dbChips) {
+            const chips = [];
+            if (meta && meta.tables != null) {
+                const n = meta.tables;
+                chips.push(`<span class="chip">${n} table${n === 1 ? '' : 's'}</span>`);
+            }
+            chips.push('<span class="chip ro">read-only</span>');
+            dbChips.innerHTML = chips.join('');
+        }
         if (lpFilename) lpFilename.textContent = filename;
         if (ftStatus) ftStatus.textContent = `loaded · ${filename}`;
+        if (introName) introName.textContent = filename;
     } else {
         state.databaseLoaded = false;
         userInput.disabled = true;
         userInput.placeholder = 'Load a database to start chatting…';
         sendButton.disabled = true;
         if (searchBtn) searchBtn.disabled = true;
-        if (dbPath) dbPath.innerHTML = '<span class="dimmer">no database loaded</span>';
+        if (pathName) {
+            pathName.textContent = 'no database loaded';
+            pathName.classList.add('dimmer');
+            pathName.classList.remove('on');
+        }
+        if (dbChips) dbChips.innerHTML = '';
         if (lpFilename) lpFilename.textContent = 'no database';
         if (ftStatus) ftStatus.textContent = 'ready';
     }
@@ -95,6 +118,10 @@ export function uploadFile() {
 
         destroyAllGrids();
         resetInspector();
+        const fill = document.getElementById('cp-context-fill');
+        const count = document.getElementById('cp-context-count');
+        if (fill) fill.style.width = '0%';
+        if (count) count.textContent = '0';
 
         // Remove all chat messages but keep the welcome screen if it exists
         const messages = chatHistory.querySelectorAll('.chat-message');
@@ -122,7 +149,7 @@ export function uploadFile() {
                 state.richSchema = data.rich_schema || {};
                 appendMessage('Database loaded successfully. You can now ask questions about it.', 'bot');
                 renderSchema(data.rich_schema || data.schema);
-                updateDatabaseStatus(file.name);
+                updateDatabaseStatus(file.name, data.metadata);
                 fileNameDisplay.textContent = file.name;
                 if (data.metadata && data.metadata.hash) {
                     const ftHash = document.getElementById('ft-hash');

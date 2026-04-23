@@ -141,18 +141,24 @@ function updateThemeIcon(theme) {
 }
 
 export function initTheme() {
-    let savedTheme = 'dark';
-    try { savedTheme = localStorage.getItem('theme') || 'dark'; } catch (e) { /* private browsing */ }
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    updateThemeIcon(savedTheme);
+    let saved = null;
+    try { saved = localStorage.getItem('theme'); } catch (e) { /* private browsing */ }
+    let theme;
+    if (saved === 'dark' || saved === 'light') {
+        theme = saved;
+    } else {
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        theme = prefersDark ? 'dark' : 'light';
+    }
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    updateThemeIcon(theme);
 }
 
 export function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    try { localStorage.setItem('theme', newTheme); } catch (e) { /* private browsing */ }
-    updateThemeIcon(newTheme);
+    const isDark = document.documentElement.classList.toggle('dark');
+    const theme = isDark ? 'dark' : 'light';
+    try { localStorage.setItem('theme', theme); } catch (e) { /* private browsing */ }
+    updateThemeIcon(theme);
 }
 
 // --- Markdown / Text Rendering ---

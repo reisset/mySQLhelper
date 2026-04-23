@@ -55,6 +55,7 @@ const uploadForm = document.getElementById('upload-form');
 const exportChatButton = document.getElementById('export-chat-button');
 const searchAllTablesButton = document.getElementById('search-all-tables-button');
 const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
+const replaceDbButton = document.getElementById('replace-db-button');
 
 // --- Theme Toggle ---
 if (themeToggle) {
@@ -214,13 +215,18 @@ if (uploadForm) {
     });
 }
 
-// --- Sidebar Toggle ---
+// --- Sidebar Toggle (vestigial — three-pane layout no longer collapses) ---
 if (sidebarToggle) {
     sidebarToggle.addEventListener('click', () => {
         sidebar.classList.toggle('collapsed');
         const isExpanded = !sidebar.classList.contains('collapsed');
         sidebarToggle.setAttribute('aria-expanded', isExpanded);
     });
+}
+
+// --- Replace database button (sidebar) ---
+if (replaceDbButton && databaseFile) {
+    replaceDbButton.addEventListener('click', () => databaseFile.click());
 }
 
 // --- Export Chat ---
