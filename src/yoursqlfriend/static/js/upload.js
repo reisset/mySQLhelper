@@ -3,26 +3,22 @@
 import { state } from './state.js';
 import { escapeHtml, showConfirmModal, showAlertModal } from './ui.js';
 import { appendMessage } from './chat.js';
-import { destroyAllCharts } from './charts.js';
 import { destroyAllGrids } from './sql.js';
 
 export function updateDatabaseStatus(filename = null) {
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
-    const schemaDiagramButton = document.getElementById('schema-diagram-button');
 
     if (filename) {
         state.databaseLoaded = true;
         userInput.disabled = false;
         userInput.placeholder = 'Ask a question about your database...';
         sendButton.disabled = false;
-        if (schemaDiagramButton) schemaDiagramButton.disabled = false;
     } else {
         state.databaseLoaded = false;
         userInput.disabled = true;
         userInput.placeholder = 'Load a database to start chatting...';
         sendButton.disabled = true;
-        if (schemaDiagramButton) schemaDiagramButton.disabled = true;
     }
 }
 
@@ -84,7 +80,6 @@ export function uploadFile() {
             welcomeScreen.classList.add('minimized');
         }
 
-        destroyAllCharts();
         destroyAllGrids();
 
         // Remove all chat messages but keep the welcome screen if it exists

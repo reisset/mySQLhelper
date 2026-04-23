@@ -1,7 +1,6 @@
 // SQL execution, result table rendering, CSV export
 
 import { escapeHtml, downloadBlob, fetchJson } from './ui.js';
-import { chartIconSVG, toggleChart } from './charts.js';
 
 export async function executeSqlAndRender(fullText, contentContainer) {
     const sqlRegex = /```sql\n([\s\S]*?)\n```/;
@@ -94,19 +93,6 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
         downloadCSV(queryResults);
     });
     actionsRight.appendChild(csvBtn);
-
-    if (typeof Chart !== 'undefined' && queryResults.length > 0) {
-        const chartBtn = document.createElement('button');
-        chartBtn.className = 'chart-toggle-btn';
-        chartBtn.innerHTML = chartIconSVG() + ' Chart';
-        chartBtn.title = 'Visualize as chart';
-        chartBtn.setAttribute('aria-label', 'Toggle chart visualization');
-        actionsRight.appendChild(chartBtn);
-
-        chartBtn.addEventListener('click', () => {
-            toggleChart(queryResults, container, chartBtn);
-        });
-    }
 
     actionsRow.appendChild(actionsRight);
     container.appendChild(actionsRow);

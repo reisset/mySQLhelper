@@ -28,7 +28,7 @@ python -m yoursqlfriend.app
 - `src/yoursqlfriend/validation.py` — `validate_sql()`, `strip_strings_and_comments()` (SQL security boundary)
 - `src/yoursqlfriend/llm.py` — LLM provider abstraction, prompts, streaming/non-streaming calls
 - `src/yoursqlfriend/database.py` — Read-only connections, query execution, file hashing, upload handling
-- `src/yoursqlfriend/static/js/` — ES modules: `app.js` (entry), `state.js`, `ui.js`, `chat.js`, `sql.js`, `charts.js`, `upload.js`, `providers.js`, `search.js`, `notes.js`, `erdiagram.js`
+- `src/yoursqlfriend/static/js/` — ES modules: `app.js` (entry), `state.js`, `ui.js`, `chat.js`, `sql.js`, `upload.js`, `providers.js`, `search.js`
 - `src/yoursqlfriend/static/style.css` — Dark/light forensic terminal theme
 - `src/yoursqlfriend/templates/index.html` — Jinja2 single-page template, loads vendored libs from `static/lib/`
 - `src/yoursqlfriend/static/manifest.json` — PWA manifest (standalone display, app icons)
@@ -63,7 +63,7 @@ Supports LM Studio (OpenAI-compatible API at `localhost:1234`) and Ollama (`loca
 
 Python: Flask, pandas, requests, Flask-Session (declared in `pyproject.toml`)
 
-Frontend (vendored in `src/yoursqlfriend/static/lib/`): Grid.js, Highlight.js, Marked.js, DOMPurify, Chart.js
+Frontend (vendored in `src/yoursqlfriend/static/lib/`): Grid.js, Highlight.js, Marked.js, DOMPurify
 
 ## Tests
 

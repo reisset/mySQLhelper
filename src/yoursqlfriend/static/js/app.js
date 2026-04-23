@@ -6,12 +6,10 @@
 
 import { state } from './state.js';
 import { initTheme, toggleTheme, showConfirmModal, showAlertModal, downloadBlob, fetchJson } from './ui.js';
-import { updateChartsForTheme } from './charts.js';
 import { initProviderSelector, initModelSelector } from './providers.js';
 import { sendMessage } from './chat.js';
 import { uploadFile, handleFiles, handleDrop } from './upload.js';
 import { showSearchModal } from './search.js';
-import { showERDiagramModal } from './erdiagram.js';
 
 // --- Initialize Theme ---
 initTheme();
@@ -54,7 +52,6 @@ const sidebarToggle = document.getElementById('sidebar-toggle');
 const themeToggle = document.getElementById('theme-toggle');
 const refreshBtn = document.getElementById('refresh-btn');
 const uploadForm = document.getElementById('upload-form');
-const schemaDiagramButton = document.getElementById('schema-diagram-button');
 const exportChatButton = document.getElementById('export-chat-button');
 const searchAllTablesButton = document.getElementById('search-all-tables-button');
 const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
@@ -63,7 +60,6 @@ const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
 if (themeToggle) {
     themeToggle.addEventListener('click', () => {
         toggleTheme();
-        updateChartsForTheme();
     });
 }
 
@@ -246,13 +242,6 @@ if (exportChatButton) {
 if (searchAllTablesButton) {
     searchAllTablesButton.addEventListener('click', () => {
         showSearchModal();
-    });
-}
-
-// --- Schema Diagram ---
-if (schemaDiagramButton) {
-    schemaDiagramButton.addEventListener('click', () => {
-        showERDiagramModal();
     });
 }
 

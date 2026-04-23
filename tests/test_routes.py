@@ -132,22 +132,6 @@ class TestSearchAllTables:
         assert data['total_matches'] >= 1
 
 
-# --- GET /api/schema/diagram ---
-
-class TestSchemaDiagram:
-    def test_no_db_loaded(self, client):
-        resp = client.get('/api/schema/diagram')
-        assert resp.status_code == 400
-
-    def test_with_db(self, client, temp_db):
-        _load_db(client, temp_db)
-        resp = client.get('/api/schema/diagram')
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert len(data['tables']) == 1
-        assert data['tables'][0]['name'] == 'users'
-
-
 # --- POST /save_assistant_message ---
 
 class TestSaveAssistantMessage:
@@ -167,28 +151,6 @@ class TestSaveAssistantMessage:
         data = resp.get_json()
         assert data['status'] == 'success'
         assert 'message_id' in data
-
-
-# --- POST /add_note ---
-
-class TestAddNote:
-    def test_missing_fields(self, client):
-        resp = client.post('/add_note', json={})
-        assert resp.status_code == 400
-
-    def test_message_not_found(self, client):
-        with client.session_transaction() as sess:
-            sess['chat_history'] = []
-        resp = client.post('/add_note', json={'message_id': 'nonexistent', 'note_content': 'test'})
-        assert resp.status_code == 404
-
-    def test_valid_note(self, client):
-        msg_id = 'test-msg-123'
-        with client.session_transaction() as sess:
-            sess['chat_history'] = [{'role': 'assistant', 'content': 'hi', 'id': msg_id}]
-        resp = client.post('/add_note', json={'message_id': msg_id, 'note_content': 'Important finding'})
-        assert resp.status_code == 200
-        assert resp.get_json()['status'] == 'success'
 
 
 # --- GET /export_chat ---

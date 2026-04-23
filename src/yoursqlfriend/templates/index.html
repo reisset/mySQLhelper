@@ -42,7 +42,6 @@
                 <div class="sidebar-section">
                     <h3 class="section-label">Actions</h3>
                     <button id="search-all-tables-button" class="sidebar-button">Search All Tables</button>
-                    <button id="schema-diagram-button" class="sidebar-button" disabled>Schema Diagram</button>
                     <button id="export-chat-button" class="sidebar-button">Export Chat</button>
                 </div>
 
@@ -115,7 +114,6 @@
     <script src="{{ url_for('static', filename='lib/purify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/highlight.min.js') }}"></script>
     <script src="{{ url_for('static', filename='lib/gridjs.umd.js') }}"></script>
-    <script src="{{ url_for('static', filename='lib/chart.umd.min.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}"></script>
 </body>
 </html>

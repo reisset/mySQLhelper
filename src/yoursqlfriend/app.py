@@ -645,88 +645,6 @@ def search_all_tables():
         logger.error(f"Search All Tables Error: {e}")
         return jsonify({'error': f'Database error: {e}'}), 500
 
-@app.route('/api/schema/diagram', methods=['GET'])
-def schema_diagram():
-    """Return schema data for ER diagram: tables, columns, types, PKs, FKs."""
-    db_filepath = session.get('db_filepath')
-    if not db_filepath:
-        return jsonify({'error': 'No database loaded'}), 400
-
-    try:
-        with get_readonly_connection(db_filepath) as conn:
-            cursor = conn.cursor()
-
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
-            table_names = [row[0] for row in cursor.fetchall()]
-
-            tables = []
-            relationships = []
-
-            for table_name in table_names:
-                cursor.execute(f'PRAGMA table_info("{table_name}");')
-                columns_raw = cursor.fetchall()
-                columns = []
-                for col in columns_raw:
-                    columns.append({
-                        'name': col[1],
-                        'type': col[2] or 'TEXT',
-                        'pk': bool(col[5])
-                    })
-
-                tables.append({
-                    'name': table_name,
-                    'columns': columns
-                })
-
-                cursor.execute(f'PRAGMA foreign_key_list("{table_name}");')
-                fks = cursor.fetchall()
-                for fk in fks:
-                    relationships.append({
-                        'from_table': table_name,
-                        'from_column': fk[3],
-                        'to_table': fk[2],
-                        'to_column': fk[4]
-                    })
-
-        return jsonify({
-            'tables': tables,
-            'relationships': relationships
-        })
-
-    except sqlite3.Error as e:
-        logger.error(f"Schema diagram error: {e}")
-        return jsonify({'error': f'Database error: {e}'}), 500
-
-@app.route('/add_note', methods=['POST'])
-def add_note():
-    data = request.json
-    if not data:
-        return jsonify({'error': 'Invalid request body'}), 400
-
-    message_id = data.get('message_id')
-    note_content = data.get('note_content')
-
-    if not message_id or note_content is None:
-        return jsonify({'error': 'Missing message_id or note_content'}), 400
-
-    chat_history = session.get('chat_history', [])
-
-    # Find message by ID
-    msg_found = False
-    for msg in chat_history:
-        if msg.get('id') == message_id:
-            msg['note'] = note_content
-            msg_found = True
-            break
-
-    if not msg_found:
-        return jsonify({'error': 'Message not found'}), 404
-
-    session['chat_history'] = chat_history
-    session.modified = True
-
-    return jsonify({'status': 'success'})
-
 def _get_css_content():
     css_path = os.path.join(BASE_PATH, 'static', 'style.css')
     try:
@@ -772,10 +690,6 @@ def _generate_chat_html(chat_history):
                     table += "<tr>" + "".join(f"<td>{html_escape(str(row[h]))}</td>" for h in headers) + "</tr>"
                 table += "</tbody></table>"
                 parts.append(f'<div class="results-table-container">{table}</div>')
-
-            if entry.get("note"):
-                note_text = html_escape(entry["note"])
-                parts.append(f'<div class="forensic-note" style="margin-top: 10px; padding: 10px; background: #332b00; border-left: 3px solid #ffcc00; font-style: italic; color: #fff;"><strong>Analyst Note:</strong> {note_text}</div>')
 
             # Wrap in content-container with token counter
             content_html = f'<div class="content-container">{token_html}{"".join(parts)}</div>'

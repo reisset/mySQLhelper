@@ -3,7 +3,6 @@
 import { state } from './state.js';
 import { renderText, fetchJson } from './ui.js';
 import { executeSqlAndRender } from './sql.js';
-import { enableAnnotation } from './notes.js';
 
 export async function sendMessage() {
     const userInput = document.getElementById('user-input');
@@ -175,15 +174,10 @@ export async function sendMessage() {
         }
 
         // SAVE THE ASSISTANT MESSAGE TO SESSION (with token usage)
-        const saveData = await fetchJson('/save_assistant_message', {
+        await fetchJson('/save_assistant_message', {
             content: fullResponse,
             token_usage: tokenUsage
         });
-
-        // Enable annotation if message ID is returned
-        if (saveData.message_id) {
-            enableAnnotation(contentContainer, saveData.message_id);
-        }
 
         // Execute SQL if present
         await executeSqlAndRender(fullResponse, contentContainer);
