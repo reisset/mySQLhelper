@@ -11,8 +11,7 @@ Built for offline analysis on a single workstation.
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?style=for-the-badge&logo=python&logoColor=white&labelColor=0a0a0c)](https://python.org)
 [![Flask](https://img.shields.io/badge/flask-3.x-green?style=for-the-badge&labelColor=0a0a0c)](https://flask.palletsprojects.com)
 
-![yourSQLfriend](https://github.com/user-attachments/assets/9984c22c-53f8-4679-9443-6d99574f4280)
-
+<img width="1769" alt="yourSQLfriend — load a database and get started" src="https://github.com/user-attachments/assets/7fc453e2-08f7-40f3-8ee1-8421238a734a" />
 
 </div>
 
@@ -30,6 +29,31 @@ Built for offline analysis on a single workstation.
 | 📋 **Interactive Tables** | Sort, filter, paginate results with dark/light theme |
 | 💾 **Export Sessions** | Save your entire chat session as a formatted HTML file with hashes + timestamps |
 | 🖥️ **Install as App** | PWA support — install as a standalone desktop app from Chrome/Edge/Brave |
+
+Ask a question in plain English — the LLM writes parameterised read-only SQL, runs it, and returns results you can sort, filter, and export.
+
+<img width="1059" alt="Workbench — question, generated SQL, and paginated results" src="https://github.com/user-attachments/assets/f9483143-a6e4-4330-ad8c-2f8a9eb0e194" />
+
+<details>
+<summary><strong>Schema browser & query history</strong></summary>
+<br>
+
+Browse all tables, columns, types, and row counts in the left pane. Query history lives at the bottom — click any entry to jump back.
+
+<img width="342" alt="Schema browser and query history" src="https://github.com/user-attachments/assets/d681458a-5a94-4db4-b650-043d82c2b9a0" />
+
+</details>
+
+<details>
+<summary><strong>Row Inspector</strong></summary>
+<br>
+
+Click any result row to expand it. Foreign key references become navigable links — follow relationships without writing another query.
+
+<img width="414" alt="Row Inspector with foreign key navigation" src="https://github.com/user-attachments/assets/6a882305-ac01-43d2-8099-6bed8631a122" />
+
+</details>
+
 > The Flask server must be running for the app to work. Use `./run.sh` to start it.
                         
 
