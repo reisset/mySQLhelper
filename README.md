@@ -4,7 +4,7 @@
 
 **Connect SQLite databases to a local LLM. Ask questions in plain English, get SQL queries and results.**
 
-Built for offline analysis on a single workstation.
+Built for offline forensic analysis on a single workstation — no cloud, no telemetry, nothing leaves your machine.
 
 [![Version](https://img.shields.io/badge/version-3.9.0-c1522b?style=for-the-badge&labelColor=0a0a0c)](https://github.com/reisset/yourSQLfriend/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=for-the-badge&labelColor=0a0a0c)](LICENSE)
@@ -17,13 +17,18 @@ Built for offline analysis on a single workstation.
 
 ---
 
+**yourSQLfriend is for analysts, investigators, and developers who need to interrogate SQLite databases without sending data anywhere.** Load a `.db`, `.sqlite`, `.csv`, or `.sql` file, ask questions in plain English, and get parameterised read-only SQL with full results — air-gap safe, forensic-grade.
+
+---
+
 ## ✨ Features
+
 | | |
 |---|---|
 | 🔒 **100% Offline** | Runs on a local LLM via Ollama or LM Studio. Zero telemetry, air-gap safe |
 | 💬 **Natural Language** | Ask "show me the top 5 customers" and get results + the exact SQL query |
 | 🔍 **Search All Tables** | Find a value across your entire database (`⌘K` / `Ctrl+K`) |
-| 🪟 **Three-Pane Workbench** | Schema browser · conversation · Row Inspector — the forensic atelier layout |
+| 🪟 **Three-Pane Workbench** | Schema browser · conversation · Row Inspector |
 | 🔎 **Row Inspector** | Click any result row to expand it; foreign keys become clickable links |
 | 🕘 **Query History** | Per-session panel of every question asked; click to jump back to that turn |
 | 📋 **Interactive Tables** | Sort, filter, paginate results with dark/light theme |
@@ -54,14 +59,40 @@ Click any result row to expand it. Foreign key references become navigable links
 
 </details>
 
-> The Flask server must be running for the app to work. Use `./run.sh` to start it.
-                        
+---
+
+## 🤖 LLM Setup
+
+**yourSQLfriend requires a local LLM running before you launch.** Set one up first:
+
+### Option A: Ollama
+
+```bash
+ollama pull gemma4:26b
+ollama serve
+```
+
+### Option B: LM Studio
+
+1. Download [LM Studio](https://lmstudio.ai)
+2. Load a model
+3. Start local server on port 1234
+
+Once connected, the provider indicator in the top bar turns green.
+
+<img width="451" alt="Settings panel — provider connected" src="https://github.com/user-attachments/assets/f7b78356-daaf-468e-86f8-8326ba7adff5" />
+
+> **Context window:** The system prompt is token-heavy by design. A 16K context window is the minimum; 32K or more is strongly recommended for complex schemas.
+
+> **LLM model sizes:** Smallest → 4B | Mid → 8-9B | Large → 14B | Largest → 26-30B
+
+> **Recommended LLM families:** Qwen | Gemma | Mistral / Devstral
 
 ---
 
 ## 🚀 Quick Start
 
-**Prerequisite:** [Python 3.10+](https://python.org) must be installed.
+**Prerequisite:** [Python 3.10+](https://python.org) must be installed, and your LLM must be running (see above).
 
 ### Linux / macOS
 
@@ -75,13 +106,11 @@ curl -fsSL https://raw.githubusercontent.com/reisset/yourSQLfriend/main/install.
 irm https://raw.githubusercontent.com/reisset/yourSQLfriend/main/install.ps1 | iex
 ```
 
-Then launch from any terminal:
-
-```
-yoursqlfriend
-```
+Then launch from any terminal: yoursqlfriend
 
 Options: `yoursqlfriend --port 8080`, `--no-browser`, `--host 0.0.0.0`
+
+> **Note:** The Flask server must be running for the app to work. `yoursqlfriend` starts it automatically — do not close the terminal.
 
 <details>
 <summary><strong>Install with pipx (manual)</strong></summary>
@@ -106,30 +135,6 @@ run.bat           # Windows
 
 ---
 
-## 🤖 LLM Setup
-
-yourSQLfriend requires a local LLM. Set one up before you start:
-
-### Option A: Ollama (Recommended)
-
-```bash
-ollama pull llama3.2
-ollama serve
-```
-
-### Option B: LM Studio
-
-1. Download [LM Studio](https://lmstudio.ai)
-2. Load a model
-3. Start local server on port 1234
-
-> **Fair Warning:** The system prompt required to get better SQL query results is token-heavy. For optimal usage, a ~16 000 tokens context window is MINIMUM, and ~32 000 or more is highly recommended.
- 
-> **Recommended models:** Smallest => Qwen3:4B | Mid-Size => Qwen3:8B | Large => Ministral-3:14B OR Qwen3:14B | Largest => Qwen3-coder:30B
-
-
----
-
 ## 🛡️ Forensic Integrity
 
 | | |
@@ -139,7 +144,16 @@ ollama serve
 | **Audit logs** | All queries logged to `logs/` with daily rotation |
 | **Air-gap safe** | Zero telemetry, works fully offline |
 
-> **Note:** The upload process excludes WAL files (`.db-wal`, `.db-shm`). Checkpoint your database first to include recent transactions.
+> **WAL files:** The upload process excludes `.db-wal` and `.db-shm` files. Checkpoint your database first to ensure recent transactions are included.
+
+---
+
+## ⚠️ Known Limitations
+
+- **Model quality matters.** Smaller models will produce incorrect or incomplete SQL on complex schemas. If results look wrong, the query is the first thing to check.
+- **SQLite only.** No support for Postgres, MySQL, or other engines.
+- **Single database per session.** You can replace the loaded database mid-session, but results from different databases are not cross-queryable.
+- **Complex queries may fail.** Heavily nested subqueries, window functions, and non-standard SQLite extensions may exceed what the LLM generates reliably.
 
 ---
 
@@ -153,12 +167,6 @@ All data lives in your home directory:
 | Windows | `%APPDATA%\.yourSQLfriend\` |
 
 Contains `uploads/`, `logs/`, and `sessions/`.
-
----
-
-## 🧰 Tech Stack
-
-Flask, Vanilla JS, CSS, HTML, SQLite, PWA, local LLM (OpenAI-compatible API)
 
 ---
 
