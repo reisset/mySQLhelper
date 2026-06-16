@@ -44,7 +44,10 @@ class TestBuildPayload:
         payload = _build_llm_payload(config, [{'role': 'user', 'content': 'hi'}], stream=True)
         assert payload['model'] == 'llama3'
         assert payload['stream'] is True
-        assert payload['options']['temperature'] == 0.1
+        assert payload['keep_alive'] == '30m'
+        assert payload['options']['temperature'] == 0
+        assert payload['options']['seed'] == 42
+        assert payload['options']['num_predict'] == 2048
 
     def test_lmstudio_streaming(self):
         config = get_provider_config('lmstudio')
@@ -92,9 +95,11 @@ class TestBuildSchemaContext:
         fd, path = tempfile.mkstemp(suffix='.db')
         os.close(fd)
         try:
-            with sqlite3.connect(path) as conn:
-                conn.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, val TEXT)')
-                conn.execute("INSERT INTO test VALUES (1, 'hello')")
+            conn = sqlite3.connect(path)
+            conn.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, val TEXT)')
+            conn.execute("INSERT INTO test VALUES (1, 'hello')")
+            conn.commit()
+            conn.close()  # explicit close — required for os.unlink on Windows
             context = build_schema_context(path)
             assert 'CREATE TABLE test' in context
             assert 'hello' in context
@@ -105,9 +110,11 @@ class TestBuildSchemaContext:
         fd, path = tempfile.mkstemp(suffix='.db')
         os.close(fd)
         try:
-            with sqlite3.connect(path) as conn:
-                conn.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, val TEXT)')
-                conn.execute("INSERT INTO test VALUES (1, 'hello')")
+            conn = sqlite3.connect(path)
+            conn.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, val TEXT)')
+            conn.execute("INSERT INTO test VALUES (1, 'hello')")
+            conn.commit()
+            conn.close()  # explicit close — required for os.unlink on Windows
             context = build_schema_context(path, include_samples=False)
             assert 'CREATE TABLE test' in context
             assert 'hello' not in context

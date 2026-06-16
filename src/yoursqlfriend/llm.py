@@ -2,16 +2,19 @@
 
 import os
 import json
-import sqlite3
 import logging
 
 import requests
+
+from yoursqlfriend.database import get_readonly_connection
 
 logger = logging.getLogger(__name__)
 
 LLM_API_URL = os.environ.get('LLM_API_URL', "http://localhost:1234/v1/chat/completions")
 OLLAMA_URL = os.environ.get('OLLAMA_URL', "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.2')
+# No hardcoded fallback — resolved at call time via resolve_ollama_model().
+# Set OLLAMA_MODEL env var to pin a specific model; otherwise the first installed model is used.
+OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL')
 
 
 def check_llm_available():
@@ -47,6 +50,21 @@ def check_ollama_available():
     return False, []
 
 
+def resolve_ollama_model(session_model=None):
+    """Return the best available Ollama model name, in priority order:
+    1. session_model — the user's in-session pick
+    2. OLLAMA_MODEL  — env-var override
+    3. First model currently installed in Ollama
+    4. None          — caller must handle (Ollama unavailable / no models)
+    """
+    if session_model:
+        return session_model
+    if OLLAMA_MODEL:
+        return OLLAMA_MODEL
+    _, models = check_ollama_available()
+    return models[0] if models else None
+
+
 def get_provider_config(provider, model=None):
     """Return provider-specific configuration for LLM requests.
 
@@ -75,23 +93,56 @@ def get_provider_config(provider, model=None):
     }
 
 
-def _build_llm_payload(config, messages, stream=False):
-    """Build request payload for the given provider config."""
+def _build_llm_payload(config, messages, stream=False, use_structured_output=False):
+    """Build request payload for the given provider config.
+
+    use_structured_output: when True, asks the provider to return JSON
+    {"sql": "..."} instead of free-form text. Only used on the retry path.
+    """
+    # JSON schema used for constrained SQL-correction output
+    _sql_schema = {
+        'type': 'object',
+        'properties': {'sql': {'type': 'string'}},
+        'required': ['sql'],
+        'additionalProperties': False,
+    }
+
     if config['provider'] == 'ollama':
-        return {
+        payload = {
             'model': config['model'],
             'messages': messages,
             'stream': stream,
-            'options': {'temperature': 0.1},
+            'keep_alive': '30m',   # keep model warm across a forensic session
+            'options': {
+                'temperature': 0,  # deterministic output — same question → same SQL
+                'seed': 42,
+                'num_predict': 2048,
+            },
         }
+        if use_structured_output:
+            payload['format'] = _sql_schema
+        return payload
+
+    # LM Studio (OpenAI-compatible)
     payload = {
         'messages': messages,
-        'temperature': 0.1,
+        'temperature': 0,
+        'seed': 42,
+        'max_tokens': 2048,
         'stream': stream,
     }
     if stream:
         payload['mode'] = 'chat'
         payload['stream_options'] = {'include_usage': True}
+    if use_structured_output:
+        payload['response_format'] = {
+            'type': 'json_schema',
+            'json_schema': {
+                'name': 'sql_correction',
+                'strict': True,
+                'schema': _sql_schema,
+            },
+        }
     return payload
 
 
@@ -108,11 +159,14 @@ def build_schema_context(db_filepath, include_samples=True):
 
     Includes CREATE TABLE DDL, foreign key relationships, and optionally
     sample data. Set include_samples=False for error correction prompts.
+    Uses a read-only connection to match the app's read-only guarantee.
     """
+    import sqlite3  # local import — only needed here; avoid module-level dep
     if not db_filepath:
         return ""
 
-    with sqlite3.connect(db_filepath) as conn:
+    conn = get_readonly_connection(db_filepath)
+    try:
         cursor = conn.cursor()
 
         cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
@@ -151,6 +205,8 @@ def build_schema_context(db_filepath, include_samples=True):
                         parts.append("")
                 except sqlite3.Error:
                     pass
+    finally:
+        conn.close()
 
     return '\n'.join(parts)
 
@@ -207,11 +263,16 @@ Assistant: "Based on the schema, **orders** links to **customers** via CustomerI
 {schema_context}"""
 
 
-def call_llm_non_streaming(messages, provider='lmstudio', model=None):
-    """Make a non-streaming LLM call and return the response text. Used for SQL retry."""
+def call_llm_non_streaming(messages, provider='lmstudio', model=None, use_structured_output=False):
+    """Make a non-streaming LLM call and return the response text. Used for SQL retry.
+
+    When use_structured_output=True the response will be JSON {"sql": "..."} if the
+    provider supports grammar-constrained generation (both LM Studio and Ollama do).
+    """
     try:
         config = get_provider_config(provider, model)
-        payload = _build_llm_payload(config, messages, stream=False)
+        payload = _build_llm_payload(config, messages, stream=False,
+                                     use_structured_output=use_structured_output)
         r = requests.post(config['url'], headers=config['headers'], json=payload, timeout=30)
         r.raise_for_status()
         return _extract_llm_content(config, r.json())

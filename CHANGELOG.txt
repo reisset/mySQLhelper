@@ -1,5 +1,38 @@
 CHANGELOG
 
+### v3.10.0 - Backend inference & reliability improvements (Jun 2026)
+
+#### New / Changed
+- **Reproducible results:** LLM temperature lowered to 0 with a fixed seed so the same
+  question asked of the same evidence always produces the same SQL — important for
+  defensible forensic findings.
+- **Model warmth (Ollama):** `keep_alive: 30m` added to every Ollama request. The model
+  stays loaded across a forensic session instead of unloading after the default 5-minute
+  idle, eliminating cold-reload stalls mid-investigation.
+- **Response cap:** `max_tokens: 2048` (LM Studio) / `num_predict: 2048` (Ollama) prevent
+  runaway generation — SQL and a short explanation are always well within this limit.
+- **Smarter auto-correction:** the SQL retry path now requests a constrained JSON response
+  `{"sql": "..."}` from the provider (grammar-constrained generation), with the old
+  markdown regex as a belt-and-suspenders fallback. Eliminates silent failures when the
+  model formats its answer differently.
+- **No hardcoded model name:** `OLLAMA_MODEL` default removed. Ollama now auto-selects the
+  first installed model when no session pick or `OLLAMA_MODEL` env var is set — the
+  codebase no longer contains a model name that can go stale.
+- **Read-only consistency:** `build_schema_context()` now opens a proper read-only
+  connection instead of a regular `sqlite3.connect()`, matching the app's read-only
+  promise end-to-end.
+
+#### Fixed
+- **False "Request Timed Out" errors:** the frontend watchdog was 15 seconds, too short
+  for local models to prefill a large forensic schema before the first token. Raised to
+  90 seconds — the watchdog clears on the first token so normal short responses are
+  unaffected.
+- **Stale Ollama error hint:** "ollama pull llama3.2" replaced with "ollama list" so
+  users aren't instructed to pull a specific model that may not suit their hardware.
+- **Redundant search re-filtering:** case-sensitive table search now relies entirely on
+  SQLite's GLOB (which is already case-sensitive) and skips the redundant Python
+  re-filter pass.
+
 ### Unreleased
 
 #### Fixed

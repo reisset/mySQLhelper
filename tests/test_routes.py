@@ -1,5 +1,6 @@
 """Route-level tests using Flask test client."""
 
+import gc
 import io
 import os
 import sqlite3
@@ -22,11 +23,14 @@ def temp_db():
     """Create a temporary SQLite database with a test table."""
     fd, path = tempfile.mkstemp(suffix='.db')
     os.close(fd)
-    with sqlite3.connect(path) as conn:
-        conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)')
-        conn.execute("INSERT INTO users VALUES (1, 'Alice', 'alice@example.com')")
-        conn.execute("INSERT INTO users VALUES (2, 'Bob', 'bob@example.com')")
+    conn = sqlite3.connect(path)
+    conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)')
+    conn.execute("INSERT INTO users VALUES (1, 'Alice', 'alice@example.com')")
+    conn.execute("INSERT INTO users VALUES (2, 'Bob', 'bob@example.com')")
+    conn.commit()
+    conn.close()  # explicit close — required for os.unlink on Windows
     yield path
+    gc.collect()  # ensure any lingering read-only SQLite handles are released on Windows
     os.unlink(path)
 
 

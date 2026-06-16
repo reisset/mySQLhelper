@@ -8,6 +8,7 @@ import os
 import sys
 import gc
 import time
+import json
 import logging
 import re
 import uuid
@@ -34,7 +35,7 @@ from yoursqlfriend.database import (
 )
 from yoursqlfriend.llm import (
     LLM_API_URL, OLLAMA_URL, OLLAMA_MODEL,
-    check_llm_available, check_ollama_available,
+    check_llm_available, check_ollama_available, resolve_ollama_model,
     build_schema_context, build_system_prompt, build_error_correction_prompt,
     call_llm_non_streaming, stream_llm_response,
 )
@@ -122,14 +123,16 @@ def update_chat_history_with_results(chat_history, sql_query, results_dict):
 def ollama_status():
     """
     Check if Ollama is running and return available models.
-    Returns: { available: bool, models: [string], default_model: string, selected_model: string }
+    Returns: { available: bool, models: [string], default_model: string|null, selected_model: string|null }
     """
     available, models = check_ollama_available()
+    # selected_model: session pick → env override → first installed → null
+    selected = session.get('ollama_model') or OLLAMA_MODEL or (models[0] if models else None)
     return jsonify({
         'available': available,
         'models': models,
-        'default_model': OLLAMA_MODEL,
-        'selected_model': session.get('ollama_model', OLLAMA_MODEL)
+        'default_model': OLLAMA_MODEL,  # null when no env override — expected by frontend
+        'selected_model': selected,
     })
 
 @app.route('/api/ollama/model', methods=['POST'])
@@ -156,12 +159,13 @@ def get_provider_status():
 
     if provider == 'ollama':
         available, models = check_ollama_available()
+        selected = session.get('ollama_model') or OLLAMA_MODEL or (models[0] if models else None)
         return jsonify({
             'provider': 'ollama',
             'available': available,
             'models': models,
-            'selected_model': session.get('ollama_model', OLLAMA_MODEL),
-            'url': OLLAMA_URL
+            'selected_model': selected,
+            'url': OLLAMA_URL,
         })
     else:
         # LM Studio check
@@ -437,7 +441,7 @@ def chat_stream():
     logger.info(f"Messages to send count: {len(messages_to_send)}")
 
     # Stream based on provider
-    model = session.get('ollama_model', OLLAMA_MODEL) if provider == 'ollama' else None
+    model = resolve_ollama_model(session.get('ollama_model')) if provider == 'ollama' else None
     if model:
         logger.info(f"Using Ollama model: {model}")
     return Response(stream_with_context(stream_llm_response(messages_to_send, provider, model)), content_type='text/plain')
@@ -520,20 +524,34 @@ def execute_sql():
             correction_prompt = build_error_correction_prompt(str(e), sql_query, schema_context)
 
             provider = session.get('llm_provider', LLM_PROVIDER)
-            model = session.get('ollama_model', OLLAMA_MODEL) if provider == 'ollama' else None
+            model = resolve_ollama_model(session.get('ollama_model')) if provider == 'ollama' else None
             messages = [
-                {"role": "system", "content": "You are a SQL correction assistant. Output only the corrected SQL in a ```sql code block."},
+                {"role": "system", "content": "You are a SQL correction assistant. Return a JSON object with a single key 'sql' containing the corrected query."},
                 {"role": "user", "content": correction_prompt}
             ]
 
-            llm_response = call_llm_non_streaming(messages, provider=provider, model=model)
+            # Request constrained JSON output so the SQL is always extractable.
+            llm_response = call_llm_non_streaming(messages, provider=provider, model=model,
+                                                  use_structured_output=True)
 
-            # Extract SQL from response
-            sql_match = re.search(r'```sql\n([\s\S]*?)\n```', llm_response)
-            if not sql_match:
-                raise ValueError("LLM did not return corrected SQL")
+            # Primary: parse the structured JSON response {"sql": "..."}
+            corrected_sql = None
+            try:
+                parsed = json.loads(llm_response)
+                corrected_sql = parsed.get('sql', '').strip() or None
+                if corrected_sql:
+                    logger.info("SQL correction extracted via structured output")
+            except (json.JSONDecodeError, AttributeError):
+                pass
 
-            corrected_sql = sql_match.group(1).strip()
+            # Fallback: scrape a ```sql ... ``` code block (belt-and-suspenders)
+            if not corrected_sql:
+                sql_match = re.search(r'```sql\n([\s\S]*?)\n```', llm_response)
+                if not sql_match:
+                    raise ValueError("LLM did not return corrected SQL")
+                corrected_sql = sql_match.group(1).strip()
+                logger.info("SQL correction extracted via regex fallback")
+
             logger.info(f"LLM suggested correction: {corrected_sql}")
 
             # Validate corrected SQL
@@ -617,18 +635,17 @@ def search_all_tables():
                         cursor.execute(query, params)
                         rows = cursor.fetchall()
 
-                        # Filter and collect matched values
+                        # Filter and collect matched values.
+                        # Case-sensitive: GLOB already guarantees exact-case matches — no re-check.
+                        # Case-insensitive: LIKE is ASCII-only; Python re-check covers non-ASCII edge cases.
                         matched_values = []
                         for row in rows:
                             val = row[0]
                             if val is not None:
                                 val_str = str(val)
-                                if case_sensitive:
-                                    if search_term in val_str:
-                                        matched_values.append(val_str)
-                                else:
-                                    if search_term.lower() in val_str.lower():
-                                        matched_values.append(val_str)
+                                if not case_sensitive and search_term.lower() not in val_str.lower():
+                                    continue  # non-ASCII safety net for LIKE
+                                matched_values.append(val_str)
 
                         if matched_values:
                             # Store first 3 unique values for display, plus total count

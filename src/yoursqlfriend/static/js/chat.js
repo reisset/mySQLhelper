@@ -88,7 +88,7 @@ export async function sendMessage() {
     }
     const controller = new AbortController();
     state.activeStreamController = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s watchdog
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s watchdog — local models need time to prefill large schemas
 
     try {
         const response = await fetch('/chat_stream', {
@@ -222,7 +222,7 @@ export async function sendMessage() {
 
             const helpList = document.createElement('ol');
             const helpItems = isOllama
-                ? ['Is Ollama running? (ollama serve)', 'Is a model pulled? (ollama pull llama3.2)', 'Check port 11434 is accessible']
+                ? ['Is Ollama running? (ollama serve)', 'Is a model pulled? (run: ollama list)', 'Check port 11434 is accessible']
                 : ['Is LM Studio running? (Green bar at top)', 'Is the port set to 1234?', 'Is a model loaded?'];
 
             helpItems.forEach(item => {
