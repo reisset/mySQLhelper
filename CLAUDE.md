@@ -45,7 +45,7 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 2. Backend builds schema context (`build_schema_context()`: DDL + foreign keys + 3 sample rows per table) and system prompt with decision framework
 3. LLM responds with SQL in fenced code blocks (or plain text for non-SQL questions)
 4. Frontend extracts SQL via regex, calls `/execute_sql` for validation + execution
-5. On `sqlite3.Error`: backend auto-retries once via `call_llm_non_streaming()` with error correction prompt; frontend shows collapsible "Auto-corrected" badge
+5. On `sqlite3.Error`: backend auto-retries once via `call_llm_non_streaming()` with a grammar-constrained JSON response (`{"sql": "..."}`) for reliable extraction, with a markdown regex as fallback; frontend shows collapsible "Auto-corrected" badge
 
 ## Key Constraints
 
@@ -62,6 +62,9 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 
 Supports LM Studio (OpenAI-compatible API at `localhost:1234`) and Ollama (`localhost:11434`). Configured via env vars `LLM_PROVIDER`, `LLM_API_URL`, `OLLAMA_URL`, `OLLAMA_MODEL`. Provider status polled every 30 seconds from frontend.
 
+- **LM Studio**: always uses whichever model is currently loaded in the server — no model name needed in code.
+- **Ollama**: model resolved at call time via `resolve_ollama_model()` — priority: user's session pick → `OLLAMA_MODEL` env var → first installed model → `None`. No model name is hardcoded; the codebase never goes stale. Run `ollama list` to see what's installed.
+
 ## Dependencies
 
 Python: Flask, pandas, requests, Flask-Session (declared in `pyproject.toml`)
@@ -75,4 +78,4 @@ pip install -e .
 python -m pytest tests/ -v
 ```
 
-106 pytest cases: SQL validation (63), Flask route tests (24), LLM module tests (19). No linter configured.
+101 pytest cases: SQL validation (63), Flask route tests (24), LLM module tests (19). No linter configured.
