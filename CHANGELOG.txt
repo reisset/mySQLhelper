@@ -1,5 +1,17 @@
 CHANGELOG
 
+### Unreleased
+
+#### Fixed
+- **Windows installer** (`install.ps1`): Script incorrectly reported "Could not
+  install pipx" on clean machines even though pip exited 0. Root cause: PS 5.1
+  wraps native-command stderr into ErrorRecords when `2>&1` is used, which trips
+  `$ErrorActionPreference = "Stop"` regardless of exit code. Harmless pip
+  warnings (e.g. PATH notice) were terminating the script. Fix: judge all
+  native-command success by `$LASTEXITCODE`, never by stderr capture; use
+  `python -m pipx install` (module form) as the primary install path so the
+  script works even when `pipx.exe` isn't on the session PATH yet.
+
 ### v3.9.0 - Forensic Atelier redesign (Apr 2026)
 
 The UI was rebuilt as a three-pane forensic workbench. Charts, schema
