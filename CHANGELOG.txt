@@ -4,13 +4,14 @@ CHANGELOG
 
 #### New / Changed
 - **Reproducible results:** LLM temperature lowered to 0 with a fixed seed so the same
-  question asked of the same evidence always produces the same SQL — important for
-  defensible forensic findings.
+  question produces the same SQL for a fixed model and runtime — useful for forensic
+  reproducibility notes. (Results may differ if the model file or server version changes.)
 - **Model warmth (Ollama):** `keep_alive: 30m` added to every Ollama request. The model
   stays loaded across a forensic session instead of unloading after the default 5-minute
   idle, eliminating cold-reload stalls mid-investigation.
-- **Response cap:** `max_tokens: 2048` (LM Studio) / `num_predict: 2048` (Ollama) prevent
-  runaway generation — SQL and a short explanation are always well within this limit.
+- **Response cap on retry:** the SQL auto-correction retry path caps output at 2048 tokens
+  (`max_tokens` / `num_predict`). The main streaming chat is uncapped so long explanations
+  and complex multi-CTE queries are never silently truncated.
 - **Smarter auto-correction:** the SQL retry path now requests a constrained JSON response
   `{"sql": "..."}` from the provider (grammar-constrained generation), with the old
   markdown regex as a belt-and-suspenders fallback. Eliminates silent failures when the

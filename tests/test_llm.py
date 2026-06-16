@@ -9,7 +9,7 @@ import pytest
 from yoursqlfriend.llm import (
     get_provider_config, _build_llm_payload, _extract_llm_content,
     build_schema_context, build_system_prompt, build_error_correction_prompt,
-    call_llm_non_streaming, OLLAMA_MODEL,
+    call_llm_non_streaming, resolve_ollama_model, OLLAMA_MODEL,
 )
 
 
@@ -47,6 +47,14 @@ class TestBuildPayload:
         assert payload['keep_alive'] == '30m'
         assert payload['options']['temperature'] == 0
         assert payload['options']['seed'] == 42
+        # Streaming chat is uncapped — no num_predict so long answers aren't truncated
+        assert 'num_predict' not in payload['options']
+
+    def test_ollama_non_streaming_with_max_tokens(self):
+        """Retry path: num_predict must be present when max_tokens is specified."""
+        config = get_provider_config('ollama', model='llama3')
+        payload = _build_llm_payload(config, [{'role': 'user', 'content': 'hi'}],
+                                     stream=False, max_tokens=2048)
         assert payload['options']['num_predict'] == 2048
 
     def test_lmstudio_streaming(self):
@@ -56,6 +64,8 @@ class TestBuildPayload:
         assert payload['stream'] is True
         assert payload['mode'] == 'chat'
         assert 'stream_options' in payload
+        # Streaming chat is uncapped — no max_tokens key in the payload
+        assert 'max_tokens' not in payload
 
     def test_lmstudio_non_streaming(self):
         config = get_provider_config('lmstudio')
@@ -63,6 +73,86 @@ class TestBuildPayload:
         assert payload['stream'] is False
         assert 'mode' not in payload
         assert 'stream_options' not in payload
+
+    def test_lmstudio_non_streaming_with_max_tokens(self):
+        """Retry path: max_tokens must be present when specified."""
+        config = get_provider_config('lmstudio')
+        payload = _build_llm_payload(config, [{'role': 'user', 'content': 'hi'}],
+                                     stream=False, max_tokens=2048)
+        assert payload['max_tokens'] == 2048
+
+
+class TestStructuredOutputPayload:
+    """Verify that use_structured_output=True injects the right schema for each provider."""
+
+    def test_lmstudio_structured_output_format(self):
+        config = get_provider_config('lmstudio')
+        payload = _build_llm_payload(config, [{'role': 'user', 'content': 'fix'}],
+                                     stream=False, use_structured_output=True, max_tokens=2048)
+        assert 'response_format' in payload
+        rf = payload['response_format']
+        assert rf['type'] == 'json_schema'
+        assert rf['json_schema']['name'] == 'sql_correction'
+        assert rf['json_schema']['strict'] is True
+        schema = rf['json_schema']['schema']
+        assert schema['type'] == 'object'
+        assert 'sql' in schema['properties']
+        assert schema['required'] == ['sql']
+
+    def test_ollama_structured_output_format(self):
+        config = get_provider_config('ollama', model='llama3')
+        payload = _build_llm_payload(config, [{'role': 'user', 'content': 'fix'}],
+                                     stream=False, use_structured_output=True, max_tokens=2048)
+        assert 'format' in payload
+        fmt = payload['format']
+        assert fmt['type'] == 'object'
+        assert 'sql' in fmt['properties']
+        assert fmt['required'] == ['sql']
+
+    def test_no_structured_output_when_flag_false(self):
+        """Default call must not inject response_format or format."""
+        lms_config = get_provider_config('lmstudio')
+        lms_payload = _build_llm_payload(lms_config, [{'role': 'user', 'content': 'hi'}])
+        assert 'response_format' not in lms_payload
+
+        ollama_config = get_provider_config('ollama', model='llama3')
+        ollama_payload = _build_llm_payload(ollama_config, [{'role': 'user', 'content': 'hi'}])
+        assert 'format' not in ollama_payload
+
+
+class TestResolveOllamaModel:
+    """Priority ladder: session → env → first-installed → None."""
+
+    def test_session_model_takes_priority(self):
+        with patch('yoursqlfriend.llm.OLLAMA_MODEL', 'env-model'):
+            with patch('yoursqlfriend.llm.check_ollama_available', return_value=(True, ['installed-model'])):
+                result = resolve_ollama_model(session_model='session-model')
+        assert result == 'session-model'
+
+    def test_env_var_used_when_no_session(self):
+        with patch('yoursqlfriend.llm.OLLAMA_MODEL', 'env-model'):
+            with patch('yoursqlfriend.llm.check_ollama_available', return_value=(True, ['installed-model'])):
+                result = resolve_ollama_model(session_model=None)
+        assert result == 'env-model'
+
+    def test_first_installed_model_when_no_env(self):
+        with patch('yoursqlfriend.llm.OLLAMA_MODEL', None):
+            with patch('yoursqlfriend.llm.check_ollama_available', return_value=(True, ['first', 'second'])):
+                result = resolve_ollama_model(session_model=None)
+        assert result == 'first'
+
+    def test_returns_none_when_no_models_available(self):
+        with patch('yoursqlfriend.llm.OLLAMA_MODEL', None):
+            with patch('yoursqlfriend.llm.check_ollama_available', return_value=(False, [])):
+                result = resolve_ollama_model(session_model=None)
+        assert result is None
+
+    def test_empty_session_string_falls_through(self):
+        """Empty string should not count as a session pick."""
+        with patch('yoursqlfriend.llm.OLLAMA_MODEL', None):
+            with patch('yoursqlfriend.llm.check_ollama_available', return_value=(True, ['auto'])):
+                result = resolve_ollama_model(session_model='')
+        assert result == 'auto'
 
 
 # --- Content Extraction ---

@@ -56,6 +56,10 @@ def resolve_ollama_model(session_model=None):
     2. OLLAMA_MODEL  — env-var override
     3. First model currently installed in Ollama
     4. None          — caller must handle (Ollama unavailable / no models)
+
+    Note: structured-output (format: <schema>) requires Ollama ≥ 0.5. Older
+    builds only accept format: "json". The retry path degrades gracefully via
+    the regex fallback if the server rejects the schema object.
     """
     if session_model:
         return session_model
@@ -93,11 +97,17 @@ def get_provider_config(provider, model=None):
     }
 
 
-def _build_llm_payload(config, messages, stream=False, use_structured_output=False):
+def _build_llm_payload(config, messages, stream=False, use_structured_output=False,
+                       max_tokens=None):
     """Build request payload for the given provider config.
 
     use_structured_output: when True, asks the provider to return JSON
     {"sql": "..."} instead of free-form text. Only used on the retry path.
+
+    max_tokens: cap on generated tokens. Pass None (default) to omit the key
+    entirely and let the server use its default — important for streaming chat
+    where answers may include long explanations + multi-CTE queries. The retry
+    path passes 2048 explicitly (the corrected SQL is always short).
     """
     # JSON schema used for constrained SQL-correction output
     _sql_schema = {
@@ -108,16 +118,18 @@ def _build_llm_payload(config, messages, stream=False, use_structured_output=Fal
     }
 
     if config['provider'] == 'ollama':
+        options = {
+            'temperature': 0,  # deterministic output — same question → same SQL
+            'seed': 42,
+        }
+        if max_tokens is not None:
+            options['num_predict'] = max_tokens
         payload = {
             'model': config['model'],
             'messages': messages,
             'stream': stream,
             'keep_alive': '30m',   # keep model warm across a forensic session
-            'options': {
-                'temperature': 0,  # deterministic output — same question → same SQL
-                'seed': 42,
-                'num_predict': 2048,
-            },
+            'options': options,
         }
         if use_structured_output:
             payload['format'] = _sql_schema
@@ -128,9 +140,10 @@ def _build_llm_payload(config, messages, stream=False, use_structured_output=Fal
         'messages': messages,
         'temperature': 0,
         'seed': 42,
-        'max_tokens': 2048,
         'stream': stream,
     }
+    if max_tokens is not None:
+        payload['max_tokens'] = max_tokens
     if stream:
         payload['mode'] = 'chat'
         payload['stream_options'] = {'include_usage': True}
@@ -271,8 +284,11 @@ def call_llm_non_streaming(messages, provider='lmstudio', model=None, use_struct
     """
     try:
         config = get_provider_config(provider, model)
+        # Cap the retry response at 2048 tokens — the corrected SQL is always short.
+        # The streaming chat path does NOT pass max_tokens so the server default applies.
         payload = _build_llm_payload(config, messages, stream=False,
-                                     use_structured_output=use_structured_output)
+                                     use_structured_output=use_structured_output,
+                                     max_tokens=2048)
         r = requests.post(config['url'], headers=config['headers'], json=payload, timeout=30)
         r.raise_for_status()
         return _extract_llm_content(config, r.json())

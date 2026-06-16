@@ -63,7 +63,7 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 Supports LM Studio (OpenAI-compatible API at `localhost:1234`) and Ollama (`localhost:11434`). Configured via env vars `LLM_PROVIDER`, `LLM_API_URL`, `OLLAMA_URL`, `OLLAMA_MODEL`. Provider status polled every 30 seconds from frontend.
 
 - **LM Studio**: always uses whichever model is currently loaded in the server — no model name needed in code.
-- **Ollama**: model resolved at call time via `resolve_ollama_model()` — priority: user's session pick → `OLLAMA_MODEL` env var → first installed model → `None`. No model name is hardcoded; the codebase never goes stale. Run `ollama list` to see what's installed.
+- **Ollama**: model resolved at call time via `resolve_ollama_model()` — priority: user's session pick → `OLLAMA_MODEL` env var → first installed model → `None`. No model name is hardcoded; the codebase never goes stale. Run `ollama list` to see what's installed. The SQL auto-correction retry passes a JSON schema object in `format` (grammar-constrained output) — this requires **Ollama ≥ 0.5**. Older builds accept only `format: "json"` and may reject the schema; the retry degrades gracefully via the regex fallback in that case.
 
 ## Dependencies
 
