@@ -1,5 +1,16 @@
 CHANGELOG
 
+### v3.10.1 - Windows installer fix (Jun 2026)
+
+#### Fixed
+- **Windows installer false-failure on pipx bootstrap (round 2):** `Invoke-Native` piped
+  the wrapped command's stdout directly into the function's output stream, so a *successful*
+  `pip install pipx` caused the caller's `$rc` to be an array of stdout strings + exit code.
+  `if ($rc -ne 0)` on an array is a PS filter (truthy even on success), so the installer
+  reported "pip exited Collecting pipx … Successfully installed … 0" and aborted even though
+  pipx had been installed correctly. Stdout is now routed via `Out-Host` so it stays visible
+  to the user but does not pollute the return value; `$rc` is always a clean integer.
+
 ### v3.10.0 - Backend inference & reliability improvements (Jun 2026)
 
 #### New / Changed

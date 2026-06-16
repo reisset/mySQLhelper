@@ -8,11 +8,17 @@ $MinPythonMajor = 3
 $MinPythonMinor = 10
 
 # --- Helper: run a native executable and return its exit code.
-#     We do NOT use 2>&1 here. In PowerShell 5.1, redirecting a native
-#     command's stderr with 2>&1 wraps each stderr line in an ErrorRecord
-#     (NativeCommandError), which trips $ErrorActionPreference = "Stop"
-#     even when the process exits 0. Instead we let stderr flow to the
-#     console normally and judge success only by $LASTEXITCODE.
+#     Two PS 5.1 traps avoided here:
+#     1) We do NOT use 2>&1 — redirecting a native command's stderr with 2>&1
+#        wraps each stderr line in an ErrorRecord (NativeCommandError), which
+#        trips $ErrorActionPreference = "Stop" even when the process exits 0.
+#        Stderr flows to the console normally; success is judged by $LASTEXITCODE.
+#     2) We pipe stdout via Out-Host rather than letting it fall through to the
+#        function's output stream. In PS, *everything* on the success/output stream
+#        becomes the function's return value — including stdout lines from the child
+#        process. Without Out-Host, the caller's $rc would be an array of stdout
+#        strings plus the exit code integer, making $rc -ne 0 a filter (truthy) even
+#        on success. Out-Host writes to the console and stays off the output stream.
 function Invoke-Native {
     param(
         [string]$Exe,
@@ -25,7 +31,7 @@ function Invoke-Native {
         if ($Silent) {
             & $Exe @Arguments >$null 2>$null
         } else {
-            & $Exe @Arguments
+            & $Exe @Arguments | Out-Host
         }
         return $LASTEXITCODE
     } finally {
