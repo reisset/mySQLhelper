@@ -109,11 +109,12 @@ export async function sendMessage() {
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';       // incomplete SSE frame accumulator
-        let fullResponse = ''; // assembled model text (from event: token frames)
+        let buffer = '';        // incomplete SSE frame accumulator
+        let fullResponse = '';  // assembled model text (from event: token frames)
         let tokenUsage = null;
         let firstChunk = true;
         let streamComplete = false;
+        let renderPending = false; // rAF gate — prevents O(n²) re-renders during streaming
 
         // Parse complete SSE frames from the buffer (split on blank lines).
         // Returns { frames: string[], remainder: string } where remainder is
@@ -131,7 +132,7 @@ export async function sendMessage() {
                 if (line.startsWith('event: ')) {
                     event = line.slice(7).trim();
                 } else if (line.startsWith('data: ')) {
-                    data = line.slice(6);
+                    data += (data ? '\n' : '') + line.slice(6);
                 }
                 // Lines starting with ':' are comments (keepalive) — silently ignored.
             }
@@ -142,11 +143,6 @@ export async function sendMessage() {
             const { done, value } = await reader.read();
             if (done) break;
 
-            if (firstChunk) {
-                clearTimeout(timeoutId);
-                firstChunk = false;
-            }
-
             buffer += decoder.decode(value, { stream: true });
             const { frames, remainder } = parseFrames(buffer);
             buffer = remainder;
@@ -156,18 +152,28 @@ export async function sendMessage() {
                 const { event, data } = parseFrame(frame);
 
                 if (event === 'token') {
+                    // Disarm watchdog on first real model event — not on keepalive comments,
+                    // which arrive before any content and would clear it prematurely.
+                    if (firstChunk) { clearTimeout(timeoutId); firstChunk = false; }
                     try {
                         const parsed = JSON.parse(data);
                         const chunk = parsed.chunk || '';
                         if (chunk) {
                             fullResponse += chunk;
-                            renderText(pText, fullResponse);
-                            chatHistory.scrollTop = chatHistory.scrollHeight;
+                            if (!renderPending) {
+                                renderPending = true;
+                                requestAnimationFrame(() => {
+                                    renderText(pText, fullResponse);
+                                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                                    renderPending = false;
+                                });
+                            }
                         }
                     } catch (e) {
                         console.warn('Failed to parse token frame:', e);
                     }
                 } else if (event === 'done') {
+                    if (firstChunk) { clearTimeout(timeoutId); firstChunk = false; }
                     try {
                         const parsed = JSON.parse(data);
                         tokenUsage = parsed.token_usage || null;
@@ -177,6 +183,7 @@ export async function sendMessage() {
                     streamComplete = true;
                     break outer;
                 } else if (event === 'error') {
+                    if (firstChunk) { clearTimeout(timeoutId); firstChunk = false; }
                     let msg = data;
                     try { msg = JSON.parse(data).message || data; } catch (_) {}
                     throw new Error(msg);

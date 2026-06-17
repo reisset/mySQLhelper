@@ -1,5 +1,45 @@
 CHANGELOG
 
+### v3.11.1 - Streaming and security hardening follow-up (Jun 2026)
+
+#### Fixed
+- **SSE stream not completing on server drop (LM Studio):** If the HTTP connection
+  closed before the `data: [DONE]` sentinel arrived (server crash, model OOM), the
+  frontend received no `event: done` frame and always showed a timeout error — even
+  for complete responses. A post-loop fallback now emits `event: done` whenever the
+  stream closes without a terminal signal.
+- **Generator continued after `event: done` (both providers):** Neither the Ollama
+  nor the LM Studio branch broke out of the `iter_lines()` loop after emitting the
+  done frame. Trailing bytes or a second `done: true` line could produce spurious
+  post-done `event: token` frames (silently dropped by the client) or a duplicate
+  done frame. Both branches now `break` immediately after emitting done.
+- **Injection fence bypassable via crafted cell values:** A database row whose value
+  was exactly `<<END_UNTRUSTED_DATA>>` (≤ 50 chars, within the truncation limit)
+  would be emitted as a bare line indistinguishable from the real fence-closing
+  marker, potentially exposing subsequent row values as trusted model context. All
+  sample cell values and column names now have `<<` replaced with `««` before
+  insertion into the prompt.
+- **Schema budget bypass for very wide DDL:** After dropping sample rows on budget
+  overflow, the DDL-only schema was returned without a second size check. A database
+  with thousands of tables could still produce a DDL-only context exceeding the
+  20 000-char budget, silently overflowing the model's context window. The fallback
+  now hard-truncates with a visible `[...schema truncated]` marker if DDL alone
+  still exceeds the limit.
+- **AbortController watchdog cleared by keepalive comment:** The 90-second stream
+  watchdog was disarmed on the first raw `reader.read()` result, which includes SSE
+  keepalive comment frames (`: keep-alive`). A model that emitted one keepalive and
+  then stalled indefinitely would clear the watchdog before generating any content,
+  leaving the UI spinner running forever. The watchdog is now cleared only on the
+  first real named event (`token`, `done`, or `error`).
+- **SSE `parseFrame` discarded all but the last `data:` line:** Multiple `data:`
+  lines in one SSE frame (valid per WHATWG spec) were overwritten instead of
+  concatenated with `\n`. Now correctly concatenated.
+- **O(n²) streaming render:** `renderText` (full `marked.parse` + `DOMPurify` +
+  `innerHTML`) was called on every `event: token` frame with the full accumulated
+  response string, making total rendering work quadratic in response length. All
+  streaming renders are now gated behind `requestAnimationFrame` so multiple tokens
+  arriving within a single animation frame are batched into one DOM update.
+
 ### v3.11.0 - Backend hardening: SSE streaming, prompt security, schema budget (Jun 2026)
 
 #### Changed
