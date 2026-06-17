@@ -54,6 +54,7 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 - **SQL validation** (`validate_sql()`): Strips string literals and comments first, then checks allowed statement starts (SELECT/WITH/EXPLAIN/PRAGMA) and blocks 13 forbidden keywords. Multi-statement queries rejected
 - **PRAGMA table names must be double-quoted**: `PRAGMA table_info("table_name")` — not single quotes
 - **Version**: `pyproject.toml` `version` is the single source of truth. Read at runtime via `importlib.metadata` in `__init__.py`. On release, update `pyproject.toml` version and add a `CHANGELOG.txt` entry. Template cache-bust `?v=` and service worker `CACHE_NAME` are injected automatically.
+  - **PyPI release**: a GitHub Actions workflow publishes to PyPI automatically on push to `main`. Do not run `twine` or `python -m build` manually — just bump the version, update `CHANGELOG.txt`, commit, and push.
   - **Editable-install gotcha**: `pip install -e .` writes dist-info metadata at install time and does *not* re-read `pyproject.toml` on subsequent imports. After bumping the version, refresh the dev venv with `pip install -e . --force-reinstall --no-deps` — otherwise `importlib.metadata.version()` will keep returning the old version, and the template will inject stale `?v=` cache-bust tokens. Only affects contributors; pipx users always get fresh metadata.
 - **User data**: stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows)
 - **Session state**: Server-side filesystem sessions — set `session.modified = True` after updates
