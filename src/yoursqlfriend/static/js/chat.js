@@ -109,13 +109,36 @@ export async function sendMessage() {
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let accumulatedText = '';
-        let fullResponse = '';
-        let tokenUsage = null;  // Track token usage
+        let buffer = '';       // incomplete SSE frame accumulator
+        let fullResponse = ''; // assembled model text (from event: token frames)
+        let tokenUsage = null;
         let firstChunk = true;
         let streamComplete = false;
 
-        while (true) {
+        // Parse complete SSE frames from the buffer (split on blank lines).
+        // Returns { frames: string[], remainder: string } where remainder is
+        // any partial frame still being received.
+        function parseFrames(buf) {
+            const parts = buf.split('\n\n');
+            return { frames: parts.slice(0, -1), remainder: parts[parts.length - 1] };
+        }
+
+        // Parse a single SSE frame string into { event, data }.
+        function parseFrame(frame) {
+            let event = 'message';
+            let data = '';
+            for (const line of frame.split('\n')) {
+                if (line.startsWith('event: ')) {
+                    event = line.slice(7).trim();
+                } else if (line.startsWith('data: ')) {
+                    data = line.slice(6);
+                }
+                // Lines starting with ':' are comments (keepalive) — silently ignored.
+            }
+            return { event, data };
+        }
+
+        outer: while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -124,45 +147,49 @@ export async function sendMessage() {
                 firstChunk = false;
             }
 
-            const chunk = decoder.decode(value, { stream: true });
-            const endToken = '<|END_OF_STREAM|>';
-            const tokenToken = '<|TOKEN_USAGE|>';
+            buffer += decoder.decode(value, { stream: true });
+            const { frames, remainder } = parseFrames(buffer);
+            buffer = remainder;
 
-            if (chunk.includes(endToken)) {
-                streamComplete = true;
-                const parts = chunk.split(endToken);
-                accumulatedText += parts[0];
+            for (const frame of frames) {
+                if (!frame.trim()) continue;
+                const { event, data } = parseFrame(frame);
 
-                // Check if token usage data is present
-                const metadata = parts[1];
-                if (metadata.includes(tokenToken)) {
-                    const metaParts = metadata.split(tokenToken);
-                    fullResponse = metaParts[0];
+                if (event === 'token') {
                     try {
-                        tokenUsage = JSON.parse(metaParts[1]);
+                        const parsed = JSON.parse(data);
+                        const chunk = parsed.chunk || '';
+                        if (chunk) {
+                            fullResponse += chunk;
+                            renderText(pText, fullResponse);
+                            chatHistory.scrollTop = chatHistory.scrollHeight;
+                        }
                     } catch (e) {
-                        console.warn('Failed to parse token usage:', e);
-                        tokenUsage = null;
+                        console.warn('Failed to parse token frame:', e);
                     }
-                } else {
-                    // Backward compatibility: No token data
-                    fullResponse = metadata;
+                } else if (event === 'done') {
+                    try {
+                        const parsed = JSON.parse(data);
+                        tokenUsage = parsed.token_usage || null;
+                    } catch (e) {
+                        console.warn('Failed to parse done frame:', e);
+                    }
+                    streamComplete = true;
+                    break outer;
+                } else if (event === 'error') {
+                    let msg = data;
+                    try { msg = JSON.parse(data).message || data; } catch (_) {}
+                    throw new Error(msg);
                 }
-                break;
-            } else {
-                accumulatedText += chunk;
             }
-
-            renderText(pText, accumulatedText);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
         }
 
         if (!streamComplete) {
             throw new Error("Connection to LLM timed out or was interrupted.");
         }
 
-        // Final render
-        renderText(pText, accumulatedText);
+        // Final render (ensures any last partial buffer is flushed)
+        renderText(pText, fullResponse);
 
         // Dismiss status bar (with minimum display time)
         clearInterval(shimmerInterval);

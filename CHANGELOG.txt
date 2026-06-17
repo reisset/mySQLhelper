@@ -1,5 +1,34 @@
 CHANGELOG
 
+### v3.11.0 - Backend hardening: SSE streaming, prompt security, schema budget (Jun 2026)
+
+#### Changed
+- **Proper SSE streaming:** The `/chat_stream` endpoint now emits a real
+  `text/event-stream` response with named SSE events (`event: token`,
+  `event: done`, `event: error`) instead of the previous in-band magic-string
+  sentinel (`<|END_OF_STREAM|>`). The full response is no longer re-sent at
+  stream end — the frontend accumulates it from token events, cutting payload
+  size in half for long answers. Periodic `: keep-alive` comments prevent
+  proxy idle-timeout drops during slow local-model generation.
+- **Prompt injection fencing:** Sample rows injected into the LLM system prompt
+  are now wrapped in explicit `<<UNTRUSTED_DATA>>` / `<<END_UNTRUSTED_DATA>>`
+  markers with a corresponding system-prompt rule instructing the model to treat
+  that content as data values only, never as instructions. Defense-in-depth for
+  adversarial forensic databases where cell values may contain injected text.
+- **Schema-context token budget:** `build_schema_context()` now enforces a
+  20,000-character soft budget (~5k tokens). When a wide database exceeds it,
+  sample rows are dropped automatically and a visible notice is prepended
+  (`[NOTE: Large schema — sample rows omitted…]`) so the LLM understands why
+  samples are absent. The `schema_truncated` flag is also included in the
+  `/upload` response for future UI use. Prevents silent context-window overflow
+  on local models with smaller context windows.
+
+#### Tests
+- 24 new test cases (101 → 125 total): SSE frame format for both Ollama and
+  LM Studio providers, error/timeout frame format, confirmation that full
+  response is never re-sent in the done frame, untrusted-data marker presence,
+  schema budget trigger, system-prompt untrusted-data rule.
+
 ### v3.10.1 - Windows installer fix (Jun 2026)
 
 #### Fixed

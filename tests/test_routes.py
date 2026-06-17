@@ -179,7 +179,7 @@ class TestExportChat:
 class TestExecuteSQLRetry:
     """Test the auto-correction retry logic introduced in v3.10.0."""
 
-    @patch('yoursqlfriend.app.build_schema_context', return_value='')
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
     @patch('yoursqlfriend.app.call_llm_non_streaming')
     def test_retry_structured_output_success(self, mock_llm, mock_schema, client, temp_db):
         """Primary path: LLM returns JSON {"sql": "..."} and the corrected query runs."""
@@ -193,7 +193,7 @@ class TestExecuteSQLRetry:
         assert data.get('corrected_sql') == 'SELECT * FROM users'
         assert len(data.get('query_results', [])) == 2
 
-    @patch('yoursqlfriend.app.build_schema_context', return_value='')
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
     @patch('yoursqlfriend.app.call_llm_non_streaming')
     def test_retry_regex_fallback(self, mock_llm, mock_schema, client, temp_db):
         """Fallback path: JSON parse fails so the regex extracts the SQL from a code block."""
@@ -206,7 +206,7 @@ class TestExecuteSQLRetry:
         assert data.get('retried') is True
         assert data.get('corrected_sql') == 'SELECT * FROM users'
 
-    @patch('yoursqlfriend.app.build_schema_context', return_value='')
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
     @patch('yoursqlfriend.app.call_llm_non_streaming')
     def test_retry_total_failure_returns_500(self, mock_llm, mock_schema, client, temp_db):
         """Both JSON and regex fail: should return 500 with the original SQL error, not crash."""

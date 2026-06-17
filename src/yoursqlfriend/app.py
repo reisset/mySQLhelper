@@ -335,8 +335,10 @@ def upload_file():
         session['upload_timestamp'] = datetime.now().isoformat()
         session['file_size_bytes'] = os.path.getsize(final_filepath)
         session['chat_history'] = []  # Reset chat history
-        # Cache schema context so build_schema_context() isn't called every message
-        session['schema_context_cache'] = build_schema_context(final_filepath)
+        # Cache schema context so build_schema_context() isn't called every message.
+        # build_schema_context returns (context_str, truncated) — store both.
+        schema_context_str, schema_truncated = build_schema_context(final_filepath)
+        session['schema_context_cache'] = schema_context_str
         session.modified = True
 
         logger.info(f"Database loaded successfully: {original_filename}")
@@ -358,7 +360,8 @@ def upload_file():
                 'filename': original_filename,
                 'hash': file_hash,
                 'size_mb': os.path.getsize(final_filepath) / (1024*1024),
-                'tables': len(schema)
+                'tables': len(schema),
+                'schema_truncated': schema_truncated,  # True → large schema, samples omitted from LLM context
             }
         })
 
@@ -417,7 +420,7 @@ def chat_stream():
         schema_context = session.get('schema_context_cache', '')
         if not schema_context:
             try:
-                schema_context = build_schema_context(db_filepath)
+                schema_context, _ = build_schema_context(db_filepath)
                 session['schema_context_cache'] = schema_context
                 session.modified = True
             except sqlite3.Error as e:
@@ -444,7 +447,14 @@ def chat_stream():
     model = resolve_ollama_model(session.get('ollama_model')) if provider == 'ollama' else None
     if model:
         logger.info(f"Using Ollama model: {model}")
-    return Response(stream_with_context(stream_llm_response(messages_to_send, provider, model)), content_type='text/plain')
+    return Response(
+        stream_with_context(stream_llm_response(messages_to_send, provider, model)),
+        content_type='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',   # disable nginx buffering if behind a reverse proxy
+        },
+    )
 
 @app.route('/save_assistant_message', methods=['POST'])
 def save_assistant_message():
@@ -520,7 +530,7 @@ def execute_sql():
 
         # Attempt auto-correction via LLM (max 1 retry)
         try:
-            schema_context = build_schema_context(db_filepath, include_samples=False)
+            schema_context, _ = build_schema_context(db_filepath, include_samples=False)
             correction_prompt = build_error_correction_prompt(str(e), sql_query, schema_context)
 
             provider = session.get('llm_provider', LLM_PROVIDER)

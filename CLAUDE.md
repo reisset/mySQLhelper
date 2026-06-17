@@ -41,11 +41,12 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 
 ### Request Flow
 
-1. User types natural language question → streams to `/chat_stream` via SSE
-2. Backend builds schema context (`build_schema_context()`: DDL + foreign keys + 3 sample rows per table) and system prompt with decision framework
-3. LLM responds with SQL in fenced code blocks (or plain text for non-SQL questions)
-4. Frontend extracts SQL via regex, calls `/execute_sql` for validation + execution
-5. On `sqlite3.Error`: backend auto-retries once via `call_llm_non_streaming()` with a grammar-constrained JSON response (`{"sql": "..."}`) for reliable extraction, with a markdown regex as fallback; frontend shows collapsible "Auto-corrected" badge
+1. User types natural language question → `POST /chat_stream` → response is `text/event-stream` (proper SSE)
+2. Backend builds schema context (`build_schema_context()`: DDL + foreign keys + 3 sample rows per table, capped at `SCHEMA_CONTEXT_CHAR_BUDGET` chars; samples are omitted and flagged when over budget) and system prompt with decision framework
+3. LLM streams tokens → backend yields `event: token` frames; sends `event: done` with token-usage JSON once complete; `event: error` on failure. Periodic `: keep-alive` comments prevent proxy drops during slow generation.
+4. Frontend accumulates `event: token` chunks into `fullResponse`, renders progressively. On `event: done`: updates token counter. On `event: error`: renders error UI.
+5. Frontend extracts SQL via regex from `fullResponse`, calls `/execute_sql` for validation + execution
+6. On `sqlite3.Error`: backend auto-retries once via `call_llm_non_streaming()` with a grammar-constrained JSON response (`{"sql": "..."}`) for reliable extraction, with a markdown regex as fallback; frontend shows collapsible "Auto-corrected" badge
 
 ## Key Constraints
 
@@ -78,4 +79,4 @@ pip install -e .
 python -m pytest tests/ -v
 ```
 
-101 pytest cases: SQL validation (63), Flask route tests (24), LLM module tests (19). No linter configured.
+125 pytest cases: SQL validation (63), Flask route tests (24), LLM module tests (38). No linter configured.
