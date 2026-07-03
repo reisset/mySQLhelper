@@ -112,6 +112,14 @@ Options: `yoursqlfriend --port 8080`, `--no-browser`, `--host 0.0.0.0`
 
 > **Note:** The Flask server must be running for the app to work. `yoursqlfriend` starts it automatically — do not close the terminal.
 
+### Updating
+
+Re-run the install one-liner above — it upgrades an existing installation in place. Or, equivalently:
+
+```bash
+pipx upgrade yoursqlfriend
+```
+
 <details>
 <summary><strong>Install with pipx (manual)</strong></summary>
 
