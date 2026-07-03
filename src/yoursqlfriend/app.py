@@ -11,6 +11,7 @@ import time
 import json
 import logging
 import re
+import secrets
 import uuid
 import socket
 import argparse
@@ -19,6 +20,7 @@ import threading
 from datetime import datetime
 
 from html import escape as html_escape
+from urllib.parse import urlsplit
 
 # Flask
 from flask import Flask, render_template, request, jsonify, session, make_response, Response, stream_with_context
@@ -61,13 +63,41 @@ app = Flask(__name__,
             template_folder=os.path.join(BASE_PATH, 'templates'),
             static_folder=os.path.join(BASE_PATH, 'static'))
 
+def _load_or_create_secret_key(data_dir):
+    """Return a persistent per-install secret key.
+
+    SECRET_KEY env var wins; otherwise a random key is generated once and stored
+    in the user data dir so sessions survive restarts without a hardcoded key.
+    """
+    env_key = os.environ.get('SECRET_KEY')
+    if env_key:
+        return env_key
+    key_path = os.path.join(data_dir, 'secret_key')
+    try:
+        with open(key_path, encoding='utf-8') as f:
+            key = f.read().strip()
+        if key:
+            return key
+    except OSError:
+        pass
+    key = secrets.token_hex(32)
+    with open(key_path, 'w', encoding='utf-8') as f:
+        f.write(key)
+    try:
+        os.chmod(key_path, 0o600)  # best-effort; no-op on Windows ACLs
+    except OSError:
+        pass
+    return key
+
+
 # --- Configuration ---
-# Use environment variable for secret key, or default for dev
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
+app.secret_key = _load_or_create_secret_key(DATA_DIR)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_FILE_DIR'] = os.path.join(DATA_DIR, 'sessions')
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
+# Localhost tool: Lax blocks the session cookie on cross-site POSTs (CSRF class)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # --- Logging Setup ---
 # Ensure upload directory exists (defined early for logging)
@@ -100,6 +130,46 @@ logger.info("=" * 60)
 
 # Initialize Server-side Session
 Session(app)
+
+# --- Cross-site request hardening ---
+# Browsers attach an Origin header to cross-site POSTs. Without this guard, a
+# malicious web page could fire requests at http://localhost:5000 (CSRF /
+# DNS-rebinding class). No tokens needed for a localhost tool: reject POSTs
+# whose Origin or Host don't line up with where we're actually serving.
+_LOOPBACK_HOSTS = {'localhost', '127.0.0.1', '::1'}
+
+
+def _is_loopback_host(hostname):
+    if not hostname:
+        return False
+    hostname = hostname.lower()
+    return hostname in _LOOPBACK_HOSTS or hostname.endswith('.localhost')
+
+
+@app.before_request
+def _reject_cross_site_posts():
+    if request.method != 'POST':
+        return None
+
+    request_hostname = (urlsplit(f'//{request.host}').hostname or '').lower()
+
+    # DNS-rebinding guard: when bound to loopback (the default), the Host
+    # header must be a loopback name.
+    bind_host = app.config.get('BIND_HOST', '127.0.0.1')
+    if bind_host in _LOOPBACK_HOSTS and not _is_loopback_host(request_hostname):
+        logger.warning(f"Blocked POST with unexpected Host header: {request.host}")
+        return jsonify({'error': 'Forbidden'}), 403
+
+    # CSRF guard: cross-site POSTs carry a mismatched Origin ("null" counts —
+    # it's what sandboxed/file:// pages send, never our own UI).
+    origin = request.headers.get('Origin')
+    if origin:
+        origin_hostname = (urlsplit(origin).hostname or '').lower()
+        if origin_hostname != request_hostname and not _is_loopback_host(origin_hostname):
+            logger.warning(f"Blocked cross-site POST from Origin: {origin}")
+            return jsonify({'error': 'Forbidden'}), 403
+    return None
+
 
 # LLM Provider Configuration
 LLM_PROVIDER = os.environ.get('LLM_PROVIDER', 'lmstudio')  # 'lmstudio' or 'ollama'
@@ -940,8 +1010,9 @@ def internal_error(error):
 
 @app.errorhandler(Exception)
 def unhandled_exception(e):
+    # Full detail goes to the log only — exception text can leak paths/internals.
     logger.error(f"Unhandled Exception: {e}", exc_info=True)
-    return jsonify({'error': str(e)}), 500
+    return jsonify({'error': 'Internal server error'}), 500
 
 def main():
     parser = argparse.ArgumentParser(description='yourSQLfriend — SQLite forensic analysis tool')
@@ -949,6 +1020,9 @@ def main():
     parser.add_argument('--host', default='127.0.0.1', help='Host to bind to (default: 127.0.0.1)')
     parser.add_argument('--no-browser', action='store_true', help='Do not auto-open browser')
     args = parser.parse_args()
+
+    # The cross-site POST guard relaxes the Host check when not bound to loopback
+    app.config['BIND_HOST'] = args.host
 
     if not args.no_browser:
         url = f'http://{args.host}:{args.port}'

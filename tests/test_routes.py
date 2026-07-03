@@ -250,6 +250,43 @@ class TestExecuteSQLRetry:
         assert 'SQL Error' in resp.get_json().get('error', '')
 
 
+# --- Cross-site POST guard ---
+
+class TestCrossSiteGuard:
+    def test_cross_origin_post_rejected(self, client):
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT 1'},
+                           headers={'Origin': 'http://evil.example.com'})
+        assert resp.status_code == 403
+
+    def test_null_origin_post_rejected(self, client):
+        """Origin: null (sandboxed iframe / file:// page) is never our own UI."""
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT 1'},
+                           headers={'Origin': 'null'})
+        assert resp.status_code == 403
+
+    def test_localhost_origin_post_allowed(self, client, temp_db):
+        _load_db(client, temp_db)
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM users'},
+                           headers={'Origin': 'http://localhost'})
+        assert resp.status_code == 200
+
+    def test_no_origin_post_allowed(self, client, temp_db):
+        """Same-origin requests and non-browser clients often omit Origin."""
+        _load_db(client, temp_db)
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM users'})
+        assert resp.status_code == 200
+
+    def test_rebound_host_post_rejected(self, client):
+        """DNS rebinding: non-loopback Host header while bound to loopback."""
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT 1'},
+                           headers={'Host': 'evil.example.com'})
+        assert resp.status_code == 403
+
+    def test_get_requests_unaffected(self, client):
+        resp = client.get('/', headers={'Origin': 'http://evil.example.com'})
+        assert resp.status_code == 200
+
+
 # --- POST /search_all_tables (special character edge cases) ---
 
 @pytest.fixture
