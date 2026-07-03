@@ -36,7 +36,7 @@ from yoursqlfriend.database import (
 )
 from yoursqlfriend.llm import (
     LLM_API_URL, OLLAMA_URL, OLLAMA_MODEL,
-    check_llm_available, check_ollama_available, resolve_ollama_model,
+    check_llm_available, check_ollama_available, resolve_provider_model,
     build_schema_context, build_system_prompt, build_error_correction_prompt,
     call_llm_non_streaming, stream_llm_response, extract_sql_from_response,
 )
@@ -516,9 +516,9 @@ def chat_stream():
     logger.info(f"Messages to send count: {len(messages_to_send)}")
 
     # Stream based on provider
-    model = resolve_ollama_model(session.get('ollama_model')) if provider == 'ollama' else None
+    model = resolve_provider_model(provider, session.get('ollama_model'))
     if model:
-        logger.info(f"Using Ollama model: {model}")
+        logger.info(f"Using {provider} model: {model}")
     return Response(
         stream_with_context(stream_llm_response(messages_to_send, provider, model)),
         content_type='text/event-stream',
@@ -607,7 +607,7 @@ def execute_sql():
                                                               structured=True)
 
             provider = session.get('llm_provider', LLM_PROVIDER)
-            model = resolve_ollama_model(session.get('ollama_model')) if provider == 'ollama' else None
+            model = resolve_provider_model(provider, session.get('ollama_model'))
             messages = [
                 {"role": "system", "content": "You are a SQL correction assistant. Return a JSON object with a single key 'sql' containing the corrected query."},
                 {"role": "user", "content": correction_prompt}

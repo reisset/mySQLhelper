@@ -1,5 +1,68 @@
 CHANGELOG
 
+### v3.12.0 - Reliability, security, and CI sweep (Jul 2026)
+
+Full-project audit pass: lower query error rates with local models, patched
+vendored libraries, cross-site request hardening, and a CI test gate in
+front of PyPI publishing.
+
+#### New / Changed
+- **SQLite-specific prompt rules:** the system prompt now teaches the model the
+  pitfalls that caused most failed queries — double-quoted identifiers (never
+  backticks), strftime/date/datetime instead of DATE_FORMAT/NOW, `||` instead
+  of CONCAT, LIKE's ASCII case-insensitivity, and exact schema-name copying.
+- **Tolerant SQL extraction:** the client and the retry fallback now accept
+  ```SQL / ```sqlite tags, single-line fences, untagged fences (retry only),
+  and bare-SQL responses, instead of requiring a perfectly formatted lowercase
+  ```sql block. Everything extracted still passes validate_sql().
+- **Consistent auto-correction instructions:** the retry previously told the
+  model to return JSON (system message) *and* a ```sql block (user prompt) at
+  the same time; both now ask for the same JSON shape the grammar constraint
+  enforces. New targeted hints for "ambiguous column", "misuse of aggregate",
+  and "no such function" errors.
+- **Gradual schema-budget degradation:** on budget overflow, sample rows are
+  reduced to 1 per table before being dropped entirely — sample values are the
+  model's strongest signal for real column contents.
+- **CI:** new GitHub Actions test workflow (Python 3.10 + 3.13, plus ruff
+  lint) on every push/PR; the PyPI publish workflow now requires tests to pass
+  before building — a v* tag can no longer ship a broken release.
+- **Tests:** 125 → 172 (database.py was previously untested, including the
+  .sql import security gate; plus extraction, budget-ladder, prompt, and
+  cross-site guard tests).
+
+#### Security
+- **DOMPurify 3.0.8 → 3.4.11:** closes published sanitizer-bypass CVEs
+  (CVE-2024-45801/47875, CVE-2025-26791, CVE-2026-0540). DOMPurify is the XSS
+  boundary for all LLM-rendered markdown. Highlight.js 11.9.0 → 11.11.1.
+  Vendored library versions are now recorded in static/lib/VERSIONS.md.
+- **Per-install session secret:** the hardcoded dev fallback key is gone; a
+  random key is generated once and persisted in the user data dir
+  (SECRET_KEY env var still takes precedence).
+- **Cross-site POST guard:** SameSite=Lax session cookie plus Origin/Host
+  validation on POST routes — a malicious web page can no longer fire
+  CSRF/DNS-rebinding requests at localhost:5000.
+- **No internal error leakage:** the global exception handler returns a
+  generic message; details go to the log only.
+
+#### Fixed
+- **LM Studio broken on current builds:** recent LM Studio versions return
+  400 Bad Request when the request omits the model id (older builds ignored
+  it). The loaded chat model is now resolved via /v1/models at call time —
+  mirroring the Ollama pattern — and included in the payload; embedding
+  models are skipped. Old LM Studio builds keep working (field omitted when
+  unresolvable).
+- **Reasoning models returned empty auto-corrections:** LM Studio can leave a
+  reasoning model's final answer in reasoning_content with an empty content
+  field; the SQL-correction retry now falls back to it. Verified live against
+  qwen3.6-27b: misspelled-column queries are auto-corrected again.
+- **Timeout message said "15 seconds"** while the actual watchdog is 90 s.
+- **Keyboard accessibility:** schema-browser table rows and Row Inspector
+  foreign-key links are now focusable and operable with Enter/Space.
+- Removed dead code (vestigial sidebar toggle, unused CSS reader); deduplicated
+  the Windows file-lock retry loops and the welcome-screen minimize logic.
+- README version badge was two minor versions stale; mis-filed "Unreleased"
+  CHANGELOG block merged into its actual release (v3.10.0).
+
 ### v3.11.1 - Streaming and security hardening follow-up (Jun 2026)
 
 #### Fixed

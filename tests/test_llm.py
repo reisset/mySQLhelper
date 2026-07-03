@@ -12,6 +12,7 @@ from yoursqlfriend.llm import (
     get_provider_config, _build_llm_payload, _extract_llm_content,
     build_schema_context, build_system_prompt, build_error_correction_prompt,
     call_llm_non_streaming, stream_llm_response, resolve_ollama_model,
+    resolve_lmstudio_model, resolve_provider_model,
     extract_sql_from_response,
     OLLAMA_MODEL, SCHEMA_CONTEXT_CHAR_BUDGET,
 )
@@ -39,6 +40,42 @@ class TestGetProviderConfig:
         assert config['headers'] == {'Content-Type': 'application/json'}
         assert config['label'] == 'LM Studio'
 
+    def test_lmstudio_config_with_model(self):
+        config = get_provider_config('lmstudio', model='qwen/qwen3.6-27b')
+        assert config['model'] == 'qwen/qwen3.6-27b'
+
+
+class TestResolveLmstudioModel:
+    """Current LM Studio builds require a model id; embedding models are skipped."""
+
+    @patch('yoursqlfriend.llm.requests.get')
+    def test_returns_first_chat_model(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {'data': [
+            {'id': 'text-embedding-nomic-embed-text-v1.5'},
+            {'id': 'qwen/qwen3.6-27b'},
+        ]}
+        mock_get.return_value = mock_resp
+        assert resolve_lmstudio_model() == 'qwen/qwen3.6-27b'
+
+    @patch('yoursqlfriend.llm.requests.get')
+    def test_none_when_only_embedding_models(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {'data': [{'id': 'text-embedding-x'}]}
+        mock_get.return_value = mock_resp
+        assert resolve_lmstudio_model() is None
+
+    @patch('yoursqlfriend.llm.requests.get', side_effect=requests.exceptions.ConnectionError)
+    def test_none_when_unreachable(self, mock_get):
+        assert resolve_lmstudio_model() is None
+
+    def test_resolve_provider_model_dispatch(self):
+        with patch('yoursqlfriend.llm.resolve_lmstudio_model', return_value='m1'):
+            assert resolve_provider_model('lmstudio') == 'm1'
+        with patch('yoursqlfriend.llm.check_ollama_available', return_value=(True, ['om'])):
+            with patch('yoursqlfriend.llm.OLLAMA_MODEL', None):
+                assert resolve_provider_model('ollama') == 'om'
+
 
 # --- Payload Building ---
 
@@ -60,6 +97,12 @@ class TestBuildPayload:
         payload = _build_llm_payload(config, [{'role': 'user', 'content': 'hi'}],
                                      stream=False, max_tokens=2048)
         assert payload['options']['num_predict'] == 2048
+
+    def test_lmstudio_model_included_when_known(self):
+        """Current LM Studio builds 400 without a model id — include it when resolved."""
+        config = get_provider_config('lmstudio', model='qwen/qwen3.6-27b')
+        payload = _build_llm_payload(config, [{'role': 'user', 'content': 'hi'}], stream=True)
+        assert payload['model'] == 'qwen/qwen3.6-27b'
 
     def test_lmstudio_streaming(self):
         config = get_provider_config('lmstudio')
@@ -166,6 +209,17 @@ class TestExtractContent:
         config = get_provider_config('ollama')
         data = {'message': {'content': 'Hello world'}}
         assert _extract_llm_content(config, data) == 'Hello world'
+
+    def test_lmstudio_reasoning_content_fallback(self):
+        """Reasoning models can leave the answer in reasoning_content with empty content."""
+        config = get_provider_config('lmstudio')
+        data = {'choices': [{'message': {'content': '', 'reasoning_content': '{"sql": "SELECT 1"}'}}]}
+        assert _extract_llm_content(config, data) == '{"sql": "SELECT 1"}'
+
+    def test_lmstudio_content_wins_over_reasoning(self):
+        config = get_provider_config('lmstudio')
+        data = {'choices': [{'message': {'content': 'answer', 'reasoning_content': 'thinking...'}}]}
+        assert _extract_llm_content(config, data) == 'answer'
 
     def test_lmstudio_response(self):
         config = get_provider_config('lmstudio')

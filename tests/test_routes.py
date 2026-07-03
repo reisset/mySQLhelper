@@ -181,7 +181,8 @@ class TestExecuteSQLRetry:
 
     @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
     @patch('yoursqlfriend.app.call_llm_non_streaming')
-    def test_retry_structured_output_success(self, mock_llm, mock_schema, client, temp_db):
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_retry_structured_output_success(self, mock_resolve, mock_llm, mock_schema, client, temp_db):
         """Primary path: LLM returns JSON {"sql": "..."} and the corrected query runs."""
         _load_db(client, temp_db)
         mock_llm.return_value = '{"sql": "SELECT * FROM users"}'
@@ -195,7 +196,8 @@ class TestExecuteSQLRetry:
 
     @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
     @patch('yoursqlfriend.app.call_llm_non_streaming')
-    def test_retry_regex_fallback(self, mock_llm, mock_schema, client, temp_db):
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_retry_regex_fallback(self, mock_resolve, mock_llm, mock_schema, client, temp_db):
         """Fallback path: JSON parse fails so the regex extracts the SQL from a code block."""
         _load_db(client, temp_db)
         mock_llm.return_value = '```sql\nSELECT * FROM users\n```'
@@ -208,7 +210,8 @@ class TestExecuteSQLRetry:
 
     @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
     @patch('yoursqlfriend.app.call_llm_non_streaming')
-    def test_retry_total_failure_returns_500(self, mock_llm, mock_schema, client, temp_db):
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_retry_total_failure_returns_500(self, mock_resolve, mock_llm, mock_schema, client, temp_db):
         """Both JSON and regex fail: should return 500 with the original SQL error, not crash."""
         _load_db(client, temp_db)
         mock_llm.return_value = ''
@@ -227,7 +230,8 @@ class TestExecuteSQLRetry:
     ])
     @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
     @patch('yoursqlfriend.app.call_llm_non_streaming')
-    def test_retry_tolerant_fallback_variants(self, mock_llm, mock_schema, client, temp_db, llm_response):
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_retry_tolerant_fallback_variants(self, mock_resolve, mock_llm, mock_schema, client, temp_db, llm_response):
         """Fallback extraction handles imperfect fencing from weaker local models."""
         _load_db(client, temp_db)
         mock_llm.return_value = llm_response
@@ -240,7 +244,8 @@ class TestExecuteSQLRetry:
 
     @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
     @patch('yoursqlfriend.app.call_llm_non_streaming')
-    def test_retry_bare_prose_still_fails(self, mock_llm, mock_schema, client, temp_db):
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_retry_bare_prose_still_fails(self, mock_resolve, mock_llm, mock_schema, client, temp_db):
         """A prose-only response with no SQL must not be executed."""
         _load_db(client, temp_db)
         mock_llm.return_value = 'Sorry, I cannot help with that.'

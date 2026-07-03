@@ -80,6 +80,34 @@ def resolve_ollama_model(session_model=None):
     return models[0] if models else None
 
 
+def resolve_lmstudio_model():
+    """Return the id of the first loaded LM Studio chat model, or None.
+
+    Older LM Studio builds ignore the request's model field, but current
+    builds return 400 Bad Request when it is missing. Embedding models are
+    skipped. Returns None when LM Studio is unreachable — the payload then
+    omits the field, preserving old-build behaviour.
+    """
+    try:
+        models_url = LLM_API_URL.replace('/chat/completions', '/models')
+        response = requests.get(models_url, timeout=2)
+        response.raise_for_status()
+        for m in response.json().get('data', []):
+            model_id = m.get('id', '')
+            if model_id and 'embed' not in model_id.lower():
+                return model_id
+    except Exception:
+        pass
+    return None
+
+
+def resolve_provider_model(provider, session_model=None):
+    """Resolve which model to request for the given provider (None if unknown)."""
+    if provider == 'ollama':
+        return resolve_ollama_model(session_model)
+    return resolve_lmstudio_model()
+
+
 def get_provider_config(provider, model=None):
     """Return provider-specific configuration for LLM requests.
 
@@ -101,7 +129,7 @@ def get_provider_config(provider, model=None):
         'provider': 'lmstudio',
         'url': LLM_API_URL,
         'headers': {'Content-Type': 'application/json'},
-        'model': None,
+        'model': model,
         'label': 'LM Studio',
         'hint': 'Is the server running at http://localhost:1234?',
         'stream_timeout': (3.05, 60),
@@ -153,6 +181,9 @@ def _build_llm_payload(config, messages, stream=False, use_structured_output=Fal
         'seed': 42,
         'stream': stream,
     }
+    # Current LM Studio builds 400 without a model id; old builds ignore it.
+    if config['model']:
+        payload['model'] = config['model']
     if max_tokens is not None:
         payload['max_tokens'] = max_tokens
     if stream:
@@ -175,7 +206,12 @@ def _extract_llm_content(config, data):
     if config['provider'] == 'ollama':
         return data.get('message', {}).get('content', '')
     choices = data.get('choices', [])
-    return choices[0].get('message', {}).get('content', '') if choices else ''
+    if not choices:
+        return ''
+    message = choices[0].get('message', {})
+    # Reasoning models served by LM Studio sometimes finish with an empty
+    # content field and the actual answer left in reasoning_content.
+    return message.get('content', '') or message.get('reasoning_content', '') or ''
 
 
 def _safe_sample_val(v):
