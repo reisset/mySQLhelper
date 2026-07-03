@@ -47,8 +47,6 @@ const sendButton = document.getElementById('send-button');
 const chatHistory = document.getElementById('chat-history');
 const databaseFile = document.getElementById('database-file');
 const dropZone = document.getElementById('drop-zone');
-const sidebar = document.getElementById('sidebar');
-const sidebarToggle = document.getElementById('sidebar-toggle');
 const themeToggle = document.getElementById('theme-toggle');
 const settingsBtn = document.getElementById('settings-btn');
 const uploadForm = document.getElementById('upload-form');
@@ -223,15 +221,6 @@ if (uploadForm) {
     uploadForm.addEventListener('submit', function(e) {
         e.preventDefault();
         uploadFile();
-    });
-}
-
-// --- Sidebar Toggle (vestigial — three-pane layout no longer collapses) ---
-if (sidebarToggle) {
-    sidebarToggle.addEventListener('click', () => {
-        sidebar.classList.toggle('collapsed');
-        const isExpanded = !sidebar.classList.contains('collapsed');
-        sidebarToggle.setAttribute('aria-expanded', isExpanded);
     });
 }
 

@@ -5,6 +5,19 @@ import { escapeHtml, fetchJson } from './ui.js';
 
 const inspectorStack = [];
 
+// Make a non-button element clickable AND keyboard-operable (Enter/Space).
+function makeInteractive(el, handler) {
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.addEventListener('click', handler);
+    el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handler();
+        }
+    });
+}
+
 export function showRowInInspector(row, tableName) {
     inspectorStack.length = 0;
     inspectorStack.push({ row, tableName });
@@ -75,7 +88,7 @@ function render() {
             link.className = 'fk';
             link.textContent = String(raw);
             link.title = `follow to ${fk.ref_table}.${fk.ref_column}`;
-            link.addEventListener('click', () => followFk(fk.ref_table, fk.ref_column, raw));
+            makeInteractive(link, () => followFk(fk.ref_table, fk.ref_column, raw));
             v.appendChild(link);
         } else {
             v.textContent = String(raw);
@@ -151,7 +164,7 @@ async function loadRelated(container, table, column, value) {
                 .join('  ');
             row.textContent = preview;
             row.title = 'open this row';
-            row.addEventListener('click', () => pushRelated(r, table));
+            makeInteractive(row, () => pushRelated(r, table));
             container.appendChild(row);
         });
         if (data.rows.length > 10) {

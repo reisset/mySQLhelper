@@ -29,7 +29,7 @@ from werkzeug.utils import secure_filename
 
 # Internal modules
 from yoursqlfriend import __version__ as VERSION
-from yoursqlfriend.validation import validate_sql, strip_strings_and_comments
+from yoursqlfriend.validation import validate_sql
 from yoursqlfriend.database import (
     get_readonly_connection, execute_and_parse_query, calculate_file_hash,
     validate_upload_file, convert_csv_to_sqlite, execute_sql_file,
@@ -177,6 +177,35 @@ LLM_PROVIDER = os.environ.get('LLM_PROVIDER', 'lmstudio')  # 'lmstudio' or 'olla
 # --- Constants ---
 MAX_HISTORY_MESSAGES = 20
 MAX_STORED_MESSAGES = 100
+
+
+# --- Windows file-lock helpers ---
+# SQLite/antivirus can hold a handle briefly after close; retry before giving up.
+
+def _replace_with_retry(src, dst, attempts=5):
+    for attempt in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt < attempts - 1:
+                time.sleep(0.1)
+            else:
+                raise
+
+
+def _remove_with_retry(path, attempts=5):
+    """Best-effort removal — logs instead of raising if the file stays locked."""
+    for attempt in range(attempts):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+            return
+        except PermissionError:
+            if attempt < attempts - 1:
+                time.sleep(0.1)
+            else:
+                logger.warning(f"Could not remove temp file: {path}")
 
 
 def update_chat_history_with_results(chat_history, sql_query, results_dict):
@@ -348,27 +377,10 @@ def upload_file():
                 logger.info(f"SQLite validated: {len(schema)} tables found")
 
                 # Move to final location (retry for Windows file lock release)
-                for attempt in range(5):
-                    try:
-                        os.replace(temp_filepath, final_filepath)
-                        break
-                    except PermissionError:
-                        if attempt < 4:
-                            time.sleep(0.1)
-                        else:
-                            raise
+                _replace_with_retry(temp_filepath, final_filepath)
 
             except sqlite3.Error as e:
-                for attempt in range(5):
-                    try:
-                        if os.path.exists(temp_filepath):
-                            os.remove(temp_filepath)
-                        break
-                    except PermissionError:
-                        if attempt < 4:
-                            time.sleep(0.1)
-                        else:
-                            logger.warning(f"Could not remove temp file: {temp_filepath}")
+                _remove_with_retry(temp_filepath)
                 logger.error(f"SQLite validation failed: {str(e)}")
                 return jsonify({'error': f'Invalid SQLite database: {str(e)}'}), 400
 
@@ -437,16 +449,7 @@ def upload_file():
 
     except Exception as e:
         # Clean up on any error (retry for Windows file lock release)
-        for attempt in range(5):
-            try:
-                if os.path.exists(temp_filepath):
-                    os.remove(temp_filepath)
-                break
-            except PermissionError:
-                if attempt < 4:
-                    time.sleep(0.1)
-                else:
-                    logger.warning(f"Could not remove temp file: {temp_filepath}")
+        _remove_with_retry(temp_filepath)
         logger.error(f"Upload failed: {str(e)}", exc_info=True)
         return jsonify({'error': f'Upload processing failed: {str(e)}'}), 500
 
@@ -752,14 +755,6 @@ def search_all_tables():
     except sqlite3.Error as e:
         logger.error(f"Search All Tables Error: {e}")
         return jsonify({'error': f'Database error: {e}'}), 500
-
-def _get_css_content():
-    css_path = os.path.join(BASE_PATH, 'static', 'style.css')
-    try:
-        with open(css_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    except FileNotFoundError:
-        return ""
 
 def _generate_chat_html(chat_history):
     chat_html_parts = []

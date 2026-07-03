@@ -1,7 +1,7 @@
 // Chat messaging: send, stream, render, token tracking
 
 import { state } from './state.js';
-import { renderText, fetchJson, renderQueryHistory, setFooterMetrics } from './ui.js';
+import { renderText, fetchJson, renderQueryHistory, setFooterMetrics, minimizeWelcomeScreen } from './ui.js';
 import { executeSqlAndRender } from './sql.js';
 
 export async function sendMessage() {
@@ -13,13 +13,7 @@ export async function sendMessage() {
     const message = userInput.value.trim();
     if (!message) return;
 
-    // Minimize welcome screen and move it above the scrollable chat area
-    if (welcomeScreen && !welcomeScreen.classList.contains('minimized')) {
-        const chatContainer = chatHistory.parentElement;
-        chatContainer.insertBefore(welcomeScreen, chatHistory);
-        void welcomeScreen.offsetHeight; // force reflow so transition animates
-        welcomeScreen.classList.add('minimized');
-    }
+    minimizeWelcomeScreen(welcomeScreen, chatHistory);
 
     // Save to input history (arrow-key recall) + visible query history panel
     state.inputHistory.push(message);
@@ -249,7 +243,7 @@ export async function sendMessage() {
 
         if (error.name === 'AbortError') {
             errorTitle.textContent = 'Request Timed Out';
-            errorDetails.textContent = `The ${state.currentProvider === 'ollama' ? 'Ollama' : 'LM Studio'} server did not respond within 15 seconds.`;
+            errorDetails.textContent = `The ${state.currentProvider === 'ollama' ? 'Ollama' : 'LM Studio'} server did not start responding within 90 seconds.`;
         } else if (error.message.includes("503") || error.message.includes("Failed to fetch") || error.message.includes("LM Studio") || error.message.includes("Ollama")) {
             const isOllama = state.currentProvider === 'ollama';
             errorTitle.textContent = `Unable to connect to ${isOllama ? 'Ollama' : 'LM Studio'}`;

@@ -255,6 +255,16 @@ export function setFooterMetrics({ status, timingMs, rows } = {}) {
     }
 }
 
+// --- Welcome Screen ---
+// Minimize the welcome screen and move it above the scrollable chat area.
+export function minimizeWelcomeScreen(welcomeScreen, chatHistory) {
+    if (welcomeScreen && !welcomeScreen.classList.contains('minimized')) {
+        chatHistory.parentElement.insertBefore(welcomeScreen, chatHistory);
+        void welcomeScreen.offsetHeight; // force reflow so transition animates
+        welcomeScreen.classList.add('minimized');
+    }
+}
+
 // --- Markdown / Text Rendering ---
 export function renderText(element, text) {
     if (typeof marked !== 'undefined') {

@@ -113,10 +113,6 @@ CHANGELOG
 - **Redundant search re-filtering:** case-sensitive table search now relies entirely on
   SQLite's GLOB (which is already case-sensitive) and skips the redundant Python
   re-filter pass.
-
-### Unreleased
-
-#### Fixed
 - **Windows installer** (`install.ps1`): Script incorrectly reported "Could not
   install pipx" on clean machines even though pip exited 0. Root cause: PS 5.1
   wraps native-command stderr into ErrorRecords when `2>&1` is used, which trips

@@ -1,7 +1,7 @@
 // File upload, schema rendering, database status
 
 import { state } from './state.js';
-import { escapeHtml, showConfirmModal, showAlertModal } from './ui.js';
+import { escapeHtml, showConfirmModal, showAlertModal, minimizeWelcomeScreen } from './ui.js';
 import { appendMessage } from './chat.js';
 import { destroyAllGrids } from './sql.js';
 import { resetInspector } from './inspector.js';
@@ -108,13 +108,7 @@ export function uploadFile() {
         const formData = new FormData();
         formData.append('database_file', file);
 
-        // Minimize welcome screen and move it above the scrollable chat area
-        if (welcomeScreen && !welcomeScreen.classList.contains('minimized')) {
-            const chatContainer = chatHistory.parentElement;
-            chatContainer.insertBefore(welcomeScreen, chatHistory);
-            void welcomeScreen.offsetHeight; // force reflow so transition animates
-            welcomeScreen.classList.add('minimized');
-        }
+        minimizeWelcomeScreen(welcomeScreen, chatHistory);
 
         destroyAllGrids();
         resetInspector();
@@ -232,7 +226,20 @@ export function renderSchema(schema) {
             <span class="nm">${escapeHtml(table)}</span>
             <span class="ct">${columns.length} col${columns.length === 1 ? '' : 's'}${rowCount != null ? ` · ${rowCount} row${rowCount === 1 ? '' : 's'}` : ''}</span>
         `;
-        head.addEventListener('click', () => item.classList.toggle('open'));
+        head.setAttribute('role', 'button');
+        head.setAttribute('tabindex', '0');
+        head.setAttribute('aria-expanded', 'false');
+        const toggleOpen = () => {
+            const open = item.classList.toggle('open');
+            head.setAttribute('aria-expanded', String(open));
+        };
+        head.addEventListener('click', toggleOpen);
+        head.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleOpen();
+            }
+        });
         item.appendChild(head);
 
         const detail = document.createElement('div');
