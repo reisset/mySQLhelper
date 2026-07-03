@@ -218,6 +218,37 @@ class TestExecuteSQLRetry:
         error_body = resp.get_json()
         assert 'SQL Error' in error_body.get('error', '')
 
+    @pytest.mark.parametrize('llm_response', [
+        '```SQL\nSELECT * FROM users\n```',          # uppercase tag
+        '```sqlite\nSELECT * FROM users\n```',       # sqlite tag
+        '```sql SELECT * FROM users```',             # single-line fence
+        '```\nSELECT * FROM users\n```',             # untagged fence
+        'SELECT * FROM users',                       # bare SQL, no fence at all
+    ])
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
+    @patch('yoursqlfriend.app.call_llm_non_streaming')
+    def test_retry_tolerant_fallback_variants(self, mock_llm, mock_schema, client, temp_db, llm_response):
+        """Fallback extraction handles imperfect fencing from weaker local models."""
+        _load_db(client, temp_db)
+        mock_llm.return_value = llm_response
+
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM nonexistent_table'})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data.get('retried') is True
+        assert data.get('corrected_sql') == 'SELECT * FROM users'
+
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
+    @patch('yoursqlfriend.app.call_llm_non_streaming')
+    def test_retry_bare_prose_still_fails(self, mock_llm, mock_schema, client, temp_db):
+        """A prose-only response with no SQL must not be executed."""
+        _load_db(client, temp_db)
+        mock_llm.return_value = 'Sorry, I cannot help with that.'
+
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM nonexistent_table'})
+        assert resp.status_code == 500
+        assert 'SQL Error' in resp.get_json().get('error', '')
+
 
 # --- POST /search_all_tables (special character edge cases) ---
 

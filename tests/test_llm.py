@@ -13,6 +13,7 @@ from yoursqlfriend.llm import (
     get_provider_config, _build_llm_payload, _extract_llm_content,
     build_schema_context, build_system_prompt, build_error_correction_prompt,
     call_llm_non_streaming, stream_llm_response, resolve_ollama_model,
+    extract_sql_from_response,
     OLLAMA_MODEL, SCHEMA_CONTEXT_CHAR_BUDGET,
 )
 
@@ -277,6 +278,30 @@ class TestBuildSchemaContext:
         finally:
             os.unlink(path)
 
+    def test_schema_budget_reduces_samples_to_one_row(self):
+        """Intermediate degradation: 3 sample rows exceed the budget but 1 row per table fits."""
+        fd, path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        try:
+            conn = sqlite3.connect(path)
+            # 40 tables x 3 wide rows: with 3 rows/table the context blows the budget,
+            # with 1 row/table it fits comfortably.
+            for i in range(40):
+                conn.execute(f'CREATE TABLE tbl_{i:02d} (col_a TEXT, col_b TEXT, col_c TEXT, col_d TEXT, col_e TEXT)')
+                for _ in range(3):
+                    conn.execute(f"INSERT INTO tbl_{i:02d} VALUES ('{'x' * 40}', '{'y' * 40}', '{'z' * 40}', '{'w' * 40}', '{'v' * 40}')")
+            conn.commit()
+            conn.close()
+
+            context, truncated = build_schema_context(path, include_samples=True)
+            assert truncated is True
+            assert 'one row per table' in context
+            # Samples are still present (reduced, not dropped)
+            assert '<<UNTRUSTED_DATA' in context
+            assert len(context) <= SCHEMA_CONTEXT_CHAR_BUDGET
+        finally:
+            os.unlink(path)
+
 
 # --- Prompts ---
 
@@ -304,6 +329,73 @@ class TestPrompts:
     def test_error_correction_syntax(self):
         prompt = build_error_correction_prompt('near "SELCT": syntax error', 'SELCT * FROM t', 'schema')
         assert 'syntax' in prompt.lower()
+
+    def test_system_prompt_contains_sqlite_specifics(self):
+        """SQLite-pitfall rules that reduce query error rates with local models."""
+        prompt = build_system_prompt("")
+        assert 'strftime' in prompt
+        assert '||' in prompt
+
+    def test_error_correction_ambiguous_column(self):
+        prompt = build_error_correction_prompt('ambiguous column name: id', 'SELECT id FROM a JOIN b', 'schema')
+        assert 'qualify' in prompt.lower()
+
+    def test_error_correction_misuse_of_aggregate(self):
+        prompt = build_error_correction_prompt('misuse of aggregate: count()', 'SELECT count(*) FROM t WHERE count(*) > 1', 'schema')
+        assert 'GROUP BY' in prompt
+
+    def test_error_correction_no_such_function(self):
+        prompt = build_error_correction_prompt('no such function: CONCAT', "SELECT CONCAT(a, b) FROM t", 'schema')
+        assert 'built-in' in prompt.lower()
+
+    def test_error_correction_structured_instruction(self):
+        """structured=True must ask for JSON, not a ```sql block, matching the grammar constraint."""
+        prompt = build_error_correction_prompt('no such table: x', 'SELECT * FROM x', 'schema', structured=True)
+        assert 'JSON' in prompt
+        assert 'code block' not in prompt
+
+    def test_error_correction_unstructured_instruction_default(self):
+        prompt = build_error_correction_prompt('no such table: x', 'SELECT * FROM x', 'schema')
+        assert 'code block' in prompt
+
+
+# --- SQL extraction from LLM responses ---
+
+class TestExtractSqlFromResponse:
+    def test_standard_fence(self):
+        assert extract_sql_from_response('```sql\nSELECT 1\n```') == 'SELECT 1'
+
+    def test_uppercase_tag(self):
+        assert extract_sql_from_response('```SQL\nSELECT 1\n```') == 'SELECT 1'
+
+    def test_sqlite_tag(self):
+        assert extract_sql_from_response('```sqlite\nSELECT 1\n```') == 'SELECT 1'
+
+    def test_single_line_fence(self):
+        assert extract_sql_from_response('```sql SELECT 1```') == 'SELECT 1'
+
+    def test_untagged_fence(self):
+        assert extract_sql_from_response('```\nSELECT 1\n```') == 'SELECT 1'
+
+    def test_fence_with_surrounding_prose(self):
+        text = "Here is the corrected query:\n```sql\nSELECT a FROM t\n```\nHope that helps."
+        assert extract_sql_from_response(text) == 'SELECT a FROM t'
+
+    def test_bare_sql(self):
+        assert extract_sql_from_response('SELECT * FROM users WHERE id = 1') == 'SELECT * FROM users WHERE id = 1'
+
+    def test_bare_with_cte(self):
+        assert extract_sql_from_response('WITH x AS (SELECT 1) SELECT * FROM x') is not None
+
+    def test_prose_returns_none(self):
+        assert extract_sql_from_response('Sorry, I cannot help with that.') is None
+
+    def test_empty_returns_none(self):
+        assert extract_sql_from_response('') is None
+        assert extract_sql_from_response(None) is None
+
+    def test_empty_fence_returns_none(self):
+        assert extract_sql_from_response('```sql\n\n```') is None
 
 
 # --- Non-streaming LLM Call (mocked) ---

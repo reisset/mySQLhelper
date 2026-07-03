@@ -11,7 +11,9 @@ function inferTableName(sqlQuery) {
 }
 
 export async function executeSqlAndRender(fullText, contentContainer) {
-    const sqlRegex = /```sql\n([\s\S]*?)\n```/;
+    // Tolerant fence matching: case-insensitive sql/sqlite tag, optional
+    // whitespace after the tag, single-line fences, optional trailing newline.
+    const sqlRegex = /```(?:sqlite|sql)[ \t]*\r?\n?([\s\S]*?)```/i;
     const match = fullText.match(sqlRegex);
 
     if (!match) return { ran: false }; // No SQL to execute

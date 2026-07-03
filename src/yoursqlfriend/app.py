@@ -37,7 +37,7 @@ from yoursqlfriend.llm import (
     LLM_API_URL, OLLAMA_URL, OLLAMA_MODEL,
     check_llm_available, check_ollama_available, resolve_ollama_model,
     build_schema_context, build_system_prompt, build_error_correction_prompt,
-    call_llm_non_streaming, stream_llm_response,
+    call_llm_non_streaming, stream_llm_response, extract_sql_from_response,
 )
 
 # --- Paths ---
@@ -531,7 +531,8 @@ def execute_sql():
         # Attempt auto-correction via LLM (max 1 retry)
         try:
             schema_context, _ = build_schema_context(db_filepath, include_samples=False)
-            correction_prompt = build_error_correction_prompt(str(e), sql_query, schema_context)
+            correction_prompt = build_error_correction_prompt(str(e), sql_query, schema_context,
+                                                              structured=True)
 
             provider = session.get('llm_provider', LLM_PROVIDER)
             model = resolve_ollama_model(session.get('ollama_model')) if provider == 'ollama' else None
@@ -554,13 +555,13 @@ def execute_sql():
             except (json.JSONDecodeError, AttributeError):
                 pass
 
-            # Fallback: scrape a ```sql ... ``` code block (belt-and-suspenders)
+            # Fallback: tolerant extraction — fenced block (any casing/tag) or bare SQL.
+            # validate_sql() below guards whatever comes out.
             if not corrected_sql:
-                sql_match = re.search(r'```sql\n([\s\S]*?)\n```', llm_response)
-                if not sql_match:
+                corrected_sql = extract_sql_from_response(llm_response)
+                if not corrected_sql:
                     raise ValueError("LLM did not return corrected SQL")
-                corrected_sql = sql_match.group(1).strip()
-                logger.info("SQL correction extracted via regex fallback")
+                logger.info("SQL correction extracted via fence/bare-SQL fallback")
 
             logger.info(f"LLM suggested correction: {corrected_sql}")
 
