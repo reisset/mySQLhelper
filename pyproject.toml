@@ -57,3 +57,14 @@ packages = ["src/yoursqlfriend"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+# Lint only (no formatter): pyflakes/pycodestyle errors, bugbear, pyupgrade
+select = ["E", "F", "W", "B", "UP"]
+ignore = [
+    "E501",  # long lines: prompts and log messages read better unwrapped
+]

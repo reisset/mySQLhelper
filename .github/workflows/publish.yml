@@ -6,8 +6,27 @@ on:
       - "v*"
 
 jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and test dependencies
+        run: |
+          pip install -e .
+          pip install pytest
+
+      - name: Run tests
+        run: python -m pytest tests/ -v
+
   build:
     name: Build package
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

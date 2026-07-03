@@ -212,7 +212,7 @@ def execute_sql_file(sql_filepath, db_filepath):
         Exception: If SQL execution fails or contains forbidden commands
     """
     try:
-        with open(sql_filepath, 'r', encoding='utf-8') as f:
+        with open(sql_filepath, encoding='utf-8') as f:
             sql_content = f.read()
 
         # Security check: block destructive and dangerous operations

@@ -10,7 +10,6 @@ import gc
 import time
 import json
 import logging
-import re
 import secrets
 import uuid
 import socket
@@ -284,7 +283,7 @@ def service_worker():
     Version is injected from app.py so CACHE_NAME updates automatically.
     """
     sw_path = os.path.join(app.static_folder, 'service-worker.js')
-    with open(sw_path, 'r', encoding='utf-8') as f:
+    with open(sw_path, encoding='utf-8') as f:
         content = f.read()
     content = content.replace('%%VERSION%%', VERSION)
     return content, 200, {
@@ -297,7 +296,7 @@ def index():
     ascii_art = ''
     ascii_path = os.path.join(BASE_PATH, 'ascii.txt')
     if os.path.exists(ascii_path):
-        with open(ascii_path, 'r', encoding='utf-8') as f:
+        with open(ascii_path, encoding='utf-8') as f:
             ascii_art = f.read()
     return render_template('index.html', ascii_art=ascii_art, version=VERSION)
 
