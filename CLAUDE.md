@@ -53,12 +53,17 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 - **Read-only databases**: All connections use `mode=ro` + `PRAGMA query_only = ON`
 - **SQL validation** (`validate_sql()`): Strips string literals and comments first, then checks allowed statement starts (SELECT/WITH/EXPLAIN/PRAGMA) and blocks 13 forbidden keywords. Multi-statement queries rejected
 - **Cross-site POST guard**: a `before_request` hook in `app.py` rejects POSTs whose `Origin` or `Host` header isn't loopback/matching (CSRF + DNS-rebinding defense; session cookie is `SameSite=Lax`). Route tests that POST must not set a foreign `Origin`/`Host` header, or they'll get 403
+- **Stop button / abort causes**: while streaming, the Send button becomes Stop. Every abort sets `abortCause` on `state.activeStreamController` (`'user'` | `'watchdog'` | `'superseded'`); a user stop keeps and saves the partial text and **never executes SQL from a truncated response**. Preserve this contract when touching `chat.js`
+- **Reduced motion**: `@media (prefers-reduced-motion: reduce)` in `style.css` suppresses all animations *except* `.status-shimmer` — that exemption is deliberate (essential progress indicator; Windows commonly reports reduce because "Animation effects" ships disabled). Don't re-suppress it
+- **Pane-header alignment**: the three pane headers (sidebar search row, `.cp-head`, `.rp-head`) share the `--pane-head-h` token so their bottom rules stay pixel-aligned — change the token, never individual header heights
+- **Contrast tokens**: `--ink-3`/`--ink-4` are tuned to ≥4.5:1 WCAG AA against `--bg`/`--bg-2` in both themes; don't lighten them for aesthetics
 - **Session secret**: random per-install key persisted at `DATA_DIR/secret_key` (`SECRET_KEY` env var overrides). Never reintroduce a hardcoded fallback
 - **Error responses**: the global exception handler returns a generic message; never echo `str(e)` to the client — exception text goes to the log only
 - **Schema-context degradation** (`build_schema_context`): over `SCHEMA_CONTEXT_CHAR_BUDGET`, sample rows degrade gradually (3 → 1 → 0 per table) before DDL is hard-truncated with a visible marker
 - **PRAGMA table names must be double-quoted**: `PRAGMA table_info("table_name")` — not single quotes
 - **Version**: `pyproject.toml` `version` is the single source of truth. Read at runtime via `importlib.metadata` in `__init__.py`. On release, update `pyproject.toml` version and add a `CHANGELOG.txt` entry. Template cache-bust `?v=` and service worker `CACHE_NAME` are injected automatically.
   - **PyPI release**: a GitHub Actions workflow (`.github/workflows/publish.yml`) publishes to PyPI automatically when a `v*` tag is pushed. Do not run `twine` or `python -m build` manually. Release steps: bump `pyproject.toml` version, update `CHANGELOG.txt`, commit and push to `main`, then `git tag vX.Y.Z <commit-sha> && git push origin vX.Y.Z`.
+  - **Git authorship**: commit with the repo-local `user.email` (a GitHub noreply address, already configured). The public history was deliberately scrubbed of personal email addresses — never commit with one.
   - **Editable-install gotcha**: `pip install -e .` writes dist-info metadata at install time and does *not* re-read `pyproject.toml` on subsequent imports. After bumping the version, refresh the dev venv with `pip install -e . --force-reinstall --no-deps` — otherwise `importlib.metadata.version()` will keep returning the old version, and the template will inject stale `?v=` cache-bust tokens. Only affects contributors; pipx users always get fresh metadata.
 - **User data**: stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows)
 - **Session state**: Server-side filesystem sessions — set `session.modified = True` after updates
@@ -88,5 +93,7 @@ ruff check .
 ```
 
 180 pytest cases: SQL validation (63), Flask routes (36), LLM module (64), database (17). Ruff is configured in `pyproject.toml` (`E/F/W/B/UP`, lint-only — no formatter); keep `ruff check .` clean.
+
+For end-to-end verification (launch the app, upload a DB, drive chat/stop/focus flows in a real browser against a local LLM), follow the recipe in `.claude/skills/verify/SKILL.md`.
 
 **CI**: `.github/workflows/test.yml` runs pytest (Python 3.10 + 3.13) and ruff on every push/PR to `main`. `publish.yml` gates the PyPI publish on a passing test job — a `v*` tag with failing tests will not release.
