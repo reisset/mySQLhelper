@@ -12,6 +12,10 @@ two correctness bugs, and a dead-code sweep.
   saves it to the session (so exports stay coherent), and never executes SQL
   from a truncated response. The 90s watchdog timeout and its error message
   are unchanged.
+- **Quirky status lines:** the streaming status bar now rotates through a
+  larger pool — grounded ("Reading schema…"), Claude-Code-style nonsense
+  ("Flummering…", "Whatchamacalliting…"), and in-character forensic lines
+  ("Dusting for prints…", "Cross-examining tables…").
 - **Desktop-first, stated:** below 880px the schema browser and Row Inspector
   are hidden by design; a small notice now says so instead of leaving narrow-
   viewport users guessing. README updated to match.
@@ -26,9 +30,11 @@ two correctness bugs, and a dead-code sweep.
   settings popover moves focus in on open and back to the gear on Escape.
 - **Keyboard path to the Row Inspector:** result-table rows are focusable and
   respond to Enter/Space — the inspector was previously mouse-only.
-- **prefers-reduced-motion:** all animations and transitions (including the
-  infinite status-bar shimmer) are suppressed when the OS asks for reduced
-  motion.
+- **prefers-reduced-motion:** animations and transitions are suppressed when
+  the OS asks for reduced motion. The status-bar shimmer is deliberately
+  exempt — it's an essential progress indicator with no spatial motion, and
+  Windows machines commonly report reduced motion because "Animation effects"
+  ships disabled.
 - **WCAG AA contrast:** the faintest text tier (--ink-4, used for micro-labels
   and hints at 10px) was ~2:1 against the paper background; both ink-3 and
   ink-4 now meet the 4.5:1 AA threshold in light and dark themes.

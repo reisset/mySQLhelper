@@ -93,17 +93,35 @@ async function readChatStream(response, { onToken, onFirstEvent }) {
 
 // --- Status bar shimmer ---
 
-// Build the rotating "Reading schema…" shimmer in the status bar.
+// Status lines shown while the model works: a few grounded ones, some
+// Claude-Code-style nonsense gerunds, and some in forensic character.
+const STATUS_MESSAGES = [
+    'Reading schema…',
+    'Generating SQL…',
+    'Analyzing question…',
+    'Flummering…',
+    'Whatchamacalliting…',
+    'Cogitating…',
+    'Noodling…',
+    'Percolating…',
+    'Ruminating…',
+    'Reticulating…',
+    'Marinating…',
+    'Mulling…',
+    'Dusting for prints…',
+    'Interrogating rows…',
+    'Cross-examining tables…',
+    'Following the foreign keys…',
+    'Squinting at timestamps…',
+    'Bagging evidence…'
+];
+
+// Build the rotating status shimmer in the status bar.
 // softDismiss() honors the minimum display time; forceDismiss() clears
 // immediately (used in the finally cleanup path).
 function createStatusShimmer(statusBar) {
-    const statusMessages = [
-        'Reading schema…',
-        'Analyzing question…',
-        'Generating SQL…',
-        'Preparing response…'
-    ];
-    // Shuffle messages so the starting message varies each time
+    // Shuffle a copy so each send gets its own rotation order
+    const statusMessages = [...STATUS_MESSAGES];
     for (let i = statusMessages.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [statusMessages[i], statusMessages[j]] = [statusMessages[j], statusMessages[i]];

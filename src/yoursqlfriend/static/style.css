@@ -1382,12 +1382,13 @@ table.gridjs-table tr.row-selected td.gridjs-td {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  /* the shimmer's animated gradient text becomes plain readable text */
+  /* Exempt the streaming status shimmer: it's an essential progress
+     indicator — a small text-gradient sweep with no spatial motion —
+     not the kind of movement reduced-motion is meant to suppress.
+     (Windows machines commonly ship with animation effects off, which
+     would otherwise kill it for everyone.) */
   .status-shimmer {
-    animation: none;
-    background: none;
-    -webkit-background-clip: initial;
-    background-clip: initial;
-    color: var(--ink-2);
+    animation-duration: var(--shimmer-duration, 2s) !important;
+    animation-iteration-count: infinite !important;
   }
 }
