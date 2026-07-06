@@ -3,13 +3,32 @@
 import { state } from './state.js';
 import { showAlertModal, fetchJson } from './ui.js';
 
+// Human-readable provider name, shared by chat errors and status UI.
+export function providerLabel(provider) {
+    return provider === 'ollama' ? 'Ollama' : 'LM Studio';
+}
+
+// Per-provider connection checklists, rendered both in the sidebar
+// offline guidance and in chat connection-error messages.
+export const PROVIDER_HELP = {
+    ollama: [
+        'Start the server: ollama serve',
+        'Pull a model if needed (check with: ollama list)',
+        'Check port 11434 is accessible'
+    ],
+    lmstudio: [
+        'Open LM Studio and load a model',
+        'Start the server (green bar at top)',
+        'Check the port is set to 1234'
+    ]
+};
+
 export async function checkProviderStatus() {
     try {
         const data = await fetchJson(`/api/provider/status?provider=${state.currentProvider}`);
 
         if (state.currentProvider === 'ollama') {
             state.ollamaAvailable = data.available;
-            state.ollamaModels = data.models || [];
             state.selectedOllamaModel = data.selected_model;
         }
 
@@ -37,7 +56,7 @@ function updateProviderStatusUI(available, models) {
         landingDot.classList.toggle('off', !available);
     }
     if (landingText) {
-        const label = state.currentProvider === 'ollama' ? 'Ollama' : 'LM Studio';
+        const label = providerLabel(state.currentProvider);
         landingText.textContent = available ? `${label} connected` : `${label} offline`;
     }
 
@@ -69,7 +88,7 @@ function updateProviderStatusUI(available, models) {
     if (available) {
         statusIndicator.classList.remove('offline');
         statusIndicator.classList.add('online');
-        statusText.textContent = state.currentProvider === 'ollama' ? 'Ollama Connected' : 'LM Studio Connected';
+        statusText.textContent = `${providerLabel(state.currentProvider)} Connected`;
 
         // Populate model dropdown for Ollama only
         if (state.currentProvider === 'ollama' && modelSelector && modelSelect) {
@@ -100,32 +119,24 @@ function updateProviderStatusUI(available, models) {
     } else {
         statusIndicator.classList.remove('online');
         statusIndicator.classList.add('offline');
-        statusText.textContent = state.currentProvider === 'ollama' ? 'Ollama Offline' : 'LM Studio Offline';
+        statusText.textContent = `${providerLabel(state.currentProvider)} Offline`;
         if (modelSelector) modelSelector.style.display = 'none';
         if (modelSelect) modelSelect.disabled = true;
 
-        // Add friendly guidance
+        // Add friendly guidance (shared checklist, also used by chat errors)
         const guidanceDiv = document.createElement('div');
         guidanceDiv.className = 'llm-guidance';
 
-        if (state.currentProvider === 'ollama') {
-            guidanceDiv.innerHTML = `
-                <p>To connect Ollama:</p>
-                <ol>
-                    <li>Run <code>ollama serve</code></li>
-                    <li>Pull a model: <code>ollama pull llama3.2</code></li>
-                </ol>
-            `;
-        } else {
-            guidanceDiv.innerHTML = `
-                <p>To connect LM Studio:</p>
-                <ol>
-                    <li>Open LM Studio</li>
-                    <li>Load a model</li>
-                    <li>Start server on port 1234</li>
-                </ol>
-            `;
-        }
+        const guidanceIntro = document.createElement('p');
+        guidanceIntro.textContent = `To connect ${providerLabel(state.currentProvider)}:`;
+        const guidanceList = document.createElement('ol');
+        PROVIDER_HELP[state.currentProvider === 'ollama' ? 'ollama' : 'lmstudio'].forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            guidanceList.appendChild(li);
+        });
+        guidanceDiv.appendChild(guidanceIntro);
+        guidanceDiv.appendChild(guidanceList);
 
         // Insert inside the left-pane provider section so offline help
         // lives where the user is configuring the provider.
@@ -170,14 +181,6 @@ export function initProviderSelector() {
         await checkProviderStatus();
     });
 }
-
-// Clean up interval on page unload
-window.addEventListener('beforeunload', () => {
-    if (state.statusCheckInterval) {
-        clearInterval(state.statusCheckInterval);
-        state.statusCheckInterval = null;
-    }
-});
 
 export function initModelSelector() {
     const modelSelect = document.getElementById('ollama-model-select');

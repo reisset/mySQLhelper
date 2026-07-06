@@ -16,6 +16,8 @@ export function escapeHtml(text) {
  * @param {object} [options] - { closeSelector, onClose, focusSelector }
  * @returns {{ modal: HTMLElement, close: Function }}
  */
+const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export function createModal(id, overlayClass, contentHTML, options = {}) {
     const existing = document.getElementById(id);
     if (existing) existing.remove();
@@ -27,9 +29,15 @@ export function createModal(id, overlayClass, contentHTML, options = {}) {
 
     document.body.appendChild(modal);
 
+    // Remember the trigger so focus can be restored when the modal closes.
+    const previouslyFocused = document.activeElement;
+
     const close = () => {
         document.removeEventListener('keydown', escHandler);
         modal.remove();
+        if (previouslyFocused && document.contains(previouslyFocused)) {
+            previouslyFocused.focus();
+        }
         if (options.onClose) options.onClose();
     };
 
@@ -44,9 +52,24 @@ export function createModal(id, overlayClass, contentHTML, options = {}) {
         if (closeBtn) closeBtn.addEventListener('click', close);
     }
 
-    // Escape key closes modal
+    // Escape closes; Tab is trapped inside the dialog (wraps at the edges)
     const escHandler = (e) => {
-        if (e.key === 'Escape') close();
+        if (e.key === 'Escape') {
+            close();
+        } else if (e.key === 'Tab') {
+            const focusables = Array.from(modal.querySelectorAll(FOCUSABLE_SELECTOR))
+                .filter(el => !el.disabled && el.offsetParent !== null);
+            if (focusables.length === 0) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
     };
     document.addEventListener('keydown', escHandler);
 
@@ -78,9 +101,16 @@ export async function fetchJson(url, body) {
         ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
         : {};
     const response = await fetch(url, options);
-    const data = await response.json();
+    // Parse leniently: error bodies may be non-JSON (proxy HTML page, empty
+    // response) — don't let a SyntaxError mask the real HTTP status.
+    let data = null;
+    try {
+        data = await response.json();
+    } catch (_) {
+        if (response.ok) throw new Error('Invalid JSON response from server');
+    }
     if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}`);
+        throw new Error((data && data.error) || `HTTP ${response.status}`);
     }
     return data;
 }
@@ -112,7 +142,13 @@ export function showConfirmModal(title, message, onConfirm, confirmText = 'Conti
     const cancelBtn = modal.querySelector('.confirm-modal-cancel');
     const confirmBtn = modal.querySelector('.confirm-modal-confirm');
 
-    cancelBtn.addEventListener('click', close);
+    // Alert-style dialogs pass an empty cancelText — drop the button
+    // entirely rather than hiding a focusable artifact.
+    if (cancelText) {
+        cancelBtn.addEventListener('click', close);
+    } else {
+        cancelBtn.remove();
+    }
     confirmBtn.addEventListener('click', () => {
         close();
         if (onConfirm) onConfirm();
@@ -124,9 +160,6 @@ export function showConfirmModal(title, message, onConfirm, confirmText = 'Conti
 // --- Custom Alert Modal ---
 export function showAlertModal(title, message) {
     showConfirmModal(title, message, null, 'OK', '');
-    // Hide cancel button for alerts
-    const cancelBtn = document.querySelector('.confirm-modal-cancel');
-    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 // --- Theme Toggle ---
@@ -170,14 +203,21 @@ export function toggleSettingsPopover(force) {
     if (willOpen) {
         pop.removeAttribute('hidden');
         btn.setAttribute('aria-expanded', 'true');
+        // Move keyboard focus into the popover
+        const firstControl = pop.querySelector('button, [href], input, select, textarea');
+        if (firstControl) firstControl.focus();
         // Close on outside click / escape
         setTimeout(() => document.addEventListener('click', outsideHandler), 0);
         document.addEventListener('keydown', escHandler);
     } else {
+        // If focus is inside the popover (keyboard close), return it to the
+        // gear button; a mouse click elsewhere keeps its own focus target.
+        const focusWasInside = pop.contains(document.activeElement);
         pop.setAttribute('hidden', '');
         btn.setAttribute('aria-expanded', 'false');
         document.removeEventListener('click', outsideHandler);
         document.removeEventListener('keydown', escHandler);
+        if (focusWasInside || document.activeElement === document.body) btn.focus();
     }
 }
 function outsideHandler(e) {
@@ -267,12 +307,10 @@ export function minimizeWelcomeScreen(welcomeScreen, chatHistory) {
 
 // --- Markdown / Text Rendering ---
 export function renderText(element, text) {
-    if (typeof marked !== 'undefined') {
-        let html = marked.parse(text);
-        if (typeof DOMPurify !== 'undefined') {
-            html = DOMPurify.sanitize(html);
-        }
-        element.innerHTML = html;
+    // DOMPurify is the XSS boundary for LLM output — if either lib is
+    // missing, fail safe to plain text rather than injecting raw HTML.
+    if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+        element.innerHTML = DOMPurify.sanitize(marked.parse(text));
         addCopyButtons(element);
     } else {
         element.textContent = text;
@@ -291,7 +329,7 @@ export function addCopyButtons(container) {
         const copyBtn = document.createElement('button');
         copyBtn.className = 'copy-sql-button';
         copyBtn.textContent = 'Copy';
-        copyBtn.onclick = async () => {
+        copyBtn.addEventListener('click', async () => {
             try {
                 await navigator.clipboard.writeText(code.textContent);
                 copyBtn.textContent = 'Copied!';
@@ -299,7 +337,7 @@ export function addCopyButtons(container) {
                 copyBtn.textContent = 'Failed';
             }
             setTimeout(() => copyBtn.textContent = 'Copy', 2000);
-        };
+        });
 
         pre.appendChild(copyBtn);
     });

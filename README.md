@@ -35,6 +35,8 @@ Built for offline forensic analysis on a single workstation — no cloud, no tel
 | 💾 **Export Sessions** | Save your entire chat session as a formatted HTML file with hashes + timestamps |
 | 🖥️ **Install as App** | PWA support — install as a standalone desktop app from Chrome/Edge/Brave |
 
+yourSQLfriend is a **desktop-first workbench**: on narrow screens (below ~880px) the schema browser and Row Inspector are hidden by design.
+
 Ask a question in plain English — the LLM writes parameterised read-only SQL, runs it, and returns results you can sort, filter, and export.
 
 <img width="1059" alt="Workbench — question, generated SQL, and paginated results" src="https://github.com/user-attachments/assets/f9483143-a6e4-4330-ad8c-2f8a9eb0e194" />

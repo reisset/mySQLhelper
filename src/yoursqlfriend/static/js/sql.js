@@ -85,7 +85,7 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
         return;
     }
 
-    // Row count + chart button row
+    // Row count + CSV export row
     const actionsRow = document.createElement('div');
     actionsRow.className = 'results-actions-row';
 
@@ -133,20 +133,10 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
     tableWrapper._resultData = queryResults;
     tableWrapper._tableName = inferredTable;
 
-    // Row clicks feed the Row Inspector; pagination clicks reset scroll.
-    tableWrapper.addEventListener('click', (e) => {
-        if (e.target.closest('.gridjs-pagination button')) {
-            const wrapper = tableWrapper.querySelector('.gridjs-wrapper');
-            if (wrapper) wrapper.scrollTop = 0;
-            return;
-        }
-        const tr = e.target.closest('tr.gridjs-tr');
+    // Select a data row: highlight it and feed it to the Row Inspector.
+    function selectRow(tr) {
         if (!tr || !tr.parentElement || tr.parentElement.tagName !== 'TBODY') return;
-
         const tbody = tr.parentElement;
-        const rowsInBody = Array.from(tbody.querySelectorAll('tr.gridjs-tr'));
-        const domIdx = rowsInBody.indexOf(tr);
-        if (domIdx < 0) return;
 
         const cols = Object.keys(queryResults[0] || {});
         const cells = tr.querySelectorAll('td.gridjs-td');
@@ -159,7 +149,36 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
         tr.classList.add('row-selected');
 
         showRowInInspector(rowObj, inferredTable);
+    }
+
+    // Row clicks feed the Row Inspector; pagination clicks reset scroll.
+    tableWrapper.addEventListener('click', (e) => {
+        if (e.target.closest('.gridjs-pagination button')) {
+            const wrapper = tableWrapper.querySelector('.gridjs-wrapper');
+            if (wrapper) wrapper.scrollTop = 0;
+            return;
+        }
+        selectRow(e.target.closest('tr.gridjs-tr'));
     });
+
+    // Keyboard path to the Row Inspector: rows are focusable, Enter/Space selects.
+    tableWrapper.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const tr = e.target.closest('tr.gridjs-tr');
+        if (!tr) return;
+        e.preventDefault();
+        selectRow(tr);
+    });
+
+    // Grid.js rebuilds the tbody on pagination/sort/filter — reapply
+    // focusability whenever rows are (re)rendered.
+    const makeRowsFocusable = () => {
+        tableWrapper.querySelectorAll('tbody tr.gridjs-tr:not([tabindex])').forEach(tr => {
+            tr.setAttribute('tabindex', '0');
+        });
+    };
+    makeRowsFocusable();
+    new MutationObserver(makeRowsFocusable).observe(tableWrapper, { childList: true, subtree: true });
 }
 
 // --- CSV Export ---

@@ -12,6 +12,17 @@
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#c1522b">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <script>
+        // Pre-paint theme: mirror initTheme() in ui.js so dark-theme users
+        // don't get a cream flash before the modules load.
+        (function () {
+            let saved = null;
+            try { saved = localStorage.getItem('theme'); } catch (e) { /* private browsing */ }
+            const dark = saved === 'dark' ||
+                (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.classList.toggle('dark', dark);
+        })();
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ version }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/styles/atom-one-dark.min.css') }}">
 </head>
@@ -164,6 +175,7 @@
                     <div class="cp-title"><em>the</em> Forensic Workbench</div>
                     <span class="grow"></span>
                 </div>
+                <div class="narrow-viewport-note" role="note">Designed for desktop — the schema browser and row inspector are hidden at this width.</div>
                 <div class="chat-container">
                     <div class="chat-history" id="chat-history">
                         <div id="welcome-screen">

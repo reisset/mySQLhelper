@@ -3,6 +3,221 @@
 import { state } from './state.js';
 import { renderText, fetchJson, renderQueryHistory, setFooterMetrics, minimizeWelcomeScreen } from './ui.js';
 import { executeSqlAndRender } from './sql.js';
+import { providerLabel, PROVIDER_HELP } from './providers.js';
+
+const WATCHDOG_MS = 90000;      // local models need time to prefill large schemas
+const SHIMMER_MIN_MS = 2500;    // minimum shimmer display so it doesn't flash
+const SHIMMER_ROTATE_MS = 3500; // status message rotation cadence
+
+// --- SSE frame parsing ---
+
+// Parse complete SSE frames from the buffer (split on blank lines).
+// Returns { frames: string[], remainder: string } where remainder is
+// any partial frame still being received.
+function parseFrames(buf) {
+    const parts = buf.split('\n\n');
+    return { frames: parts.slice(0, -1), remainder: parts[parts.length - 1] };
+}
+
+// Parse a single SSE frame string into { event, data }.
+function parseFrame(frame) {
+    let event = 'message';
+    let data = '';
+    for (const line of frame.split('\n')) {
+        if (line.startsWith('event: ')) {
+            event = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+            data += (data ? '\n' : '') + line.slice(6);
+        }
+        // Lines starting with ':' are comments (keepalive) — silently ignored.
+    }
+    return { event, data };
+}
+
+// Consume the SSE body: parse frames, dispatch token chunks to onToken,
+// call onFirstEvent once on the first real model event (not keepalives —
+// they arrive before any content and would disarm the watchdog prematurely).
+// Returns { tokenUsage, streamComplete }; throws on an error frame.
+async function readChatStream(response, { onToken, onFirstEvent }) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let tokenUsage = null;
+    let firstEvent = true;
+    let streamComplete = false;
+
+    const markFirstEvent = () => {
+        if (firstEvent) { onFirstEvent(); firstEvent = false; }
+    };
+
+    outer: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const { frames, remainder } = parseFrames(buffer);
+        buffer = remainder;
+
+        for (const frame of frames) {
+            if (!frame.trim()) continue;
+            const { event, data } = parseFrame(frame);
+
+            if (event === 'token') {
+                markFirstEvent();
+                try {
+                    const chunk = JSON.parse(data).chunk || '';
+                    if (chunk) onToken(chunk);
+                } catch (e) {
+                    console.warn('Failed to parse token frame:', e);
+                }
+            } else if (event === 'done') {
+                markFirstEvent();
+                try {
+                    tokenUsage = JSON.parse(data).token_usage || null;
+                } catch (e) {
+                    console.warn('Failed to parse done frame:', e);
+                }
+                streamComplete = true;
+                break outer;
+            } else if (event === 'error') {
+                markFirstEvent();
+                let msg = data;
+                try { msg = JSON.parse(data).message || data; } catch (_) {}
+                throw new Error(msg);
+            }
+        }
+    }
+
+    return { tokenUsage, streamComplete };
+}
+
+// --- Status bar shimmer ---
+
+// Build the rotating "Reading schema…" shimmer in the status bar.
+// softDismiss() honors the minimum display time; forceDismiss() clears
+// immediately (used in the finally cleanup path).
+function createStatusShimmer(statusBar) {
+    const statusMessages = [
+        'Reading schema…',
+        'Analyzing question…',
+        'Generating SQL…',
+        'Preparing response…'
+    ];
+    // Shuffle messages so the starting message varies each time
+    for (let i = statusMessages.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [statusMessages[i], statusMessages[j]] = [statusMessages[j], statusMessages[i]];
+    }
+    let statusIndex = 0;
+
+    const statusEl = document.createElement('p');
+    statusEl.className = 'status-shimmer';
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'shimmer-icon';
+    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = statusMessages[0];
+
+    statusEl.appendChild(iconSpan);
+    statusEl.appendChild(textSpan);
+    statusBar.innerHTML = '';
+    statusBar.appendChild(statusEl);
+    statusBar.classList.add('active');
+    const shownAt = Date.now();
+
+    const interval = setInterval(() => {
+        statusIndex = (statusIndex + 1) % statusMessages.length;
+        textSpan.textContent = statusMessages[statusIndex];
+        const duration = 1.8 + Math.random() * 0.7;
+        statusEl.style.setProperty('--shimmer-duration', duration.toFixed(2) + 's');
+    }, SHIMMER_ROTATE_MS);
+
+    return {
+        softDismiss() {
+            clearInterval(interval);
+            const remaining = Math.max(0, SHIMMER_MIN_MS - (Date.now() - shownAt));
+            setTimeout(() => statusBar.classList.remove('active'), remaining);
+        },
+        forceDismiss() {
+            clearInterval(interval);
+            statusBar.classList.remove('active');
+        }
+    };
+}
+
+// --- Error rendering ---
+
+function renderChatError(pText, error) {
+    const label = providerLabel(state.currentProvider);
+
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'chat-error-message';
+    errorDiv.setAttribute('role', 'alert');
+
+    const errorIcon = document.createElement('span');
+    errorIcon.className = 'error-icon';
+    errorIcon.textContent = '⚠';
+
+    const errorContent = document.createElement('div');
+    errorContent.className = 'error-content';
+
+    const errorTitle = document.createElement('strong');
+    const errorDetails = document.createElement('div');
+    errorDetails.className = 'error-details';
+
+    if (error.name === 'AbortError') {
+        errorTitle.textContent = 'Request Timed Out';
+        errorDetails.textContent = `The ${label} server did not start responding within ${WATCHDOG_MS / 1000} seconds.`;
+    } else if (error.message.includes("503") || error.message.includes("Failed to fetch") || error.message.includes("LM Studio") || error.message.includes("Ollama")) {
+        errorTitle.textContent = `Unable to connect to ${label}`;
+
+        const helpList = document.createElement('ol');
+        PROVIDER_HELP[state.currentProvider === 'ollama' ? 'ollama' : 'lmstudio'].forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            helpList.appendChild(li);
+        });
+
+        const helpText = document.createElement('span');
+        helpText.textContent = `Please check ${label}:`;
+        errorDetails.appendChild(helpText);
+        errorDetails.appendChild(helpList);
+    } else {
+        errorTitle.textContent = 'Error';
+        errorDetails.textContent = error.message;
+    }
+
+    errorContent.appendChild(errorTitle);
+    errorContent.appendChild(errorDetails);
+    errorDiv.appendChild(errorIcon);
+    errorDiv.appendChild(errorContent);
+
+    pText.textContent = '';
+    pText.appendChild(errorDiv);
+}
+
+// Muted "generation stopped" marker appended after a user-initiated stop.
+function appendStoppedNote(contentContainer) {
+    const note = document.createElement('div');
+    note.className = 'gen-stopped-note';
+    note.textContent = '◼ generation stopped';
+    contentContainer.appendChild(note);
+}
+
+// --- Stop control ---
+
+// Abort the in-flight stream (wired to the Send button while streaming).
+export function stopGeneration() {
+    const controller = state.activeStreamController;
+    if (controller) {
+        controller.abortCause = 'user';
+        controller.abort();
+    }
+}
+
+// --- Send orchestration ---
 
 export async function sendMessage() {
     const userInput = document.getElementById('user-input');
@@ -28,47 +243,13 @@ export async function sendMessage() {
     userInput.value = '';
     userInput.style.height = 'auto';
     userInput.disabled = true;
-    sendButton.disabled = true;
+
+    // Send button becomes a Stop button while the stream is active.
     sendButton.classList.add('sending');
+    sendButton.textContent = 'Stop';
+    sendButton.setAttribute('aria-label', 'Stop generating');
 
-    // Status Bar Shimmer
-    const statusBar = document.getElementById('status-bar');
-    const statusMessages = [
-        'Reading schema\u2026',
-        'Analyzing question\u2026',
-        'Generating SQL\u2026',
-        'Preparing response\u2026'
-    ];
-    // Shuffle messages so the starting message varies each time
-    for (let i = statusMessages.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [statusMessages[i], statusMessages[j]] = [statusMessages[j], statusMessages[i]];
-    }
-    let statusIndex = 0;
-
-    const statusEl = document.createElement('p');
-    statusEl.className = 'status-shimmer';
-
-    const iconSpan = document.createElement('span');
-    iconSpan.className = 'shimmer-icon';
-    iconSpan.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
-
-    const textSpan = document.createElement('span');
-    textSpan.textContent = statusMessages[0];
-
-    statusEl.appendChild(iconSpan);
-    statusEl.appendChild(textSpan);
-    statusBar.innerHTML = '';
-    statusBar.appendChild(statusEl);
-    statusBar.classList.add('active');
-    const shimmerStart = Date.now();
-
-    const shimmerInterval = setInterval(() => {
-        statusIndex = (statusIndex + 1) % statusMessages.length;
-        textSpan.textContent = statusMessages[statusIndex];
-        const duration = 1.8 + Math.random() * 0.7;
-        statusEl.style.setProperty('--shimmer-duration', duration.toFixed(2) + 's');
-    }, 3500);
+    const shimmer = createStatusShimmer(document.getElementById('status-bar'));
 
     // Bot message container (created now but empty until streaming)
     const botMessageElement = appendMessage('', 'bot');
@@ -78,11 +259,18 @@ export async function sendMessage() {
 
     // Abort previous stream if still active (rapid send protection)
     if (state.activeStreamController) {
+        state.activeStreamController.abortCause = 'superseded';
         state.activeStreamController.abort();
     }
     const controller = new AbortController();
     state.activeStreamController = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s watchdog — local models need time to prefill large schemas
+    const timeoutId = setTimeout(() => {
+        controller.abortCause = 'watchdog';
+        controller.abort();
+    }, WATCHDOG_MS);
+
+    let fullResponse = '';
+    let renderPending = false; // rAF gate — prevents O(n²) re-renders during streaming
 
     try {
         const response = await fetch('/chat_stream', {
@@ -97,93 +285,25 @@ export async function sendMessage() {
 
         if (!response.ok) {
             clearTimeout(timeoutId); // Clear timeout on error response
-            const errData = await response.json();
-            throw new Error(errData.error || `HTTP Error: ${response.status}`);
+            let errData = null;
+            try { errData = await response.json(); } catch (_) {} // body may be non-JSON
+            throw new Error((errData && errData.error) || `HTTP Error: ${response.status}`);
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';        // incomplete SSE frame accumulator
-        let fullResponse = '';  // assembled model text (from event: token frames)
-        let tokenUsage = null;
-        let firstChunk = true;
-        let streamComplete = false;
-        let renderPending = false; // rAF gate — prevents O(n²) re-renders during streaming
-
-        // Parse complete SSE frames from the buffer (split on blank lines).
-        // Returns { frames: string[], remainder: string } where remainder is
-        // any partial frame still being received.
-        function parseFrames(buf) {
-            const parts = buf.split('\n\n');
-            return { frames: parts.slice(0, -1), remainder: parts[parts.length - 1] };
-        }
-
-        // Parse a single SSE frame string into { event, data }.
-        function parseFrame(frame) {
-            let event = 'message';
-            let data = '';
-            for (const line of frame.split('\n')) {
-                if (line.startsWith('event: ')) {
-                    event = line.slice(7).trim();
-                } else if (line.startsWith('data: ')) {
-                    data += (data ? '\n' : '') + line.slice(6);
-                }
-                // Lines starting with ':' are comments (keepalive) — silently ignored.
-            }
-            return { event, data };
-        }
-
-        outer: while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const { frames, remainder } = parseFrames(buffer);
-            buffer = remainder;
-
-            for (const frame of frames) {
-                if (!frame.trim()) continue;
-                const { event, data } = parseFrame(frame);
-
-                if (event === 'token') {
-                    // Disarm watchdog on first real model event — not on keepalive comments,
-                    // which arrive before any content and would clear it prematurely.
-                    if (firstChunk) { clearTimeout(timeoutId); firstChunk = false; }
-                    try {
-                        const parsed = JSON.parse(data);
-                        const chunk = parsed.chunk || '';
-                        if (chunk) {
-                            fullResponse += chunk;
-                            if (!renderPending) {
-                                renderPending = true;
-                                requestAnimationFrame(() => {
-                                    renderText(pText, fullResponse);
-                                    chatHistory.scrollTop = chatHistory.scrollHeight;
-                                    renderPending = false;
-                                });
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('Failed to parse token frame:', e);
-                    }
-                } else if (event === 'done') {
-                    if (firstChunk) { clearTimeout(timeoutId); firstChunk = false; }
-                    try {
-                        const parsed = JSON.parse(data);
-                        tokenUsage = parsed.token_usage || null;
-                    } catch (e) {
-                        console.warn('Failed to parse done frame:', e);
-                    }
-                    streamComplete = true;
-                    break outer;
-                } else if (event === 'error') {
-                    if (firstChunk) { clearTimeout(timeoutId); firstChunk = false; }
-                    let msg = data;
-                    try { msg = JSON.parse(data).message || data; } catch (_) {}
-                    throw new Error(msg);
+        const { tokenUsage, streamComplete } = await readChatStream(response, {
+            onFirstEvent: () => clearTimeout(timeoutId), // disarm watchdog on first real model event
+            onToken: (chunk) => {
+                fullResponse += chunk;
+                if (!renderPending) {
+                    renderPending = true;
+                    requestAnimationFrame(() => {
+                        renderText(pText, fullResponse);
+                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                        renderPending = false;
+                    });
                 }
             }
-        }
+        });
 
         if (!streamComplete) {
             throw new Error("Connection to LLM timed out or was interrupted.");
@@ -191,14 +311,7 @@ export async function sendMessage() {
 
         // Final render (ensures any last partial buffer is flushed)
         renderText(pText, fullResponse);
-
-        // Dismiss status bar (with minimum display time)
-        clearInterval(shimmerInterval);
-        const elapsed = Date.now() - shimmerStart;
-        const remaining = Math.max(0, 2500 - elapsed);
-        setTimeout(() => {
-            statusBar.classList.remove('active');
-        }, remaining);
+        shimmer.softDismiss();
 
         // Add token counter to chat bubble if usage data available
         if (tokenUsage) {
@@ -223,68 +336,40 @@ export async function sendMessage() {
         }
 
     } catch (error) {
-        console.error('Chat Error:', error);
+        const cause = error.name === 'AbortError' ? (controller.abortCause || 'watchdog') : null;
 
-        // Create error container with proper styling
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'chat-error-message';
-        errorDiv.setAttribute('role', 'alert');
-
-        const errorIcon = document.createElement('span');
-        errorIcon.className = 'error-icon';
-        errorIcon.textContent = '\u26A0';
-
-        const errorContent = document.createElement('div');
-        errorContent.className = 'error-content';
-
-        const errorTitle = document.createElement('strong');
-        const errorDetails = document.createElement('div');
-        errorDetails.className = 'error-details';
-
-        if (error.name === 'AbortError') {
-            errorTitle.textContent = 'Request Timed Out';
-            errorDetails.textContent = `The ${state.currentProvider === 'ollama' ? 'Ollama' : 'LM Studio'} server did not start responding within 90 seconds.`;
-        } else if (error.message.includes("503") || error.message.includes("Failed to fetch") || error.message.includes("LM Studio") || error.message.includes("Ollama")) {
-            const isOllama = state.currentProvider === 'ollama';
-            errorTitle.textContent = `Unable to connect to ${isOllama ? 'Ollama' : 'LM Studio'}`;
-
-            const helpList = document.createElement('ol');
-            const helpItems = isOllama
-                ? ['Is Ollama running? (ollama serve)', 'Is a model pulled? (run: ollama list)', 'Check port 11434 is accessible']
-                : ['Is LM Studio running? (Green bar at top)', 'Is the port set to 1234?', 'Is a model loaded?'];
-
-            helpItems.forEach(item => {
-                const li = document.createElement('li');
-                li.textContent = item;
-                helpList.appendChild(li);
-            });
-
-            const helpText = document.createElement('span');
-            helpText.textContent = `Please check ${isOllama ? 'Ollama' : 'LM Studio'}:`;
-            errorDetails.appendChild(helpText);
-            errorDetails.appendChild(helpList);
+        if (cause === 'superseded') {
+            // A newer message took over; drop this bubble silently.
+            botMessageElement.remove();
+        } else if (cause === 'user') {
+            // Keep whatever streamed in; mark it stopped. SQL from a
+            // truncated response is never executed.
+            renderText(pText, fullResponse);
+            appendStoppedNote(contentContainer);
+            if (fullResponse) {
+                try {
+                    await fetchJson('/save_assistant_message', {
+                        content: fullResponse,
+                        token_usage: null
+                    });
+                } catch (e) {
+                    console.warn('Failed to save stopped message:', e);
+                }
+            }
         } else {
-            errorTitle.textContent = 'Error';
-            errorDetails.textContent = error.message;
+            console.error('Chat Error:', error);
+            renderChatError(pText, error);
         }
-
-        errorContent.appendChild(errorTitle);
-        errorContent.appendChild(errorDetails);
-        errorDiv.appendChild(errorIcon);
-        errorDiv.appendChild(errorContent);
-
-        pText.textContent = '';
-        pText.appendChild(errorDiv);
     } finally {
         clearTimeout(timeoutId); // Ensure cleanup
-        clearInterval(shimmerInterval);
+        shimmer.forceDismiss();
         if (state.activeStreamController === controller) {
             state.activeStreamController = null;
         }
-        statusBar.classList.remove('active');
         userInput.disabled = false;
-        sendButton.disabled = false;
         sendButton.classList.remove('sending');
+        sendButton.textContent = 'Send';
+        sendButton.setAttribute('aria-label', 'Send message');
         userInput.focus();
         chatHistory.scrollTop = chatHistory.scrollHeight;
     }

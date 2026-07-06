@@ -4,7 +4,6 @@ export const state = {
     databaseLoaded: false,
     currentProvider: 'lmstudio',
     ollamaAvailable: false,
-    ollamaModels: [],
     selectedOllamaModel: null,
     statusCheckInterval: null,
     activeStreamController: null,
@@ -13,5 +12,4 @@ export const state = {
     currentDraft: '',
     queryHistory: [], // visible bottom-left panel; entries: { q, ts, msgIndex }
     richSchema: {},
-    lastTableName: null,
 };

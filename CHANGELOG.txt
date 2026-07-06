@@ -1,5 +1,57 @@
 CHANGELOG
 
+### v3.13.0 - Front-end review: Stop button, accessibility, polish (Jul 2026)
+
+Front-end audit pass following the v3.11–3.12 backend hardening rounds:
+a Stop button for streaming, keyboard/screen-reader accessibility fixes,
+two correctness bugs, and a dead-code sweep.
+
+#### New / Changed
+- **Stop button:** the Send button becomes Stop while the model is streaming.
+  Stopping keeps the partial response with a muted "generation stopped" note,
+  saves it to the session (so exports stay coherent), and never executes SQL
+  from a truncated response. The 90s watchdog timeout and its error message
+  are unchanged.
+- **Desktop-first, stated:** below 880px the schema browser and Row Inspector
+  are hidden by design; a small notice now says so instead of leaving narrow-
+  viewport users guessing. README updated to match.
+- **sendMessage() refactor:** the 285-line streaming function is split into
+  focused helpers (SSE frame parsing, stream reader, status shimmer, error
+  renderer) with no behavior change; provider labels and offline-help
+  checklists are now shared between chat errors and the sidebar guidance.
+
+#### Accessibility
+- **Modal focus management:** dialogs (search, confirm/alert) now trap Tab
+  within themselves and restore focus to the triggering element on close; the
+  settings popover moves focus in on open and back to the gear on Escape.
+- **Keyboard path to the Row Inspector:** result-table rows are focusable and
+  respond to Enter/Space — the inspector was previously mouse-only.
+- **prefers-reduced-motion:** all animations and transitions (including the
+  infinite status-bar shimmer) are suppressed when the OS asks for reduced
+  motion.
+- **WCAG AA contrast:** the faintest text tier (--ink-4, used for micro-labels
+  and hints at 10px) was ~2:1 against the paper background; both ink-3 and
+  ink-4 now meet the 4.5:1 AA threshold in light and dark themes.
+- **Alert dialogs** no longer contain a hidden cancel button.
+
+#### Fixed
+- **Unsanitized markdown fallback:** if DOMPurify ever failed to load,
+  LLM-rendered markdown was injected as raw HTML; rendering now fails safe
+  to plain text unless both Marked and DOMPurify are present.
+- **Non-JSON error responses:** a proxy error page or empty body used to
+  surface as a confusing JSON SyntaxError; fetch helpers now report the real
+  HTTP status.
+- **Dark-mode flash on load:** the theme class is applied by an inline
+  pre-paint script before the stylesheet loads, instead of after the JS
+  modules initialize.
+- **PWA manifest palette:** theme_color/background_color still carried
+  pre-redesign colors (#f0a030 amber / #0a0a0c near-black); now aligned with
+  the Forensic Atelier palette (#c1522b / #f4efe4).
+- **Dead code sweep:** ~120 lines of orphaned CSS from the redesign
+  (.empty-hero, .cp-head model/context pills, .lp-head/.lp-actions, the old
+  sidebar drop zone, #sidebar-toggle), unused state fields, a duplicate
+  beforeunload handler, and an unused import.
+
 ### v3.12.0 - Reliability, security, and CI sweep (Jul 2026)
 
 Full-project audit pass: lower query error rates with local models, patched

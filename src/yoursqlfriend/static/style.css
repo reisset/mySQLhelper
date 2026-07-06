@@ -23,8 +23,8 @@
   --bg-3:      #e2dac6;
   --ink:       #1a1815;
   --ink-2:     #3b372f;
-  --ink-3:     #6e6a5e;
-  --ink-4:     #a39e8e;
+  --ink-3:     #5c584d; /* ≥4.5:1 (WCAG AA) on bg/bg-2/bg-3 */
+  --ink-4:     #6a665a; /* ≥4.5:1 on bg/bg-2 — used at small sizes */
   --line:      #d4ccb8;
   --line-2:    #bdb39d;
   --accent:    #c1522b;
@@ -58,7 +58,7 @@ html.dark {
   --ink: #efe9d8;
   --ink-2: #d4cdb8;
   --ink-3: #9c9684;
-  --ink-4: #6b6657;
+  --ink-4: #8a8472; /* ≥4.5:1 (WCAG AA) on dark bg/bg-2 */
   --line: #2e2920;
   --line-2: #3e382d;
   --accent: #dd6a3f;
@@ -294,18 +294,6 @@ body.db-loaded .app-main { display: grid; }
 .app-footer #ft-hash { font-variant-numeric: tabular-nums; }
 
 /* ─────────── left pane: file + actions + schema ─────────── */
-.lp-head {
-  padding: 10px 12px 8px;
-  display: flex; align-items: center; gap: 8px;
-  border-bottom: 1px solid var(--line);
-}
-.lp-head .file { font-family: var(--mono); font-size: 11px; color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lp-actions {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-}
-.lp-actions .sidebar-button { width: 100%; }
 .lp-section {
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
@@ -318,22 +306,7 @@ body.db-loaded .app-main { display: grid; }
   flex: 1 1 0; min-height: 0; overflow: auto;
 }
 
-/* drop zone in left pane */
-.file-upload {
-  border: 1.5px dashed var(--line-2);
-  border-radius: var(--r-md);
-  background: var(--bg-2);
-  padding: 12px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color .15s, background .15s;
-}
-.file-upload.drag-over,
-.file-upload:hover { border-color: var(--accent); background: var(--accent-wash); }
-.file-upload.uploading { opacity: .6; pointer-events: none; }
-.drop-zone-content { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.drop-text { margin: 0; font-size: 12px; color: var(--ink-2); }
-.drop-text-small { margin: 0; font-size: 10px; color: var(--ink-3); }
+/* upload controls (shared with the landing drop zone) */
 .file-upload-buttons { display: flex; gap: 8px; }
 .custom-file-upload {
   display: inline-block;
@@ -459,49 +432,6 @@ input[type="file"]#database-file { display: none; }
 .cp-head .cp-title { font-family: var(--serif); font-size: 16px; font-weight: 500; color: var(--ink); }
 .cp-head .cp-title em { font-style: italic; color: var(--ink-3); font-weight: 400; }
 .cp-head .grow { flex: 1; min-width: 0; }
-.cp-head .cp-meta { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
-
-.cp-head .cp-model {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 8px;
-  border: 1px solid var(--line-2); border-radius: var(--r-sm);
-  background: var(--bg);
-  font-family: var(--mono); font-size: 10.5px;
-  max-width: 260px;
-}
-.cp-head .cp-model .label { color: var(--ink-4); }
-.cp-head .cp-model .name {
-  color: var(--ink); font-weight: 600;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 180px;
-}
-.cp-head .cp-model.off .name { color: var(--ink-4); font-style: italic; font-weight: 400; }
-
-.cp-head .cp-context {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 3px 10px;
-  border: 1px solid var(--line-2); border-radius: var(--r-sm);
-  background: var(--bg);
-  font-family: var(--mono); font-size: 10.5px;
-  color: var(--ink-3);
-}
-.cp-head .cp-context .label { color: var(--ink-4); }
-.cp-head .cp-context .bar {
-  width: 80px; height: 6px;
-  background: var(--bg-3);
-  border-radius: 3px;
-  overflow: hidden;
-  position: relative;
-}
-.cp-head .cp-context .fill {
-  display: block; height: 100%; width: 0%;
-  background: linear-gradient(90deg, var(--ok) 0%, var(--amber) 60%, var(--err) 95%);
-  transition: width .25s ease;
-}
-.cp-head .cp-context .count {
-  color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums;
-  min-width: 40px; text-align: right;
-}
 
 .chat-container {
   flex: 1 1 0;
@@ -525,26 +455,6 @@ input[type="file"]#database-file { display: none; }
 #welcome-screen.minimized {
   max-height: 0; opacity: 0; padding: 0; margin: 0;
   border-bottom: 0;
-}
-.empty-hero {
-  padding: 48px 12px 20px;
-  max-width: 860px;
-  margin: 0 auto;
-}
-.empty-hero .over {
-  font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
-  color: var(--accent); font-weight: 600;
-  margin-bottom: 18px;
-}
-.empty-hero h1 {
-  font-family: var(--serif); font-weight: 400; font-size: 64px;
-  line-height: .98; letter-spacing: -.02em; margin: 0;
-}
-.empty-hero h1 em { font-style: italic; color: var(--ink-3); font-weight: 400; }
-.empty-hero h1 .and { font-family: var(--serif); font-style: italic; color: var(--accent); font-weight: 400; }
-.empty-hero p.lead {
-  font-family: var(--serif); font-size: 17px; line-height: 1.45; color: var(--ink-2);
-  margin: 22px 0 0; max-width: 640px; font-weight: 400;
 }
 .example-queries {
   margin-top: 28px;
@@ -577,9 +487,6 @@ input[type="file"]#database-file { display: none; }
   background: var(--accent-wash); color: var(--accent-2); border-color: var(--accent);
 }
 .example-query:hover::after { opacity: 1; transform: translateX(0); color: var(--accent-2); }
-#welcome-screen pre {
-  display: none; /* ASCII art hidden in new design */
-}
 
 /* chat messages */
 .chat-message {
@@ -865,7 +772,16 @@ table.gridjs-table tr.row-selected td.gridjs-td {
 }
 #send-button:hover:not(:disabled) { background: var(--ink-2); }
 #send-button:disabled { opacity: .45; cursor: not-allowed; }
+/* while streaming, the button stays enabled and reads "Stop" */
 #send-button.sending { background: var(--accent); border-color: var(--accent-2); }
+#send-button.sending:hover:not(:disabled) { background: var(--accent-2); }
+
+/* muted marker under a response the user stopped mid-stream */
+.gen-stopped-note {
+  margin-top: 6px;
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-3); font-style: italic;
+}
 
 .scroll-to-bottom {
   position: absolute; right: 32px; bottom: 16px;
@@ -880,7 +796,6 @@ table.gridjs-table tr.row-selected td.gridjs-td {
 .scroll-to-bottom:hover { background: var(--ink-2); }
 
 /* header controls */
-#sidebar-toggle { display: none; }
 #theme-toggle {
   width: 26px; height: 26px;
   border: 1px solid var(--line-2); border-radius: var(--r-sm);
@@ -1441,4 +1356,38 @@ table.gridjs-table tr.row-selected td.gridjs-td {
 }
 @media (max-width: 820px) {
   .app-header .cp-model { display: none; }
+}
+
+/* ─────────── desktop-first notice ─────────── */
+/* The workbench is deliberately desktop-first: below 880px the schema
+   browser and row inspector are hidden, so say so instead of leaving
+   users guessing. */
+.narrow-viewport-note { display: none; }
+@media (max-width: 880px) {
+  .narrow-viewport-note {
+    display: block;
+    padding: 6px 16px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--ink-3);
+  }
+}
+
+/* ─────────── reduced motion ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* the shimmer's animated gradient text becomes plain readable text */
+  .status-shimmer {
+    animation: none;
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+    color: var(--ink-2);
+  }
 }

@@ -5,9 +5,9 @@
 // Main entry point — imports all modules and wires up event listeners
 
 import { state } from './state.js';
-import { initTheme, toggleTheme, showConfirmModal, showAlertModal, downloadBlob, fetchJson, toggleSettingsPopover, renderQueryHistory } from './ui.js';
+import { initTheme, toggleTheme, showAlertModal, downloadBlob, fetchJson, toggleSettingsPopover, renderQueryHistory } from './ui.js';
 import { initProviderSelector, initModelSelector } from './providers.js';
-import { sendMessage } from './chat.js';
+import { sendMessage, stopGeneration } from './chat.js';
 import { uploadFile, handleFiles, handleDrop } from './upload.js';
 import { showSearchModal } from './search.js';
 
@@ -129,10 +129,14 @@ if (historyClearBtn) {
     });
 }
 
-// --- Send Button ---
+// --- Send Button (doubles as Stop while a stream is active) ---
 if (sendButton) {
     sendButton.addEventListener('click', () => {
-        sendMessage();
+        if (state.activeStreamController) {
+            stopGeneration();
+        } else {
+            sendMessage();
+        }
     });
 }
 
@@ -251,8 +255,12 @@ if (searchAllTablesButton) {
     });
 }
 
-// --- Warn before reload/close if chat session active ---
+// --- Page unload: clear polling, warn if chat session active ---
 window.addEventListener('beforeunload', (e) => {
+    if (state.statusCheckInterval) {
+        clearInterval(state.statusCheckInterval);
+        state.statusCheckInterval = null;
+    }
     const chatMessages = document.querySelectorAll('.chat-message').length;
     if (chatMessages > 0) {
         e.preventDefault();
