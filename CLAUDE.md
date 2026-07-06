@@ -38,6 +38,7 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 - `pyproject.toml` — Package metadata, dependencies, entry point
 - `run.sh` / `run.bat` — Dev launcher scripts (venv setup, editable install, app launch)
 - `install.sh` / `install.ps1` — One-line installers (pipx-based, no git required)
+- `ROADMAP.md` — research-backed future work (agentic probe loop, dual-model mode) and ideas already evaluated/ruled out — check before proposing accuracy features
 
 ### Request Flow
 
