@@ -8,7 +8,7 @@ import tempfile
 from unittest.mock import patch
 
 import pytest
-from yoursqlfriend.app import app, VERSION
+from yoursqlfriend.app import app, VERSION, MAX_SQL_CORRECTION_ROUNDS
 
 
 @pytest.fixture
@@ -253,6 +253,98 @@ class TestExecuteSQLRetry:
         resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM nonexistent_table'})
         assert resp.status_code == 500
         assert 'SQL Error' in resp.get_json().get('error', '')
+
+
+# --- POST /execute_sql (multi-round correction loop) ---
+
+class TestExecuteSQLMultiRoundCorrection:
+    """Execution-feedback loop: up to MAX_SQL_CORRECTION_ROUNDS correction rounds,
+    each fed the latest sqlite error; repeated SQL breaks the loop early."""
+
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
+    @patch('yoursqlfriend.app.call_llm_non_streaming')
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_second_round_succeeds(self, mock_resolve, mock_llm, mock_schema, client, temp_db):
+        """Round 1 correction also fails; round 2 fixes it. Prior attempts are listed in round 2's prompt."""
+        _load_db(client, temp_db)
+        mock_llm.side_effect = [
+            '{"sql": "SELECT * FROM still_wrong"}',
+            '{"sql": "SELECT * FROM users"}',
+        ]
+
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM nonexistent_table'})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data.get('retried') is True
+        assert data.get('corrected_sql') == 'SELECT * FROM users'
+        assert data.get('correction_rounds') == 2
+        assert mock_llm.call_count == 2
+
+        # Round 2's prompt must carry the execution feedback: the round-1 failure
+        # as the failed query, and the original query in the already-tried list.
+        second_prompt = mock_llm.call_args_list[1][0][0][1]['content']
+        assert 'SELECT * FROM still_wrong' in second_prompt
+        assert 'already tried' in second_prompt
+        assert 'SELECT * FROM nonexistent_table' in second_prompt
+
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
+    @patch('yoursqlfriend.app.call_llm_non_streaming')
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_repeat_of_original_breaks_immediately(self, mock_resolve, mock_llm, mock_schema, client, temp_db):
+        """LLM returns the exact query that just failed → stop, don't burn more rounds."""
+        _load_db(client, temp_db)
+        mock_llm.return_value = '{"sql": "SELECT * FROM nonexistent_table"}'
+
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM nonexistent_table'})
+        assert resp.status_code == 500
+        assert 'SQL Error' in resp.get_json().get('error', '')
+        assert mock_llm.call_count == 1
+
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
+    @patch('yoursqlfriend.app.call_llm_non_streaming')
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_repeated_correction_breaks_early(self, mock_resolve, mock_llm, mock_schema, client, temp_db):
+        """LLM suggests the same failing correction twice → loop exits on the repeat."""
+        _load_db(client, temp_db)
+        mock_llm.side_effect = [
+            '{"sql": "SELECT * FROM still_wrong"}',
+            '{"sql": "SELECT * FROM still_wrong;"}',  # same modulo trailing semicolon
+        ]
+
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM nonexistent_table'})
+        assert resp.status_code == 500
+        assert 'SQL Error' in resp.get_json().get('error', '')
+        assert mock_llm.call_count == 2
+
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
+    @patch('yoursqlfriend.app.call_llm_non_streaming')
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_all_rounds_fail_returns_original_error(self, mock_resolve, mock_llm, mock_schema, client, temp_db):
+        """Every correction round fails → 500 carrying the ORIGINAL error, after exactly MAX rounds."""
+        _load_db(client, temp_db)
+        mock_llm.side_effect = [
+            f'{{"sql": "SELECT * FROM wrong_{i}"}}' for i in range(MAX_SQL_CORRECTION_ROUNDS)
+        ]
+
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM nonexistent_table'})
+        assert resp.status_code == 500
+        error = resp.get_json().get('error', '')
+        assert 'SQL Error' in error
+        assert 'nonexistent_table' in error
+        assert mock_llm.call_count == MAX_SQL_CORRECTION_ROUNDS
+
+    @patch('yoursqlfriend.app.build_schema_context', return_value=('', False))
+    @patch('yoursqlfriend.app.call_llm_non_streaming')
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    def test_correction_context_includes_samples(self, mock_resolve, mock_llm, mock_schema, client, temp_db):
+        """The correction schema context is built WITH sample rows (value/format grounding)."""
+        _load_db(client, temp_db)
+        mock_llm.return_value = '{"sql": "SELECT * FROM users"}'
+
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM nonexistent_table'})
+        assert resp.status_code == 200
+        mock_schema.assert_called_once()
+        assert mock_schema.call_args[1].get('include_samples') is True
 
 
 # --- Cross-site POST guard ---

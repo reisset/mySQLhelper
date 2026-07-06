@@ -1,5 +1,30 @@
 CHANGELOG
 
+### v3.14.0 - SQL accuracy: execution-feedback loop + value grounding (Jul 2026)
+
+Research-driven pass at the query error rate. Both changes follow the
+text-to-SQL literature: correction works when the model sees real execution
+errors, and hallucinated WHERE-clause values disappear when the model is shown
+the values that actually exist.
+
+#### New / Changed
+- **Multi-round auto-correction:** a failed query now gets up to two correction
+  rounds (was one), each fed the latest SQLite error. Previously tried queries
+  are listed in the prompt so the model doesn't resubmit them; a repeated
+  suggestion ends the loop early. Correction prompts now include sample rows,
+  fixing wrong date-format and value assumptions.
+- **Value grounding:** enum-like TEXT columns (≤12 distinct values, ≤40 chars,
+  tables ≤50k rows) get their real values listed in the schema context
+  ("-- values of messages.direction: 'MSG_RCV', 'MSG_SENT'"), inside the
+  untrusted-data markers. The system prompt instructs the model to copy listed
+  values exactly. Under context-budget pressure the annotations are the first
+  thing dropped, before sample rows.
+- **README:** new "Choosing a model" note — SQL-specialized local models
+  (e.g. Arctic-Text2SQL-R1-7B GGUF) are worth A/B-testing on SQL-heavy sessions.
+
+Note: prompts are larger — grounding and feedback trade tokens for accuracy.
+Schema context stays capped by the existing budget and degrades gracefully.
+
 ### v3.13.0 - Front-end review: Stop button, accessibility, polish (Jul 2026)
 
 Front-end audit pass following the v3.11–3.12 backend hardening rounds:

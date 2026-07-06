@@ -561,6 +561,11 @@ def save_assistant_message():
 
     return jsonify({'status': 'success', 'message_id': msg_id})
 
+# Max LLM correction rounds after a failed query (total executions = 1 + this).
+# Each round feeds the latest sqlite error back — execution-feedback correction.
+MAX_SQL_CORRECTION_ROUNDS = 2
+
+
 @app.route('/execute_sql', methods=['POST'])
 def execute_sql():
     data = request.json
@@ -598,66 +603,88 @@ def execute_sql():
         })
 
     except sqlite3.Error as e:
-        logger.warning(f"SQL Execution Error (will attempt retry): {e} | Query: {sql_query}")
+        logger.warning(f"SQL Execution Error (will attempt correction): {e} | Query: {sql_query}")
 
-        # Attempt auto-correction via LLM (max 1 retry)
+        # Auto-correction: bounded execution-feedback loop. Each round feeds the
+        # latest sqlite error back to the LLM; earlier attempts are listed in the
+        # prompt so the model doesn't resubmit a known failure.
         try:
-            schema_context, _ = build_schema_context(db_filepath, include_samples=False)
-            correction_prompt = build_error_correction_prompt(str(e), sql_query, schema_context,
-                                                              structured=True)
-
+            # Samples included: wrong value/format assumptions (dates, enum codes)
+            # are a top failure cause, and samples are what fixes them.
+            schema_context, _ = build_schema_context(db_filepath, include_samples=True)
             provider = session.get('llm_provider', LLM_PROVIDER)
             model = resolve_provider_model(provider, session.get('ollama_model'))
-            messages = [
-                {"role": "system", "content": "You are a SQL correction assistant. Return a JSON object with a single key 'sql' containing the corrected query."},
-                {"role": "user", "content": correction_prompt}
-            ]
 
-            # Request constrained JSON output so the SQL is always extractable.
-            llm_response = call_llm_non_streaming(messages, provider=provider, model=model,
-                                                  use_structured_output=True)
+            attempted = [sql_query]
+            failed_sql, last_error = sql_query, e
 
-            # Primary: parse the structured JSON response {"sql": "..."}
-            corrected_sql = None
-            try:
-                parsed = json.loads(llm_response)
-                corrected_sql = parsed.get('sql', '').strip() or None
-                if corrected_sql:
-                    logger.info("SQL correction extracted via structured output")
-            except (json.JSONDecodeError, AttributeError):
-                pass
+            for round_num in range(1, MAX_SQL_CORRECTION_ROUNDS + 1):
+                correction_prompt = build_error_correction_prompt(
+                    str(last_error), failed_sql, schema_context,
+                    structured=True, attempted_sql=attempted[:-1])
+                messages = [
+                    {"role": "system", "content": "You are a SQL correction assistant. Return a JSON object with a single key 'sql' containing the corrected query."},
+                    {"role": "user", "content": correction_prompt}
+                ]
 
-            # Fallback: tolerant extraction — fenced block (any casing/tag) or bare SQL.
-            # validate_sql() below guards whatever comes out.
-            if not corrected_sql:
-                corrected_sql = extract_sql_from_response(llm_response)
+                # Request constrained JSON output so the SQL is always extractable.
+                llm_response = call_llm_non_streaming(messages, provider=provider, model=model,
+                                                      use_structured_output=True)
+
+                # Primary: parse the structured JSON response {"sql": "..."}
+                corrected_sql = None
+                try:
+                    parsed = json.loads(llm_response)
+                    corrected_sql = parsed.get('sql', '').strip() or None
+                    if corrected_sql:
+                        logger.info("SQL correction extracted via structured output")
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
+                # Fallback: tolerant extraction — fenced block (any casing/tag) or bare
+                # SQL. validate_sql() below guards whatever comes out.
                 if not corrected_sql:
-                    raise ValueError("LLM did not return corrected SQL")
-                logger.info("SQL correction extracted via fence/bare-SQL fallback")
+                    corrected_sql = extract_sql_from_response(llm_response)
+                    if not corrected_sql:
+                        raise ValueError("LLM did not return corrected SQL")
+                    logger.info("SQL correction extracted via fence/bare-SQL fallback")
 
-            logger.info(f"LLM suggested correction: {corrected_sql}")
+                logger.info(f"LLM suggested correction (round {round_num}): {corrected_sql}")
 
-            # Validate corrected SQL
-            is_valid_retry, retry_error = validate_sql(corrected_sql)
-            if not is_valid_retry:
-                raise ValueError(f"Corrected SQL failed validation: {retry_error}")
+                # Same SQL as an earlier attempt → the model is stuck; stop burning rounds.
+                if any(corrected_sql.strip().rstrip(';') == a.strip().rstrip(';')
+                       for a in attempted):
+                    raise ValueError("LLM repeated an already-failed query")
 
-            results_dict = execute_and_parse_query(db_filepath, corrected_sql)
-            logger.info(f"Retry SQL Executed Successfully. Rows returned: {len(results_dict)}")
+                is_valid_retry, retry_error = validate_sql(corrected_sql)
+                if not is_valid_retry:
+                    raise ValueError(f"Corrected SQL failed validation: {retry_error}")
 
-            update_chat_history_with_results(chat_history, corrected_sql, results_dict)
-            session['chat_history'] = chat_history
+                try:
+                    results_dict = execute_and_parse_query(db_filepath, corrected_sql)
+                except sqlite3.Error as round_error:
+                    logger.warning(f"Correction round {round_num} failed: {round_error} | Query: {corrected_sql}")
+                    attempted.append(corrected_sql)
+                    failed_sql, last_error = corrected_sql, round_error
+                    continue
 
-            return jsonify({
-                'response': f"Found {len(results_dict)} results.",
-                'query_results': results_dict,
-                'retried': True,
-                'original_sql': sql_query,
-                'corrected_sql': corrected_sql
-            })
+                logger.info(f"Corrected SQL executed successfully (round {round_num}). Rows returned: {len(results_dict)}")
+                update_chat_history_with_results(chat_history, corrected_sql, results_dict)
+                session['chat_history'] = chat_history
+
+                return jsonify({
+                    'response': f"Found {len(results_dict)} results.",
+                    'query_results': results_dict,
+                    'retried': True,
+                    'original_sql': sql_query,
+                    'corrected_sql': corrected_sql,
+                    'correction_rounds': round_num
+                })
+
+            raise ValueError(f"All {MAX_SQL_CORRECTION_ROUNDS} correction rounds failed")
 
         except Exception as retry_error:
-            logger.error(f"SQL retry also failed: {retry_error} | Original query: {sql_query}")
+            logger.error(f"SQL auto-correction failed: {retry_error} | Original query: {sql_query}")
             return jsonify({'error': f"SQL Error: {e}"}), 500
 
 @app.route('/search_all_tables', methods=['POST'])

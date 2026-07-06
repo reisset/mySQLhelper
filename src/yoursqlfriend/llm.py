@@ -27,6 +27,13 @@ SCHEMA_CONTEXT_CHAR_BUDGET = 20_000
 # local models. Keepalives fire between tokens, not during initial prefill.
 KEEPALIVE_INTERVAL = 15
 
+# Value-grounding annotations: enum-like TEXT columns get their distinct values
+# listed in the schema context ("-- values of t.col: 'a', 'b'"). Guardrails keep
+# the probe cheap and the context small.
+VALUE_ANNOTATION_MAX_DISTINCT = 12    # more distinct values → not an enum, skip
+VALUE_ANNOTATION_MAX_LEN = 40         # any longer value → free text, skip
+VALUE_ANNOTATION_MAX_TABLE_ROWS = 50_000  # don't scan huge evidence tables
+
 
 def check_llm_available():
     """
@@ -222,7 +229,48 @@ def _safe_sample_val(v):
     return (s[:50] + '...' if len(s) > 50 else s).replace('<<', '««')
 
 
-def _build_schema_context_str(db_filepath, sample_rows=3):
+def _build_value_annotations(cursor, table_name):
+    """Return "-- values of table.col: ..." lines for enum-like TEXT columns.
+
+    Models are blind to data distribution: opaque codes (type='MSG_RCV',
+    status='3') can't be inferred from DDL, and invented enum values are a
+    common cause of silently-wrong WHERE clauses. Listing the real values
+    grounds the model. Emitted lines are raw database content — callers must
+    place them inside the <<UNTRUSTED_DATA>> markers.
+    """
+    import sqlite3  # local import, mirrors _build_schema_context_str
+
+    lines = []
+    try:
+        cursor.execute(f'SELECT COUNT(*) FROM "{table_name}";')
+        if cursor.fetchone()[0] > VALUE_ANNOTATION_MAX_TABLE_ROWS:
+            return lines
+        cursor.execute(f'PRAGMA table_info("{table_name}");')
+        text_cols = [row[1] for row in cursor.fetchall()
+                     if 'CHAR' in (row[2] or '').upper() or 'TEXT' in (row[2] or '').upper()]
+    except sqlite3.Error:
+        return lines
+
+    for col in text_cols:
+        try:
+            cursor.execute(
+                f'SELECT DISTINCT "{col}" FROM "{table_name}" '
+                f'WHERE "{col}" IS NOT NULL LIMIT {VALUE_ANNOTATION_MAX_DISTINCT + 1};')
+            values = [row[0] for row in cursor.fetchall()]
+        except sqlite3.Error:
+            continue
+        if not values or len(values) > VALUE_ANNOTATION_MAX_DISTINCT:
+            continue
+        rendered = sorted(str(v) for v in values)
+        if any(len(v) > VALUE_ANNOTATION_MAX_LEN for v in rendered):
+            continue
+        value_list = ', '.join(f"'{_safe_sample_val(v)}'" for v in rendered)
+        safe_col = col.replace('<<', '««')
+        lines.append(f"-- values of {table_name}.{safe_col}: {value_list}")
+    return lines
+
+
+def _build_schema_context_str(db_filepath, sample_rows=3, value_annotations=True):
     """Internal: build schema context string. See build_schema_context() for public API."""
     import sqlite3  # local import — only needed here; avoid module-level dep
 
@@ -261,6 +309,10 @@ def _build_schema_context_str(db_filepath, sample_rows=3):
                         parts.append(' | '.join(n.replace('<<', '««') for n in col_names))
                         for row in rows:
                             parts.append('|'.join(_safe_sample_val(v) for v in row))
+                        # Enum-like column values, grounded in real data. Kept inside
+                        # the untrusted markers: these are raw database content.
+                        if value_annotations:
+                            parts.extend(_build_value_annotations(cursor, table_name))
                         parts.append("<<END_UNTRUSTED_DATA>>")
                         parts.append("")
                 except sqlite3.Error:
@@ -296,8 +348,9 @@ def build_schema_context(db_filepath, include_samples=True):
 
     # Over budget with 3 sample rows per table. Sample rows are the strongest
     # signal the model has for real column values, so degrade gradually:
-    # try 1 row per table before dropping samples entirely.
-    context = _build_schema_context_str(db_filepath, sample_rows=1)
+    # drop the value annotations and try 1 row per table before dropping
+    # samples entirely.
+    context = _build_schema_context_str(db_filepath, sample_rows=1, value_annotations=False)
     notice = (
         "[NOTE: Large schema detected — sample data reduced to one row per table "
         "to fit token budget. DDL and foreign keys are still included.]\n\n"
@@ -319,11 +372,15 @@ def build_schema_context(db_filepath, include_samples=True):
     return notice + context, True
 
 
-def build_error_correction_prompt(error_msg, failed_sql, schema_context, structured=False):
+def build_error_correction_prompt(error_msg, failed_sql, schema_context, structured=False,
+                                  attempted_sql=None):
     """Build a prompt to ask the LLM to correct a failed SQL query.
 
     structured=True aligns the output instruction with the grammar-constrained
     JSON response requested via use_structured_output (single key "sql").
+
+    attempted_sql: earlier queries (beyond failed_sql) that already failed in
+    this correction loop — listed so the model doesn't resubmit one.
     """
     # Classify error type for targeted guidance
     error_upper = str(error_msg).upper()
@@ -347,6 +404,11 @@ def build_error_correction_prompt(error_msg, failed_sql, schema_context, structu
     else:
         output_instruction = "Output ONLY the corrected SQL query in a ```sql code block. No explanation needed."
 
+    attempted_section = ""
+    if attempted_sql:
+        tried = '\n'.join(f"```sql\n{q}\n```" for q in attempted_sql)
+        attempted_section = f"\nThese queries were already tried and also failed — do not return any of them again:\n{tried}\n"
+
     return f"""The following SQL query failed. {hint}
 
 Error: {error_msg}
@@ -355,7 +417,7 @@ Failed query:
 ```sql
 {failed_sql}
 ```
-
+{attempted_section}
 {schema_context}
 
 {output_instruction}"""
@@ -405,6 +467,7 @@ SQLite specifics:
 - Concatenate strings with ||; SQLite has no CONCAT().
 - LIKE is already case-insensitive for ASCII text — no LOWER() needed for simple matches.
 - Use only functions SQLite supports; when unsure, prefer core functions (COUNT, SUM, GROUP_CONCAT, COALESCE, CAST, SUBSTR, INSTR).
+- When filtering on a column whose real values are listed in the schema context ("-- values of ..."), copy a listed value exactly — never invent or guess enum values.
 
 Example 1 — Data retrieval:
 User: "Show me the 10 most recent entries in the logs table"

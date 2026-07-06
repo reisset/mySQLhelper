@@ -46,7 +46,7 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 3. LLM streams tokens → backend yields `event: token` frames; sends `event: done` with token-usage JSON once complete; `event: error` on failure. Periodic `: keep-alive` comments prevent proxy drops during slow generation.
 4. Frontend accumulates `event: token` chunks into `fullResponse`, renders progressively. On `event: done`: updates token counter. On `event: error`: renders error UI.
 5. Frontend extracts SQL from `fullResponse` with a tolerant regex (case-insensitive `sql`/`sqlite` tags, single-line fences), calls `/execute_sql` for validation + execution
-6. On `sqlite3.Error`: backend auto-retries once via `call_llm_non_streaming()` with a grammar-constrained JSON response (`{"sql": "..."}`); fallback is `extract_sql_from_response()` in `llm.py` (tolerant fences → untagged fence → bare SQL — everything extracted still passes `validate_sql()`); frontend shows collapsible "Auto-corrected" badge
+6. On `sqlite3.Error`: backend runs an execution-feedback correction loop (up to `MAX_SQL_CORRECTION_ROUNDS` in `app.py`, currently 2 rounds) via `call_llm_non_streaming()` with a grammar-constrained JSON response (`{"sql": "..."}`). Each round feeds the latest sqlite error back; prior attempts are listed in the prompt and a repeated suggestion breaks the loop early. Fallback is `extract_sql_from_response()` in `llm.py` (tolerant fences → untagged fence → bare SQL — everything extracted still passes `validate_sql()`); frontend shows collapsible "Auto-corrected" badge. The correction schema context includes sample rows (value/format grounding)
 
 ## Key Constraints
 
@@ -59,7 +59,8 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 - **Contrast tokens**: `--ink-3`/`--ink-4` are tuned to ≥4.5:1 WCAG AA against `--bg`/`--bg-2` in both themes; don't lighten them for aesthetics
 - **Session secret**: random per-install key persisted at `DATA_DIR/secret_key` (`SECRET_KEY` env var overrides). Never reintroduce a hardcoded fallback
 - **Error responses**: the global exception handler returns a generic message; never echo `str(e)` to the client — exception text goes to the log only
-- **Schema-context degradation** (`build_schema_context`): over `SCHEMA_CONTEXT_CHAR_BUDGET`, sample rows degrade gradually (3 → 1 → 0 per table) before DDL is hard-truncated with a visible marker
+- **Schema-context degradation** (`build_schema_context`): over `SCHEMA_CONTEXT_CHAR_BUDGET`, sample rows degrade gradually (3 rows + value annotations → 1 row, no annotations → 0 rows) before DDL is hard-truncated with a visible marker
+- **Value annotations** (`_build_value_annotations` in `llm.py`): enum-like TEXT columns get their real distinct values listed (`-- values of table.col: 'a', 'b'`) inside the `<<UNTRUSTED_DATA>>` markers — guarded by the `VALUE_ANNOTATION_*` constants (≤12 distinct, ≤40 chars, tables ≤50k rows). Annotation lines are raw DB content: keep them inside the untrusted markers and routed through `_safe_sample_val()`
 - **PRAGMA table names must be double-quoted**: `PRAGMA table_info("table_name")` — not single quotes
 - **Version**: `pyproject.toml` `version` is the single source of truth. Read at runtime via `importlib.metadata` in `__init__.py`. On release, update `pyproject.toml` version and add a `CHANGELOG.txt` entry. Template cache-bust `?v=` and service worker `CACHE_NAME` are injected automatically.
   - **PyPI release**: a GitHub Actions workflow (`.github/workflows/publish.yml`) publishes to PyPI automatically when a `v*` tag is pushed. Do not run `twine` or `python -m build` manually. Release steps: bump `pyproject.toml` version, update `CHANGELOG.txt`, commit and push to `main`, then `git tag vX.Y.Z <commit-sha> && git push origin vX.Y.Z`.
@@ -92,7 +93,7 @@ python -m pytest tests/ -v
 ruff check .
 ```
 
-180 pytest cases: SQL validation (63), Flask routes (36), LLM module (64), database (17). Ruff is configured in `pyproject.toml` (`E/F/W/B/UP`, lint-only — no formatter); keep `ruff check .` clean.
+195 pytest cases: SQL validation (63), Flask routes (41), LLM module (74), database (17). Ruff is configured in `pyproject.toml` (`E/F/W/B/UP`, lint-only — no formatter); keep `ruff check .` clean.
 
 For end-to-end verification (launch the app, upload a DB, drive chat/stop/focus flows in a real browser against a local LLM), follow the recipe in `.claude/skills/verify/SKILL.md`.
 

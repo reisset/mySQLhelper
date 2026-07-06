@@ -90,6 +90,10 @@ Once connected, the provider indicator in the top bar turns green.
 
 > **Recommended LLM families:** Qwen | Gemma | Mistral / Devstral
 
+### Choosing a model
+
+General chat models (the families above) are the flexible default — they explain schemas well and hold a conversation. If your sessions are SQL-heavy and you're seeing too many failed queries, try a **SQL-specialized model**: [Arctic-Text2SQL-R1-7B (GGUF)](https://huggingface.co/mradermacher/Arctic-Text2SQL-R1-7B-GGUF) outperforms GPT-4o on text-to-SQL benchmarks despite being a 7B model, and loads in LM Studio like any other GGUF. Trade-off: it's a Qwen2.5-Coder fine-tune, so its prose explanations are terser than a general chat model's. A/B both against your own database and keep whichever fails less.
+
 ---
 
 ## 🚀 Quick Start
