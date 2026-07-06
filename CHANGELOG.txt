@@ -50,6 +50,10 @@ two correctness bugs, and a dead-code sweep.
 - **Dark-mode flash on load:** the theme class is applied by an inline
   pre-paint script before the stylesheet loads, instead of after the JS
   modules initialize.
+- **Pane-header alignment:** the rules under "Search all tables", "the
+  Forensic Workbench", and "Row Inspector" sat at three different heights;
+  all three headers now share a fixed 44px height so the line runs
+  continuously across the panes.
 - **PWA manifest palette:** theme_color/background_color still carried
   pre-redesign colors (#f0a030 amber / #0a0a0c near-black); now aligned with
   the Forensic Atelier palette (#c1522b / #f4efe4).

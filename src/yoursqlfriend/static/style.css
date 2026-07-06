@@ -49,6 +49,7 @@
 
   --left: 280px;
   --right: 340px;
+  --pane-head-h: 44px; /* shared pane-header height so the three rules align */
 }
 
 html.dark {
@@ -424,8 +425,10 @@ input[type="file"]#database-file { display: none; }
 /* ─────────── center pane: chat ─────────── */
 .center-pane { background: var(--bg); }
 .cp-head {
+  flex: 0 0 auto;
+  height: var(--pane-head-h);
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 14px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
@@ -810,7 +813,9 @@ table.gridjs-table tr.row-selected td.gridjs-td {
 /* ─────────── right pane: row inspector ─────────── */
 .right-pane { background: var(--bg); }
 .rp-head {
-  padding: 10px 14px;
+  flex: 0 0 auto;
+  height: var(--pane-head-h);
+  padding: 0 14px;
   border-bottom: 1px solid var(--line);
   display: flex; align-items: center; gap: 8px;
 }
@@ -1232,7 +1237,10 @@ table.gridjs-table tr.row-selected td.gridjs-td {
 
 /* ─────────── B2: sidebar search row (replaces twin-button grid) ─────────── */
 .lp-search-row {
-  padding: 10px 12px;
+  flex: 0 0 auto;
+  height: var(--pane-head-h);
+  display: flex; align-items: center;
+  padding: 0 12px;
   border-bottom: 1px solid var(--line);
 }
 .lp-search-btn {
