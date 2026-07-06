@@ -1,7 +1,7 @@
 // File upload, schema rendering, database status
 
 import { state } from './state.js';
-import { escapeHtml, showConfirmModal, showAlertModal, minimizeWelcomeScreen } from './ui.js';
+import { escapeHtml, showConfirmModal, showAlertModal, minimizeWelcomeScreen, clearFooterMetrics } from './ui.js';
 import { appendMessage } from './chat.js';
 import { destroyAllGrids } from './sql.js';
 import { resetInspector } from './inspector.js';
@@ -112,6 +112,7 @@ export function uploadFile() {
 
         destroyAllGrids();
         resetInspector();
+        clearFooterMetrics(); // timing/rows from the previous DB no longer apply
         const fill = document.getElementById('cp-context-fill');
         const count = document.getElementById('cp-context-count');
         if (fill) fill.style.width = '0%';

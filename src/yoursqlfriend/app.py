@@ -10,6 +10,7 @@ import gc
 import time
 import json
 import logging
+import logging.handlers
 import secrets
 import uuid
 import socket
@@ -110,12 +111,16 @@ os.makedirs(LOG_DIR, exist_ok=True)
 # Ensure sessions directory exists
 os.makedirs(app.config['SESSION_FILE_DIR'], exist_ok=True)
 
-# Configure structured logging with daily rotation
+# Configure structured logging with true daily rotation: a plain FileHandler
+# with the date baked into the filename keeps writing to yesterday's file
+# after midnight in a long-running session.
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, f'analysis_{datetime.now().strftime("%Y%m%d")}.log')),
+        logging.handlers.TimedRotatingFileHandler(
+            os.path.join(LOG_DIR, 'analysis.log'),
+            when='midnight', backupCount=30, encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
@@ -381,7 +386,8 @@ def upload_file():
             except sqlite3.Error as e:
                 _remove_with_retry(temp_filepath)
                 logger.error(f"SQLite validation failed: {str(e)}")
-                return jsonify({'error': f'Invalid SQLite database: {str(e)}'}), 400
+                # Exception text can carry filesystem paths — log only.
+                return jsonify({'error': 'Invalid SQLite database: the file failed integrity validation.'}), 400
 
         elif file_ext == '.csv':
             # CSV file - convert to SQLite
@@ -394,7 +400,7 @@ def upload_file():
                 if os.path.exists(temp_filepath):
                     os.remove(temp_filepath)
                 logger.error(f"CSV conversion failed: {str(e)}")
-                return jsonify({'error': f'CSV conversion failed: {str(e)}'}), 400
+                return jsonify({'error': 'CSV conversion failed: check that the file is valid CSV.'}), 400
 
         elif file_ext == '.sql':
             # SQL file - execute to create database
@@ -407,7 +413,11 @@ def upload_file():
                 if os.path.exists(temp_filepath):
                     os.remove(temp_filepath)
                 logger.error(f"SQL execution failed: {str(e)}")
-                return jsonify({'error': f'SQL file execution failed: {str(e)}'}), 400
+                # Our own ValueError messages (forbidden keyword, trigger) are
+                # safe, actionable constants; anything else stays in the log.
+                if isinstance(e, ValueError):
+                    return jsonify({'error': f'SQL file rejected: {e}'}), 400
+                return jsonify({'error': 'SQL file execution failed: check the file for syntax errors.'}), 400
 
         # === SESSION UPDATE PHASE ===
         session['db_filepath'] = final_filepath
@@ -450,7 +460,7 @@ def upload_file():
         # Clean up on any error (retry for Windows file lock release)
         _remove_with_retry(temp_filepath)
         logger.error(f"Upload failed: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Upload processing failed: {str(e)}'}), 500
+        return jsonify({'error': 'Upload processing failed due to a server error.'}), 500
 
 
 @app.route('/chat_stream', methods=['POST'])
@@ -591,15 +601,17 @@ def execute_sql():
         return jsonify({'error': error_msg}), 403
 
     try:
-        results_dict = execute_and_parse_query(db_filepath, sql_query)
-        logger.info(f"SQL Executed Successfully. Rows returned: {len(results_dict)}")
+        results_dict, truncated = execute_and_parse_query(db_filepath, sql_query)
+        logger.info(f"SQL Executed Successfully. Rows returned: {len(results_dict)}"
+                    + (" (truncated)" if truncated else ""))
 
         update_chat_history_with_results(chat_history, sql_query, results_dict)
         session['chat_history'] = chat_history
 
         return jsonify({
             'response': f"Found {len(results_dict)} results.",
-            'query_results': results_dict
+            'query_results': results_dict,
+            'truncated': truncated
         })
 
     except sqlite3.Error as e:
@@ -661,7 +673,7 @@ def execute_sql():
                     raise ValueError(f"Corrected SQL failed validation: {retry_error}")
 
                 try:
-                    results_dict = execute_and_parse_query(db_filepath, corrected_sql)
+                    results_dict, truncated = execute_and_parse_query(db_filepath, corrected_sql)
                 except sqlite3.Error as round_error:
                     logger.warning(f"Correction round {round_num} failed: {round_error} | Query: {corrected_sql}")
                     attempted.append(corrected_sql)
@@ -675,6 +687,7 @@ def execute_sql():
                 return jsonify({
                     'response': f"Found {len(results_dict)} results.",
                     'query_results': results_dict,
+                    'truncated': truncated,
                     'retried': True,
                     'original_sql': sql_query,
                     'corrected_sql': corrected_sql,
@@ -686,6 +699,16 @@ def execute_sql():
         except Exception as retry_error:
             logger.error(f"SQL auto-correction failed: {retry_error} | Original query: {sql_query}")
             return jsonify({'error': f"SQL Error: {e}"}), 500
+
+# Per-column cap for Search All Tables: bounds memory and scan work on huge
+# DBs (previously unbounded DISTINCT + fetchall could buffer millions of rows).
+SEARCH_MAX_VALUES_PER_COLUMN = 200
+
+
+def _escape_like_term(term):
+    """Escape LIKE metacharacters so the term matches literally (ESCAPE '\\')."""
+    return term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
 
 @app.route('/search_all_tables', methods=['POST'])
 def search_all_tables():
@@ -708,6 +731,7 @@ def search_all_tables():
 
     logger.info(f"Search All Tables: '{search_term}' (case_sensitive={case_sensitive})")
 
+    capped = False
     try:
         with get_readonly_connection(db_filepath) as conn:
             cursor = conn.cursor()
@@ -733,27 +757,35 @@ def search_all_tables():
 
                 for col in all_columns:
                     try:
-                        # Build query based on case sensitivity
-                        if case_sensitive:
-                            query = f'SELECT DISTINCT "{col}" FROM "{table}" WHERE "{col}" LIKE ? AND "{col}" GLOB ?'
-                            # GLOB is case-sensitive, LIKE finds candidates
-                            params = [f'%{search_term}%', f'*{search_term}*']
-                        else:
-                            query = f'SELECT DISTINCT "{col}" FROM "{table}" WHERE "{col}" LIKE ?'
-                            params = [f'%{search_term}%']
+                        # LIKE with escaped metacharacters = literal substring
+                        # match ('%'/'_' in the term no longer act as wildcards).
+                        # LIKE is ASCII case-insensitive, so it over-selects
+                        # candidates; the Python check below applies exact-case
+                        # (or full unicode-insensitive) matching. This replaced
+                        # a GLOB branch whose '*?[' metacharacters corrupted
+                        # case-sensitive searches.
+                        query = (
+                            f'SELECT DISTINCT "{col}" FROM "{table}" '
+                            f"WHERE \"{col}\" LIKE ? ESCAPE '\\' LIMIT ?"
+                        )
+                        params = [f'%{_escape_like_term(search_term)}%',
+                                  SEARCH_MAX_VALUES_PER_COLUMN + 1]
 
                         cursor.execute(query, params)
                         rows = cursor.fetchall()
+                        if len(rows) > SEARCH_MAX_VALUES_PER_COLUMN:
+                            rows = rows[:SEARCH_MAX_VALUES_PER_COLUMN]
+                            capped = True
 
-                        # Filter and collect matched values.
-                        # Case-sensitive: GLOB already guarantees exact-case matches — no re-check.
-                        # Case-insensitive: LIKE is ASCII-only; Python re-check covers non-ASCII edge cases.
                         matched_values = []
                         for row in rows:
                             val = row[0]
                             if val is not None:
                                 val_str = str(val)
-                                if not case_sensitive and search_term.lower() not in val_str.lower():
+                                if case_sensitive:
+                                    if search_term not in val_str:
+                                        continue
+                                elif search_term.lower() not in val_str.lower():
                                     continue  # non-ASCII safety net for LIKE
                                 matched_values.append(val_str)
 
@@ -770,17 +802,19 @@ def search_all_tables():
                     results[table] = table_matches
 
         total = sum(t['total_matches'] for t in results.values())
-        logger.info(f"Search complete: {total} matches in {len(results)} tables")
+        logger.info(f"Search complete: {total} matches in {len(results)} tables"
+                    + (" (capped)" if capped else ""))
 
         return jsonify({
             'results': results,
             'total_matches': total,
-            'tables_with_matches': len(results)
+            'tables_with_matches': len(results),
+            'capped': capped
         })
 
     except sqlite3.Error as e:
         logger.error(f"Search All Tables Error: {e}")
-        return jsonify({'error': f'Database error: {e}'}), 500
+        return jsonify({'error': 'Database error while searching'}), 500
 
 def _generate_chat_html(chat_history):
     chat_html_parts = []
@@ -837,7 +871,10 @@ def row_lookup():
     table = data.get('table')
     column = data.get('column')
     value = data.get('value')
-    limit = int(data.get('limit', 25))
+    try:
+        limit = int(data.get('limit') or 25)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'limit must be a number'}), 400
 
     db_filepath = session.get('db_filepath')
     if not db_filepath:
@@ -871,7 +908,56 @@ def row_lookup():
 
     except sqlite3.Error as e:
         logger.error(f"Row lookup error: {e}")
-        return jsonify({'error': f'Database error: {e}'}), 500
+        return jsonify({'error': 'Database error during row lookup'}), 500
+
+
+# Session files older than this are clearly stale (cookies are
+# non-permanent, so a week-old server-side session has no live client).
+STALE_SESSION_MAX_AGE_SECONDS = 7 * 24 * 3600
+
+
+@app.route('/clear_stored_data', methods=['POST'])
+def clear_stored_data():
+    """Delete stored upload copies and stale session files. User-initiated
+    from the settings popover — nothing is ever deleted silently.
+
+    Never touches: the currently loaded database, recent session files
+    (including the active session), or the secret key.
+    """
+    active_db = session.get('db_filepath')
+    active_real = os.path.realpath(active_db) if active_db else None
+    freed_bytes = 0
+    removed = 0
+
+    for name in os.listdir(UPLOAD_FOLDER):
+        path = os.path.join(UPLOAD_FOLDER, name)
+        if not os.path.isfile(path):
+            continue
+        if active_real and os.path.realpath(path) == active_real:
+            continue
+        try:
+            size = os.path.getsize(path)
+            os.remove(path)
+            freed_bytes += size
+            removed += 1
+        except OSError as e:
+            logger.warning(f"Clear stored data: could not remove {path}: {e}")
+
+    session_dir = app.config['SESSION_FILE_DIR']
+    cutoff = time.time() - STALE_SESSION_MAX_AGE_SECONDS
+    for name in os.listdir(session_dir):
+        path = os.path.join(session_dir, name)
+        try:
+            if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                size = os.path.getsize(path)
+                os.remove(path)
+                freed_bytes += size
+                removed += 1
+        except OSError as e:
+            logger.warning(f"Clear stored data: could not remove session file {path}: {e}")
+
+    logger.info(f"Clear stored data: removed {removed} files, freed {freed_bytes} bytes")
+    return jsonify({'removed': removed, 'freed_bytes': freed_bytes})
 
 EXPORT_CSS = """
 :root {
@@ -1045,8 +1131,24 @@ def main():
     # The cross-site POST guard relaxes the Host check when not bound to loopback
     app.config['BIND_HOST'] = args.host
 
+    # Fail with a friendly message (and without firing the browser timer)
+    # if the port is taken — e.g. a second instance or another dev server.
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.bind((args.host, args.port))
+    except OSError:
+        print(f"Error: port {args.port} on {args.host} is already in use.\n"
+              f"Is yourSQLfriend already running? Try another port: yoursqlfriend --port {args.port + 1}",
+              file=sys.stderr)
+        sys.exit(1)
+    finally:
+        probe.close()
+
     if not args.no_browser:
-        url = f'http://{args.host}:{args.port}'
+        # 0.0.0.0/:: are bind addresses, not destinations — browsers won't
+        # open them. Point the tab at loopback instead.
+        open_host = '127.0.0.1' if args.host in ('0.0.0.0', '::') else args.host
+        url = f'http://{open_host}:{args.port}'
         threading.Timer(1.5, webbrowser.open, args=[url]).start()
 
     app.run(

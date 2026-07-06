@@ -51,10 +51,12 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
 
 ## Key Constraints
 
-- **Read-only databases**: All connections use `mode=ro` + `PRAGMA query_only = ON`
+- **Read-only databases**: All connections use `mode=ro` + `PRAGMA query_only = ON`. `get_readonly_connection()` is a context manager that closes on exit — always use `with`
+- **Result truncation is a contract**: `execute_and_parse_query()` returns `(rows, truncated)`; `/execute_sql` responses carry `truncated: bool` and the frontend renders a warning banner + `_TRUNCATED` CSV filename. Never reintroduce a silent row cap
+- **Search All Tables**: LIKE terms are escaped (`_escape_like_term`) so `%`/`_` match literally; case sensitivity is enforced in Python, not GLOB; per-column scan capped at `SEARCH_MAX_VALUES_PER_COLUMN` with a `capped` response flag
 - **SQL validation** (`validate_sql()`): Strips string literals and comments first, then checks allowed statement starts (SELECT/WITH/EXPLAIN/PRAGMA) and blocks 13 forbidden keywords. Multi-statement queries rejected
 - **Cross-site POST guard**: a `before_request` hook in `app.py` rejects POSTs whose `Origin` or `Host` header isn't loopback/matching (CSRF + DNS-rebinding defense; session cookie is `SameSite=Lax`). Route tests that POST must not set a foreign `Origin`/`Host` header, or they'll get 403
-- **Stop button / abort causes**: while streaming, the Send button becomes Stop. Every abort sets `abortCause` on `state.activeStreamController` (`'user'` | `'watchdog'` | `'superseded'`); a user stop keeps and saves the partial text and **never executes SQL from a truncated response**. Preserve this contract when touching `chat.js`
+- **Stop button / abort causes**: while streaming, the Send button becomes Stop. Every abort sets `abortCause` on `state.activeStreamController` (`'user'` | `'watchdog'` | `'superseded'`); a user stop, mid-stream disconnect, or watchdog stall all keep and save the partial text and **never execute SQL from a truncated response**. The watchdog is 90s to first token, then re-armed per token (120s idle). In the `finally`, composer reset runs only for the stream that still owns `state.activeStreamController`; session saves are best-effort (`saveAssistantMessage()` — a failed save must never destroy a rendered answer or block SQL execution). Preserve these contracts when touching `chat.js`
 - **Reduced motion**: `@media (prefers-reduced-motion: reduce)` in `style.css` suppresses all animations *except* `.status-shimmer` — that exemption is deliberate (essential progress indicator; Windows commonly reports reduce because "Animation effects" ships disabled). Don't re-suppress it
 - **Pane-header alignment**: the three pane headers (sidebar search row, `.cp-head`, `.rp-head`) share the `--pane-head-h` token so their bottom rules stay pixel-aligned — change the token, never individual header heights
 - **Contrast tokens**: `--ink-3`/`--ink-4` are tuned to ≥4.5:1 WCAG AA against `--bg`/`--bg-2` in both themes; don't lighten them for aesthetics
@@ -67,7 +69,7 @@ UI is a three-pane **Forensic Atelier** workbench: left pane = schema browser + 
   - **PyPI release**: a GitHub Actions workflow (`.github/workflows/publish.yml`) publishes to PyPI automatically when a `v*` tag is pushed. Do not run `twine` or `python -m build` manually. Release steps: bump `pyproject.toml` version, update `CHANGELOG.txt`, commit and push to `main`, then `git tag vX.Y.Z <commit-sha> && git push origin vX.Y.Z`.
   - **Git authorship**: commit with the repo-local `user.email` (a GitHub noreply address, already configured). The public history was deliberately scrubbed of personal email addresses — never commit with one.
   - **Editable-install gotcha**: `pip install -e .` writes dist-info metadata at install time and does *not* re-read `pyproject.toml` on subsequent imports. After bumping the version, refresh the dev venv with `pip install -e . --force-reinstall --no-deps` — otherwise `importlib.metadata.version()` will keep returning the old version, and the template will inject stale `?v=` cache-bust tokens. Only affects contributors; pipx users always get fresh metadata.
-- **User data**: stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows)
+- **User data**: stored in `~/.yourSQLfriend/` (Linux/macOS) or `%APPDATA%\.yourSQLfriend\` (Windows). The settings popover's "Clear stored data" (`POST /clear_stored_data`) deletes upload copies (never the active DB) and 7-day-stale session files; tests for it must patch `UPLOAD_FOLDER`/`SESSION_FILE_DIR` to tmp dirs or they'd wipe real user data
 - **Session state**: Server-side filesystem sessions — set `session.modified = True` after updates
 - **Grid.js table limit**: 2000 rows max for performance
 
@@ -94,8 +96,8 @@ python -m pytest tests/ -v
 ruff check .
 ```
 
-195 pytest cases: SQL validation (63), Flask routes (41), LLM module (74), database (17). Ruff is configured in `pyproject.toml` (`E/F/W/B/UP`, lint-only — no formatter); keep `ruff check .` clean.
+219 pytest cases: SQL validation (66), Flask routes (57), LLM module (74), database (22). Ruff is configured in `pyproject.toml` (`E/F/W/B/UP`, lint-only — no formatter); keep `ruff check .` clean.
 
 For end-to-end verification (launch the app, upload a DB, drive chat/stop/focus flows in a real browser against a local LLM), follow the recipe in `.claude/skills/verify/SKILL.md`.
 
-**CI**: `.github/workflows/test.yml` runs pytest (Python 3.10 + 3.13) and ruff on every push/PR to `main`. `publish.yml` gates the PyPI publish on a passing test job — a `v*` tag with failing tests will not release.
+**CI**: `.github/workflows/test.yml` runs pytest (Ubuntu + Windows, Python 3.10 + 3.13), ruff, and a wheel packaging smoke test (`scripts/wheel_smoke_test.py` builds the wheel, installs it in a clean venv, and verifies templates/static/service-worker are served — editable installs can't catch missing data files). `publish.yml` gates the PyPI publish on passing tests, the same wheel smoke test, and a tag↔`pyproject.toml` version match — a mismatched or failing `v*` tag will not release.

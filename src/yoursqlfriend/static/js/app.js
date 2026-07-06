@@ -5,7 +5,7 @@
 // Main entry point — imports all modules and wires up event listeners
 
 import { state } from './state.js';
-import { initTheme, toggleTheme, showAlertModal, downloadBlob, fetchJson, toggleSettingsPopover, renderQueryHistory } from './ui.js';
+import { initTheme, toggleTheme, showAlertModal, showConfirmModal, downloadBlob, fetchJson, toggleSettingsPopover, renderQueryHistory } from './ui.js';
 import { initProviderSelector, initModelSelector } from './providers.js';
 import { sendMessage, stopGeneration } from './chat.js';
 import { uploadFile, handleFiles, handleDrop } from './upload.js';
@@ -255,14 +255,38 @@ if (searchAllTablesButton) {
     });
 }
 
+// --- Clear stored data (settings popover) ---
+const clearDataButton = document.getElementById('clear-data-button');
+if (clearDataButton) {
+    clearDataButton.addEventListener('click', () => {
+        showConfirmModal(
+            'Clear stored data',
+            'Deletes copies of previously uploaded databases and stale session files from this computer. The currently loaded database is kept. This cannot be undone.',
+            async () => {
+                try {
+                    const data = await fetchJson('/clear_stored_data', {});
+                    const mb = (data.freed_bytes / (1024 * 1024)).toFixed(1);
+                    showAlertModal('Stored data cleared', `Removed ${data.removed} file${data.removed === 1 ? '' : 's'} (${mb} MB freed).`);
+                } catch (error) {
+                    console.error('Clear stored data failed:', error);
+                    showAlertModal('Clear failed', 'Could not clear stored data. See the application log for details.');
+                }
+            },
+            'Delete', 'Cancel'
+        );
+    });
+}
+
 // --- Page unload: clear polling, warn if chat session active ---
 window.addEventListener('beforeunload', (e) => {
     if (state.statusCheckInterval) {
         clearInterval(state.statusCheckInterval);
         state.statusCheckInterval = null;
     }
-    const chatMessages = document.querySelectorAll('.chat-message').length;
-    if (chatMessages > 0) {
+    // Only warn when there's an actual conversation to lose — the bot's
+    // "Database loaded" notice alone shouldn't trigger a leave prompt.
+    const userMessages = document.querySelectorAll('.chat-message.user-message').length;
+    if (userMessages > 0) {
         e.preventDefault();
         e.returnValue = '';
         return '';

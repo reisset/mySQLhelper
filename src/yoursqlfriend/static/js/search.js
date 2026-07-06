@@ -67,6 +67,9 @@ function renderSearchResults(data, searchTerm, container, caseSensitive = false)
     }
 
     let html = `<div class="search-summary">Found ${data.total_matches} matches in ${data.tables_with_matches} table(s)</div>`;
+    if (data.capped) {
+        html += `<div class="search-capped-note">Large database: match counts are lower bounds (scan capped per column).</div>`;
+    }
 
     for (const [tableName, tableData] of Object.entries(data.results)) {
         const moreCount = tableData.total_matches > 3 ? tableData.total_matches - 3 : 0;

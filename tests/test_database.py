@@ -49,50 +49,66 @@ def temp_path():
 
 class TestReadonlyConnection:
     def test_select_works(self, temp_db):
-        conn = get_readonly_connection(temp_db)
-        try:
+        with get_readonly_connection(temp_db) as conn:
             rows = conn.execute('SELECT * FROM items').fetchall()
             assert len(rows) == 2
-        finally:
-            conn.close()
 
     def test_write_rejected(self, temp_db):
         """mode=ro + PRAGMA query_only must block all writes."""
-        conn = get_readonly_connection(temp_db)
-        try:
+        with get_readonly_connection(temp_db) as conn:
             with pytest.raises(sqlite3.OperationalError):
                 conn.execute("INSERT INTO items VALUES (3, 'gamma')")
             with pytest.raises(sqlite3.OperationalError):
                 conn.execute("UPDATE items SET label = 'x'")
             with pytest.raises(sqlite3.OperationalError):
                 conn.execute("DROP TABLE items")
-        finally:
-            conn.close()
+
+    def test_connection_closed_on_exit(self, temp_db):
+        """The context manager must close the connection, not just end the txn."""
+        with get_readonly_connection(temp_db) as conn:
+            pass
+        with pytest.raises(sqlite3.ProgrammingError):
+            conn.execute('SELECT 1')
 
 
 # --- execute_and_parse_query ---
 
 class TestExecuteAndParseQuery:
     def test_returns_list_of_dicts(self, temp_db):
-        results = execute_and_parse_query(temp_db, 'SELECT * FROM items ORDER BY id')
+        results, truncated = execute_and_parse_query(temp_db, 'SELECT * FROM items ORDER BY id')
         assert results == [
             {'id': 1, 'label': 'alpha'},
             {'id': 2, 'label': 'beta'},
         ]
+        assert truncated is False
 
     def test_trailing_semicolon_stripped(self, temp_db):
-        results = execute_and_parse_query(temp_db, 'SELECT COUNT(*) AS n FROM items;')
+        results, _ = execute_and_parse_query(temp_db, 'SELECT COUNT(*) AS n FROM items;')
         assert results[0]['n'] == 2
 
-    def test_result_row_cap(self, temp_db):
-        """Results are capped at MAX_RESULT_ROWS even for larger tables."""
+    def test_result_row_cap_sets_truncated_flag(self, temp_db):
+        """Results are capped at MAX_RESULT_ROWS and the overflow is flagged —
+        silent truncation would misrepresent the evidence."""
         conn = sqlite3.connect(temp_db)
         conn.executemany('INSERT INTO items (label) VALUES (?)',
                          [(f'row{i}',) for i in range(MAX_RESULT_ROWS + 50)])
         conn.commit()
         conn.close()
-        results = execute_and_parse_query(temp_db, 'SELECT * FROM items')
+        results, truncated = execute_and_parse_query(temp_db, 'SELECT * FROM items')
         assert len(results) == MAX_RESULT_ROWS
+        assert truncated is True
+
+    def test_exact_cap_not_flagged_truncated(self, temp_db):
+        """A result set of exactly MAX_RESULT_ROWS is complete, not truncated."""
+        conn = sqlite3.connect(temp_db)
+        conn.execute('DELETE FROM items')
+        conn.executemany('INSERT INTO items (label) VALUES (?)',
+                         [(f'row{i}',) for i in range(MAX_RESULT_ROWS)])
+        conn.commit()
+        conn.close()
+        results, truncated = execute_and_parse_query(temp_db, 'SELECT * FROM items')
+        assert len(results) == MAX_RESULT_ROWS
+        assert truncated is False
 
 
 # --- calculate_file_hash ---
@@ -149,8 +165,24 @@ class TestConvertCsv:
             schema = convert_csv_to_sqlite(csv_path, db_path)
             # Column names sanitized (space -> underscore)
             assert schema == {'csv_data': ['id', 'full_name', 'city']}
-            rows = execute_and_parse_query(db_path, 'SELECT * FROM csv_data ORDER BY id')
+            rows, _ = execute_and_parse_query(db_path, 'SELECT * FROM csv_data ORDER BY id')
             assert len(rows) == 2 and rows[0]['full_name'] == 'Alice A'
+        finally:
+            gc.collect()
+            for p in (csv_path, db_path):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+    def test_colliding_headers_deduplicated(self, temp_path):
+        """'Order ID' and 'Order-ID' both sanitize to Order_ID — the second
+        must get a numeric suffix instead of failing the whole upload."""
+        csv_path = temp_path + '.csv'
+        db_path = temp_path + '.converted.db'
+        try:
+            with open(csv_path, 'w', encoding='utf-8') as f:
+                f.write('Order ID,Order-ID,Order.ID\n1,2,3\n')
+            schema = convert_csv_to_sqlite(csv_path, db_path)
+            assert schema == {'csv_data': ['Order_ID', 'Order_ID_2', 'Order_ID_3']}
         finally:
             gc.collect()
             for p in (csv_path, db_path):
@@ -201,3 +233,22 @@ class TestExecuteSqlFile:
     def test_create_trigger_rejected_case_insensitive(self, temp_path):
         with pytest.raises(ValueError, match='forbidden'):
             self._run('create   trigger tr AFTER INSERT ON t BEGIN SELECT 1; END;', temp_path)
+
+    def test_identifier_containing_keyword_allowed(self, temp_path):
+        """A table named 'attachments' must not trip the ATTACH blocklist —
+        the keyword check is word-boundary, not substring."""
+        schema = self._run(
+            'CREATE TABLE attachments (id INTEGER, path TEXT);\n'
+            "INSERT INTO attachments VALUES (1, 'photo.jpg');",
+            temp_path,
+        )
+        assert schema == {'attachments': ['id', 'path']}
+
+    def test_keyword_inside_string_literal_allowed(self, temp_path):
+        """Keywords inside data values are content, not commands."""
+        schema = self._run(
+            'CREATE TABLE notes (msg TEXT);\n'
+            "INSERT INTO notes VALUES ('please ATTACH the report');",
+            temp_path,
+        )
+        assert schema == {'notes': ['msg']}

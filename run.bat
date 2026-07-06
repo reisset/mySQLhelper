@@ -22,10 +22,13 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-for /f "tokens=2" %%V in ('python --version 2^>^&1') do set PYVER=%%V
-if not "%PYVER:~0,2%"=="3." (
-    echo Error: Python 3 is required but found Python %PYVER%
-    echo Install Python 3 from https://python.org
+REM Enforce the same 3.10+ minimum as pyproject.toml / install.ps1 —
+REM otherwise pip fails later with a confusing requires-python error.
+python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>&1
+if errorlevel 1 (
+    for /f "tokens=2" %%V in ('python --version 2^>^&1') do set PYVER=%%V
+    echo Error: Python 3.10 or newer is required but found Python %PYVER%
+    echo Install a current Python 3 from https://python.org
     pause
     exit /b 1
 )

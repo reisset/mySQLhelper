@@ -276,6 +276,18 @@ export function renderQueryHistory(entries) {
 }
 
 // --- Footer metric helpers ---
+
+// Hide timing/rows so metrics from an earlier query can't be misread as
+// belonging to the current answer (or to a freshly replaced DB).
+export function clearFooterMetrics(status) {
+    const ftStatus = document.getElementById('ft-status');
+    const ftTiming = document.getElementById('ft-timing');
+    const ftRows = document.getElementById('ft-rows');
+    if (status != null && ftStatus) ftStatus.textContent = status;
+    if (ftTiming) ftTiming.setAttribute('hidden', '');
+    if (ftRows) ftRows.setAttribute('hidden', '');
+}
+
 export function setFooterMetrics({ status, timingMs, rows } = {}) {
     const ftStatus = document.getElementById('ft-status');
     const ftTiming = document.getElementById('ft-timing');

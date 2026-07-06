@@ -5,8 +5,11 @@ import os
 import hashlib
 import re
 import logging
+from contextlib import contextmanager
 
 import pandas as pd
+
+from yoursqlfriend.validation import strip_strings_and_comments
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +21,21 @@ MAX_UPLOAD_SIZE_BYTES = 1024 * 1024 * 1024
 MAX_RESULT_ROWS = 2000
 
 
+@contextmanager
 def get_readonly_connection(db_filepath):
-    """Open a read-only SQLite connection with query_only pragma.
+    """Yield a read-only SQLite connection with query_only pragma.
 
     Use as a context manager: with get_readonly_connection(path) as conn:
+    The connection is closed on exit (sqlite3's own context manager only
+    ends the transaction — it does not close, which lingers file handles
+    on Windows).
     """
     conn = sqlite3.connect(f"file:{db_filepath}?mode=ro", uri=True)
-    conn.execute("PRAGMA query_only = ON")
-    return conn
+    try:
+        conn.execute("PRAGMA query_only = ON")
+        yield conn
+    finally:
+        conn.close()
 
 
 def build_rich_schema(db_filepath, sample_rows=3):
@@ -40,8 +50,7 @@ def build_rich_schema(db_filepath, sample_rows=3):
         }
     """
     out = {}
-    conn = get_readonly_connection(db_filepath)
-    try:
+    with get_readonly_connection(db_filepath) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
@@ -87,16 +96,16 @@ def build_rich_schema(db_filepath, sample_rows=3):
                 "row_count": row_count,
                 "sample_rows": samples,
             }
-    finally:
-        conn.close()
     return out
 
 
 def execute_and_parse_query(db_filepath, sql_query):
-    """Execute a read-only SQL query and return results as list of dicts.
+    """Execute a read-only SQL query and return (rows, truncated).
 
     Strips trailing semicolons, opens a readonly connection, fetches up to
-    MAX_RESULT_ROWS rows. Returns list of dicts.
+    MAX_RESULT_ROWS rows. `truncated` is True when the query matched more
+    rows than the cap — callers must surface this to the user (silent
+    truncation misrepresents the evidence).
     """
     cleaned = sql_query.rstrip(';').strip()
     with get_readonly_connection(db_filepath) as conn:
@@ -104,7 +113,8 @@ def execute_and_parse_query(db_filepath, sql_query):
         cursor = conn.cursor()
         cursor.execute(cleaned)
         results = cursor.fetchmany(MAX_RESULT_ROWS + 1)
-        return [dict(row) for row in results[:MAX_RESULT_ROWS]]
+        truncated = len(results) > MAX_RESULT_ROWS
+        return [dict(row) for row in results[:MAX_RESULT_ROWS]], truncated
 
 
 def calculate_file_hash(filepath):
@@ -174,8 +184,20 @@ def convert_csv_to_sqlite(csv_filepath, db_filepath):
         # Read CSV with pandas (handles encoding, delimiters automatically)
         df = pd.read_csv(csv_filepath, encoding_errors='replace')
 
-        # Sanitize column names (remove special chars, spaces)
-        df.columns = [re.sub(r'[^\w]', '_', col) for col in df.columns]
+        # Sanitize column names (remove special chars, spaces), then
+        # de-duplicate: distinct headers like "Order ID"/"Order-ID" both
+        # sanitize to "Order_ID", and to_sql would fail on the collision.
+        sanitized = [re.sub(r'[^\w]', '_', str(col)) for col in df.columns]
+        seen = {}
+        deduped = []
+        for col in sanitized:
+            if col in seen:
+                seen[col] += 1
+                deduped.append(f'{col}_{seen[col]}')
+            else:
+                seen[col] = 1
+                deduped.append(col)
+        df.columns = deduped
 
         # Create SQLite database and insert data
         with sqlite3.connect(db_filepath) as conn:
@@ -215,10 +237,13 @@ def execute_sql_file(sql_filepath, db_filepath):
         with open(sql_filepath, encoding='utf-8') as f:
             sql_content = f.read()
 
-        # Security check: block destructive and dangerous operations
-        sql_upper = sql_content.upper()
+        # Security check: block destructive and dangerous operations.
+        # Match whole words on string/comment-stripped SQL so identifiers like
+        # a table named "attachments" or quoted data don't trip the check.
+        sql_upper = strip_strings_and_comments(sql_content).upper()
         for keyword in FORBIDDEN_SQL_FILE_KEYWORDS:
-            if keyword in sql_upper:
+            pattern = r'\b' + r'\s+'.join(re.escape(w) for w in keyword.split()) + r'\b'
+            if re.search(pattern, sql_upper):
                 raise ValueError(f"SQL file contains forbidden keyword: {keyword}")
         # Block trigger creation (triggers can execute arbitrary SQL on read)
         if re.search(r'\bCREATE\s+TRIGGER\b', sql_upper):

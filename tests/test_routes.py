@@ -8,7 +8,11 @@ import tempfile
 from unittest.mock import patch
 
 import pytest
-from yoursqlfriend.app import app, VERSION, MAX_SQL_CORRECTION_ROUNDS
+from yoursqlfriend.app import (
+    app, VERSION, MAX_SQL_CORRECTION_ROUNDS, MAX_HISTORY_MESSAGES,
+    SEARCH_MAX_VALUES_PER_COLUMN,
+)
+from yoursqlfriend.database import MAX_RESULT_ROWS
 
 
 @pytest.fixture
@@ -453,3 +457,235 @@ class TestChatStream:
     def test_empty_message(self, client):
         resp = client.post('/chat_stream', json={'message': ''})
         assert resp.status_code == 400
+
+    @patch('yoursqlfriend.app.check_llm_available', return_value=False)
+    def test_provider_down_returns_503(self, mock_health, client):
+        resp = client.post('/chat_stream', json={'message': 'hi'})
+        assert resp.status_code == 503
+        assert 'LM Studio' in resp.get_json()['error']
+
+    @patch('yoursqlfriend.app.stream_llm_response')
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    @patch('yoursqlfriend.app.check_llm_available', return_value=True)
+    def test_success_streams_sse(self, mock_health, mock_resolve, mock_stream, client, temp_db):
+        """The 200 path must be a real SSE response wired to the LLM stream."""
+        _load_db(client, temp_db)
+        mock_stream.return_value = iter([
+            'event: token\ndata: {"chunk": "Hello"}\n\n',
+            'event: done\ndata: {"token_usage": null}\n\n',
+        ])
+        resp = client.post('/chat_stream', json={'message': 'hi'})
+        assert resp.status_code == 200
+        assert resp.content_type.startswith('text/event-stream')
+        assert resp.headers.get('Cache-Control') == 'no-cache'
+        body = resp.get_data(as_text=True)
+        assert 'event: token' in body
+        assert 'event: done' in body
+
+    @patch('yoursqlfriend.app.stream_llm_response', return_value=iter([]))
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    @patch('yoursqlfriend.app.check_llm_available', return_value=True)
+    def test_user_message_appended_to_session(self, mock_health, mock_resolve, mock_stream, client, temp_db):
+        _load_db(client, temp_db)
+        resp = client.post('/chat_stream', json={'message': 'where is the evidence?'})
+        resp.get_data()  # consume the stream so the request context completes
+        with client.session_transaction() as sess:
+            history = sess.get('chat_history', [])
+        assert history and history[-1]['role'] == 'user'
+        assert history[-1]['content'] == 'where is the evidence?'
+
+    @patch('yoursqlfriend.app.stream_llm_response', return_value=iter([]))
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    @patch('yoursqlfriend.app.check_llm_available', return_value=True)
+    def test_history_capped_in_llm_payload(self, mock_health, mock_resolve, mock_stream, client, temp_db):
+        """Only the most recent MAX_HISTORY_MESSAGES turns (plus the system
+        prompt) go to the model, however long the stored history is."""
+        _load_db(client, temp_db)
+        with client.session_transaction() as sess:
+            sess['chat_history'] = [
+                {'role': 'user', 'content': f'q{i}', 'id': str(i)}
+                for i in range(MAX_HISTORY_MESSAGES + 15)
+            ]
+        client.post('/chat_stream', json={'message': 'latest'}).get_data()
+        messages_sent = mock_stream.call_args[0][0]
+        assert messages_sent[0]['role'] == 'system'
+        assert len(messages_sent) == 1 + MAX_HISTORY_MESSAGES
+        assert messages_sent[-1]['content'] == 'latest'
+
+
+# --- POST /upload (CSV / .sql conversion branches) ---
+
+class TestUploadConversions:
+    def _cleanup_session_db(self, client):
+        with client.session_transaction() as sess:
+            path = sess.get('db_filepath')
+        if path and os.path.exists(path):
+            gc.collect()
+            os.unlink(path)
+        return path
+
+    def test_csv_upload_converts_to_db(self, client):
+        data = {'database_file': (io.BytesIO(b'id,name\n1,Alice\n2,Bob\n'), 'evidence.csv')}
+        resp = client.post('/upload', data=data, content_type='multipart/form-data')
+        try:
+            assert resp.status_code == 200
+            body = resp.get_json()
+            assert 'csv_data' in body['schema']
+            with client.session_transaction() as sess:
+                path = sess['db_filepath']
+            # The session must point at the converted .db, not the raw CSV
+            assert path.endswith('.db')
+            assert os.path.exists(path)
+        finally:
+            self._cleanup_session_db(client)
+
+    def test_sql_upload_builds_db(self, client):
+        sql = b"CREATE TABLE logs (id INTEGER, msg TEXT);\nINSERT INTO logs VALUES (1, 'boot');\n"
+        data = {'database_file': (io.BytesIO(sql), 'dump.sql')}
+        resp = client.post('/upload', data=data, content_type='multipart/form-data')
+        try:
+            assert resp.status_code == 200
+            body = resp.get_json()
+            assert 'logs' in body['schema']
+            with client.session_transaction() as sess:
+                path = sess['db_filepath']
+            assert path.endswith('.db')
+            assert os.path.exists(path)
+        finally:
+            self._cleanup_session_db(client)
+
+    def test_sql_upload_forbidden_keyword_rejected(self, client):
+        sql = b"ATTACH DATABASE 'other.db' AS other;"
+        data = {'database_file': (io.BytesIO(sql), 'dump.sql')}
+        resp = client.post('/upload', data=data, content_type='multipart/form-data')
+        assert resp.status_code == 400
+        assert 'forbidden keyword' in resp.get_json()['error']
+
+    def test_corrupt_sqlite_rejected(self, client):
+        data = {'database_file': (io.BytesIO(b'this is not a sqlite file' * 40), 'bad.db')}
+        resp = client.post('/upload', data=data, content_type='multipart/form-data')
+        assert resp.status_code == 400
+        err = resp.get_json()['error']
+        assert 'Invalid SQLite database' in err
+        # Error hygiene: no filesystem paths leak to the client
+        assert 'uploads' not in err
+
+
+# --- POST /execute_sql (truncation flag) ---
+
+class TestExecuteSQLTruncation:
+    def test_oversized_result_flagged(self, client, temp_db):
+        conn = sqlite3.connect(temp_db)
+        conn.executemany('INSERT INTO users (name, email) VALUES (?, ?)',
+                         [(f'u{i}', f'u{i}@x.com') for i in range(MAX_RESULT_ROWS + 10)])
+        conn.commit()
+        conn.close()
+        _load_db(client, temp_db)
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM users'})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data['query_results']) == MAX_RESULT_ROWS
+        assert data['truncated'] is True
+
+    def test_small_result_not_flagged(self, client, temp_db):
+        _load_db(client, temp_db)
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM users'})
+        assert resp.status_code == 200
+        assert resp.get_json()['truncated'] is False
+
+
+# --- POST /search_all_tables (per-column cap) ---
+
+class TestSearchCap:
+    def test_capped_flag_on_huge_column(self, client):
+        fd, path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        try:
+            conn = sqlite3.connect(path)
+            conn.execute('CREATE TABLE big (val TEXT)')
+            conn.executemany('INSERT INTO big VALUES (?)',
+                             [(f'match_{i}',) for i in range(SEARCH_MAX_VALUES_PER_COLUMN + 20)])
+            conn.commit()
+            conn.close()
+            with client.session_transaction() as sess:
+                sess['db_filepath'] = path
+            resp = client.post('/search_all_tables', json={'search_term': 'match'})
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data['capped'] is True
+            assert data['total_matches'] <= SEARCH_MAX_VALUES_PER_COLUMN
+        finally:
+            gc.collect()
+            os.unlink(path)
+
+
+# --- POST /api/row/lookup (input validation) ---
+
+class TestRowLookupValidation:
+    def test_malformed_limit_returns_400(self, client, temp_db):
+        _load_db(client, temp_db)
+        resp = client.post('/api/row/lookup',
+                           json={'table': 'users', 'column': 'id', 'value': 1, 'limit': 'abc'})
+        assert resp.status_code == 400
+        assert 'limit' in resp.get_json()['error']
+
+
+# --- POST /clear_stored_data ---
+
+class TestClearStoredData:
+    def test_clears_uploads_but_keeps_active_db(self, client, tmp_path):
+        uploads = tmp_path / 'uploads'
+        sessions = tmp_path / 'sessions'
+        uploads.mkdir()
+        sessions.mkdir()
+        active = uploads / 'active.db'
+        active.write_bytes(b'a' * 10)
+        stale = uploads / 'old_upload.db'
+        stale.write_bytes(b'b' * 20)
+        with client.session_transaction() as sess:
+            sess['db_filepath'] = str(active)
+        with patch('yoursqlfriend.app.UPLOAD_FOLDER', str(uploads)), \
+             patch.dict(app.config, {'SESSION_FILE_DIR': str(sessions)}):
+            resp = client.post('/clear_stored_data', json={})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['removed'] == 1
+        assert data['freed_bytes'] == 20
+        assert active.exists()
+        assert not stale.exists()
+
+    def test_stale_session_files_pruned_fresh_kept(self, client, tmp_path):
+        import time as _time
+        uploads = tmp_path / 'uploads'
+        sessions = tmp_path / 'sessions'
+        uploads.mkdir()
+        sessions.mkdir()
+        old = sessions / 'old_session'
+        old.write_bytes(b'x')
+        eight_days_ago = _time.time() - 8 * 24 * 3600
+        os.utime(old, (eight_days_ago, eight_days_ago))
+        fresh = sessions / 'fresh_session'
+        fresh.write_bytes(b'y')
+        with patch('yoursqlfriend.app.UPLOAD_FOLDER', str(uploads)), \
+             patch.dict(app.config, {'SESSION_FILE_DIR': str(sessions)}):
+            resp = client.post('/clear_stored_data', json={})
+        assert resp.status_code == 200
+        assert not old.exists()
+        assert fresh.exists()
+
+    def test_cross_origin_rejected(self, client):
+        resp = client.post('/clear_stored_data', json={},
+                           headers={'Origin': 'http://evil.example.com'})
+        assert resp.status_code == 403
+
+
+# --- GET /service-worker.js ---
+
+class TestServiceWorker:
+    def test_version_substituted_and_scoped(self, client):
+        resp = client.get('/service-worker.js')
+        assert resp.status_code == 200
+        assert resp.headers.get('Service-Worker-Allowed') == '/'
+        body = resp.get_data(as_text=True)
+        assert '%%VERSION%%' not in body
+        assert VERSION in body

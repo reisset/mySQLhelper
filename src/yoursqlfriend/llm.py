@@ -274,8 +274,7 @@ def _build_schema_context_str(db_filepath, sample_rows=3, value_annotations=True
     """Internal: build schema context string. See build_schema_context() for public API."""
     import sqlite3  # local import — only needed here; avoid module-level dep
 
-    conn = get_readonly_connection(db_filepath)
-    try:
+    with get_readonly_connection(db_filepath) as conn:
         cursor = conn.cursor()
 
         cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
@@ -317,8 +316,6 @@ def _build_schema_context_str(db_filepath, sample_rows=3, value_annotations=True
                         parts.append("")
                 except sqlite3.Error:
                     pass
-    finally:
-        conn.close()
 
     return '\n'.join(parts)
 

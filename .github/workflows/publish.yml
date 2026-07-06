@@ -16,6 +16,17 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Check tag matches package version
+        # Tagging v3.15.0 while pyproject.toml still says 3.14.0 would build
+        # and publish the wrong artifact — fail fast instead.
+        run: |
+          PKG_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match pyproject.toml version $PKG_VERSION" >&2
+            exit 1
+          fi
+
       - name: Install package and test dependencies
         run: |
           pip install -e .
@@ -40,6 +51,14 @@ jobs:
 
       - name: Build sdist and wheel
         run: python -m build
+
+      - name: Smoke-test built wheel
+        # The artifact about to be published must actually serve the app —
+        # editable-mode tests can't catch missing data files in the wheel.
+        run: |
+          python -m venv smoke
+          smoke/bin/pip install dist/*.whl
+          smoke/bin/python scripts/wheel_smoke_test.py
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

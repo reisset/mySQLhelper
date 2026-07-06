@@ -1,5 +1,76 @@
 CHANGELOG
 
+### v3.15.0 - Senior-dev sweep: trust fixes, resilience, release hardening (Jul 2026)
+
+Full-project audit pass (backend, frontend, distribution) before wrap-up.
+Theme: a forensic tool must never silently misrepresent results.
+
+#### Trust & correctness
+- **Row-cap truncation is now visible:** results capped at 2,000 rows return a
+  `truncated` flag; the UI shows a warning banner ("only the first 2,000 rows
+  are shown"), the row-count label and CSV tooltip say so, and truncated CSV
+  exports are named `query_results_TRUNCATED.csv`. Previously a 50k-row match
+  displayed "2000 rows returned" with no hint more existed.
+- **A streamed answer can no longer be destroyed by bookkeeping:** if the
+  session-save call fails after a successful stream, the answer stays rendered
+  and its SQL still executes (previously the whole reply was replaced by an
+  error bubble).
+- **Partial answers survive disconnects:** if the provider dies or stalls
+  mid-stream, the text streamed so far is kept with a "connection interrupted /
+  stream stalled" note — same contract as the Stop button (SQL from truncated
+  responses is never executed). A new inter-token idle watchdog (120s) means a
+  wedged provider can't leave the composer stuck on Stop forever.
+- **Search All Tables fixed and bounded:** `%`/`_` in a search term no longer
+  act as SQL wildcards (terms match literally); the GLOB branch whose `*?[`
+  metacharacters corrupted case-sensitive searches is gone; per-column scans
+  are capped (200 values) with a "counts are lower bounds" note on huge DBs —
+  previously a common term on a multi-GB database could hang the server.
+- **`.sql` uploads: no more keyword false-positives:** a table named
+  `attachments` no longer trips the ATTACH blocklist (word-boundary matching
+  on string/comment-stripped SQL).
+- **CSV uploads: colliding headers survive:** `Order ID` + `Order-ID` used to
+  fail the whole conversion with "duplicate column name"; sanitized duplicates
+  now get numeric suffixes.
+- **Read-only connections actually close** on exit (sqlite3's context manager
+  only ends the transaction) — no more lingering Windows file handles that
+  could collide with Replace DB.
+- **Leading `/* block comments */` no longer reject valid SQL** in the
+  validator (line comments already worked).
+
+#### UX & polish
+- **Clear stored data:** new Storage section in settings — deletes stored
+  upload copies (except the currently loaded DB) and stale session files,
+  after a confirm dialog; reports files removed and MB freed.
+- Footer timing/row metrics reset when a new question is sent or the DB is
+  replaced (no more stale "1,432 rows" under an unrelated answer).
+- Minimized welcome screen leaves the keyboard tab order (was an invisible
+  focus trap); long FK names ellipsize in the Row Inspector; the "leave page?"
+  prompt only fires when there's an actual conversation.
+- Error responses no longer echo raw exception text (paths, sqlite internals)
+  to the client; malformed Row Inspector requests get a clean 400; the log
+  file now truly rotates daily (30 days kept).
+- Rapid-send edge: a superseded stream's late cleanup can no longer clobber
+  the new stream's composer state or status shimmer; sub-2.5s responses keep
+  the shimmer's anti-flash minimum display.
+
+#### Distribution & CI
+- CI now tests on **Windows and Ubuntu** (Windows is a primary install target
+  with its own code paths and was previously untested).
+- New **wheel packaging smoke test**: CI builds the wheel, installs it in a
+  clean venv, and verifies the app serves its templates/static assets —
+  editable-mode tests can't catch a wheel that ships without data files.
+  The publish workflow runs the same check before uploading to PyPI, and now
+  fails fast if the git tag doesn't match the pyproject version.
+- `--host 0.0.0.0` no longer auto-opens the unloadable `http://0.0.0.0:...`
+  (opens loopback instead); a busy port prints a friendly "try --port N"
+  message instead of a traceback.
+- README: version badge is now the live PyPI badge (can't drift again); the
+  Ollama example model is a real tag (`gemma3:27b`, was the nonexistent
+  `gemma4:26b`). run.bat enforces the same Python 3.10+ minimum as the
+  installers.
+- 24 new tests (219 total): SSE streaming path, CSV/.sql upload branches,
+  truncation flag, search caps, clear-stored-data, service-worker versioning.
+
 ### v3.14.0 - SQL accuracy: execution-feedback loop + value grounding (Jul 2026)
 
 Research-driven pass at the query error rate. Both changes follow the

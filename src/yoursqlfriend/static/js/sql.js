@@ -40,7 +40,7 @@ export async function executeSqlAndRender(fullText, contentContainer) {
         // Render Result Table
         const rowCount = (data.query_results && data.query_results.length) || 0;
         if (rowCount > 0) {
-            appendResultsTable(data.query_results, contentContainer, sqlQuery);
+            appendResultsTable(data.query_results, contentContainer, sqlQuery, !!data.truncated);
         } else {
             const emptyState = document.createElement('div');
             emptyState.className = 'sql-empty-state';
@@ -79,10 +79,20 @@ export async function executeSqlAndRender(fullText, contentContainer) {
     }
 }
 
-export function appendResultsTable(queryResults, container, sqlQuery = '') {
+export function appendResultsTable(queryResults, container, sqlQuery = '', truncated = false) {
     if (typeof gridjs === 'undefined') {
         console.error("Grid.js not loaded");
         return;
+    }
+
+    // Truncation must be loudly visible: "2000 rows returned" with more
+    // matching rows silently dropped misrepresents the evidence.
+    if (truncated) {
+        const note = document.createElement('div');
+        note.className = 'results-truncation-note';
+        note.setAttribute('role', 'status');
+        note.textContent = `⚠ Results truncated: only the first ${queryResults.length.toLocaleString()} rows are shown. More rows matched — narrow the query (filters, LIMIT/OFFSET) to see the rest.`;
+        container.appendChild(note);
     }
 
     // Row count + CSV export row
@@ -91,7 +101,9 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
 
     const rowCountLabel = document.createElement('span');
     rowCountLabel.className = 'results-row-count';
-    rowCountLabel.textContent = `${queryResults.length} rows returned`;
+    rowCountLabel.textContent = truncated
+        ? `first ${queryResults.length.toLocaleString()} rows (truncated)`
+        : `${queryResults.length} rows returned`;
     actionsRow.appendChild(rowCountLabel);
 
     // CSV export button
@@ -101,10 +113,10 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
     const csvBtn = document.createElement('button');
     csvBtn.className = 'csv-export-btn';
     csvBtn.textContent = 'CSV';
-    csvBtn.title = 'Download results as CSV';
-    csvBtn.setAttribute('aria-label', 'Download results as CSV');
+    csvBtn.title = truncated ? 'Download the first rows only (result set was truncated)' : 'Download results as CSV';
+    csvBtn.setAttribute('aria-label', csvBtn.title);
     csvBtn.addEventListener('click', () => {
-        downloadCSV(queryResults);
+        downloadCSV(queryResults, truncated);
     });
     actionsRight.appendChild(csvBtn);
 
@@ -178,12 +190,14 @@ export function appendResultsTable(queryResults, container, sqlQuery = '') {
         });
     };
     makeRowsFocusable();
-    new MutationObserver(makeRowsFocusable).observe(tableWrapper, { childList: true, subtree: true });
+    const rowObserver = new MutationObserver(makeRowsFocusable);
+    rowObserver.observe(tableWrapper, { childList: true, subtree: true });
+    tableWrapper._rowObserver = rowObserver; // disconnected in destroyAllGrids
 }
 
 // --- CSV Export ---
 
-function downloadCSV(queryResults) {
+function downloadCSV(queryResults, truncated = false) {
     if (!queryResults || queryResults.length === 0) return;
 
     const columns = Object.keys(queryResults[0]);
@@ -205,7 +219,9 @@ function downloadCSV(queryResults) {
     const csv = header + '\n' + rows.join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    downloadBlob(blob, 'query_results.csv');
+    // Truncated exports are flagged in the filename so a saved file can't
+    // masquerade as the complete result set later.
+    downloadBlob(blob, truncated ? 'query_results_TRUNCATED.csv' : 'query_results.csv');
 }
 
 // --- Grid.js Cleanup ---
@@ -214,6 +230,10 @@ export function destroyAllGrids() {
         if (wrapper._gridInstance) {
             wrapper._gridInstance.destroy();
             wrapper._gridInstance = null;
+        }
+        if (wrapper._rowObserver) {
+            wrapper._rowObserver.disconnect();
+            wrapper._rowObserver = null;
         }
     });
 }

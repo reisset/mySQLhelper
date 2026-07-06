@@ -1,11 +1,12 @@
 // Chat messaging: send, stream, render, token tracking
 
 import { state } from './state.js';
-import { renderText, fetchJson, renderQueryHistory, setFooterMetrics, minimizeWelcomeScreen } from './ui.js';
+import { renderText, fetchJson, renderQueryHistory, setFooterMetrics, clearFooterMetrics, minimizeWelcomeScreen } from './ui.js';
 import { executeSqlAndRender } from './sql.js';
 import { providerLabel, PROVIDER_HELP } from './providers.js';
 
 const WATCHDOG_MS = 90000;      // local models need time to prefill large schemas
+const IDLE_WATCHDOG_MS = 120000; // max silence between tokens once streaming started
 const SHIMMER_MIN_MS = 2500;    // minimum shimmer display so it doesn't flash
 const SHIMMER_ROTATE_MS = 3500; // status message rotation cadence
 
@@ -152,15 +153,26 @@ function createStatusShimmer(statusBar) {
         statusEl.style.setProperty('--shimmer-duration', duration.toFixed(2) + 's');
     }, SHIMMER_ROTATE_MS);
 
+    let dismissed = false;
+    // Only clear the bar if a newer send hasn't already claimed it
+    // (createStatusShimmer replaces the bar's content on each send).
+    const releaseBar = () => {
+        if (statusBar.contains(statusEl)) statusBar.classList.remove('active');
+    };
+
     return {
         softDismiss() {
             clearInterval(interval);
+            if (dismissed) return;
+            dismissed = true;
             const remaining = Math.max(0, SHIMMER_MIN_MS - (Date.now() - shownAt));
-            setTimeout(() => statusBar.classList.remove('active'), remaining);
+            setTimeout(releaseBar, remaining);
         },
         forceDismiss() {
             clearInterval(interval);
-            statusBar.classList.remove('active');
+            if (dismissed) return;
+            dismissed = true;
+            releaseBar();
         }
     };
 }
@@ -216,12 +228,26 @@ function renderChatError(pText, error) {
     pText.appendChild(errorDiv);
 }
 
-// Muted "generation stopped" marker appended after a user-initiated stop.
-function appendStoppedNote(contentContainer) {
+// Muted marker appended when a response ends early (user stop, connection
+// drop, or mid-stream stall). The partial text above it is always kept.
+function appendStoppedNote(contentContainer, text = '◼ generation stopped') {
     const note = document.createElement('div');
     note.className = 'gen-stopped-note';
-    note.textContent = '◼ generation stopped';
+    note.textContent = text;
     contentContainer.appendChild(note);
+}
+
+// Session bookkeeping must never destroy a delivered answer: a failed save
+// means this exchange won't be in the export/context, nothing worse.
+async function saveAssistantMessage(content, tokenUsage) {
+    try {
+        await fetchJson('/save_assistant_message', {
+            content: content,
+            token_usage: tokenUsage
+        });
+    } catch (e) {
+        console.warn('Failed to save assistant message to session:', e);
+    }
 }
 
 // --- Stop control ---
@@ -262,6 +288,10 @@ export async function sendMessage() {
     userInput.style.height = 'auto';
     userInput.disabled = true;
 
+    // Hide metrics from the previous query so they can't be misread as
+    // belonging to this answer.
+    clearFooterMetrics();
+
     // Send button becomes a Stop button while the stream is active.
     sendButton.classList.add('sending');
     sendButton.textContent = 'Stop';
@@ -282,10 +312,19 @@ export async function sendMessage() {
     }
     const controller = new AbortController();
     state.activeStreamController = controller;
-    const timeoutId = setTimeout(() => {
-        controller.abortCause = 'watchdog';
-        controller.abort();
-    }, WATCHDOG_MS);
+
+    // Watchdog: WATCHDOG_MS to the first model event (local prefill is slow),
+    // then re-armed on every token so a provider that wedges mid-stream can't
+    // leave the composer stuck in Stop-state forever.
+    let watchdogId = null;
+    const armWatchdog = (ms) => {
+        clearTimeout(watchdogId);
+        watchdogId = setTimeout(() => {
+            controller.abortCause = 'watchdog';
+            controller.abort();
+        }, ms);
+    };
+    armWatchdog(WATCHDOG_MS);
 
     let fullResponse = '';
     let renderPending = false; // rAF gate — prevents O(n²) re-renders during streaming
@@ -302,15 +341,16 @@ export async function sendMessage() {
         });
 
         if (!response.ok) {
-            clearTimeout(timeoutId); // Clear timeout on error response
+            clearTimeout(watchdogId); // Clear watchdog on error response
             let errData = null;
             try { errData = await response.json(); } catch (_) {} // body may be non-JSON
             throw new Error((errData && errData.error) || `HTTP Error: ${response.status}`);
         }
 
         const { tokenUsage, streamComplete } = await readChatStream(response, {
-            onFirstEvent: () => clearTimeout(timeoutId), // disarm watchdog on first real model event
+            onFirstEvent: () => armWatchdog(IDLE_WATCHDOG_MS), // switch to inter-token idle guard
             onToken: (chunk) => {
+                armWatchdog(IDLE_WATCHDOG_MS);
                 fullResponse += chunk;
                 if (!renderPending) {
                     renderPending = true;
@@ -323,12 +363,21 @@ export async function sendMessage() {
             }
         });
 
-        if (!streamComplete) {
-            throw new Error("Connection to LLM timed out or was interrupted.");
-        }
-
         // Final render (ensures any last partial buffer is flushed)
         renderText(pText, fullResponse);
+
+        if (!streamComplete) {
+            // Connection dropped mid-stream. Keep the partial answer — same
+            // contract as a user stop: never execute SQL from a truncated
+            // response, but never throw away text the user already read.
+            if (!fullResponse) {
+                throw new Error("Connection to LLM timed out or was interrupted.");
+            }
+            appendStoppedNote(contentContainer, '◼ connection interrupted — response may be incomplete');
+            await saveAssistantMessage(fullResponse, null);
+            return;
+        }
+
         shimmer.softDismiss();
 
         // Add token counter to chat bubble if usage data available
@@ -336,11 +385,9 @@ export async function sendMessage() {
             addTokenCounter(contentContainer, tokenUsage);
         }
 
-        // SAVE THE ASSISTANT MESSAGE TO SESSION (with token usage)
-        await fetchJson('/save_assistant_message', {
-            content: fullResponse,
-            token_usage: tokenUsage
-        });
+        // Save to session — best-effort; must not block SQL execution or
+        // destroy the rendered answer if it fails.
+        await saveAssistantMessage(fullResponse, tokenUsage);
 
         // Execute SQL if present; capture timing + row count for the footer.
         const sqlStart = Date.now();
@@ -359,36 +406,33 @@ export async function sendMessage() {
         if (cause === 'superseded') {
             // A newer message took over; drop this bubble silently.
             botMessageElement.remove();
-        } else if (cause === 'user') {
-            // Keep whatever streamed in; mark it stopped. SQL from a
+        } else if (cause === 'user' || (cause === 'watchdog' && fullResponse)) {
+            // Keep whatever streamed in; mark why it ended. SQL from a
             // truncated response is never executed.
             renderText(pText, fullResponse);
-            appendStoppedNote(contentContainer);
+            appendStoppedNote(contentContainer, cause === 'user'
+                ? '◼ generation stopped'
+                : '◼ stream stalled — response may be incomplete');
             if (fullResponse) {
-                try {
-                    await fetchJson('/save_assistant_message', {
-                        content: fullResponse,
-                        token_usage: null
-                    });
-                } catch (e) {
-                    console.warn('Failed to save stopped message:', e);
-                }
+                await saveAssistantMessage(fullResponse, null);
             }
         } else {
             console.error('Chat Error:', error);
             renderChatError(pText, error);
         }
     } finally {
-        clearTimeout(timeoutId); // Ensure cleanup
-        shimmer.forceDismiss();
+        clearTimeout(watchdogId); // Ensure cleanup
+        shimmer.forceDismiss(); // no-op after softDismiss; bar ownership is checked inside
         if (state.activeStreamController === controller) {
             state.activeStreamController = null;
+            // Only the stream that still owns the composer may reset it — a
+            // superseded stream's late cleanup must not clobber the new one.
+            userInput.disabled = false;
+            sendButton.classList.remove('sending');
+            sendButton.textContent = 'Send';
+            sendButton.setAttribute('aria-label', 'Send message');
+            userInput.focus();
         }
-        userInput.disabled = false;
-        sendButton.classList.remove('sending');
-        sendButton.textContent = 'Send';
-        sendButton.setAttribute('aria-label', 'Send message');
-        userInput.focus();
         chatHistory.scrollTop = chatHistory.scrollHeight;
     }
 }

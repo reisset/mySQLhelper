@@ -8,11 +8,15 @@ on:
 
 jobs:
   test:
-    name: pytest (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        # Windows is a primary install target (install.ps1/run.bat) and has
+        # its own code paths (APPDATA data dir, file-lock retry helpers) —
+        # it must be tested, not assumed.
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.13"]
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +42,24 @@ jobs:
         run: pip install ruff
       - name: Lint
         run: ruff check .
+
+  wheel-smoke:
+    # Editable installs mask packaging breaks: a wheel missing templates/
+    # or static/ would pass pytest but 500 for every pipx user. Build the
+    # real artifact, install it clean, and hit the routes that need data files.
+    name: wheel packaging smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build --wheel
+      - name: Install wheel into a clean venv and smoke-test
+        run: |
+          python -m venv smoke
+          smoke/bin/pip install dist/*.whl
+          smoke/bin/python scripts/wheel_smoke_test.py

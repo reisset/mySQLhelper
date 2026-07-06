@@ -6,7 +6,7 @@
 
 Built for offline forensic analysis on a single workstation — no cloud, no telemetry, nothing leaves your machine.
 
-[![Version](https://img.shields.io/badge/version-3.12.0-c1522b?style=for-the-badge&labelColor=0a0a0c)](https://github.com/reisset/yourSQLfriend/releases)
+[![Version](https://img.shields.io/pypi/v/yoursqlfriend?style=for-the-badge&labelColor=0a0a0c&color=c1522b&label=version)](https://pypi.org/project/yoursqlfriend/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=for-the-badge&labelColor=0a0a0c)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?style=for-the-badge&logo=python&logoColor=white&labelColor=0a0a0c)](https://python.org)
 [![Flask](https://img.shields.io/badge/flask-3.x-green?style=for-the-badge&labelColor=0a0a0c)](https://flask.palletsprojects.com)
@@ -70,7 +70,7 @@ Click any result row to expand it. Foreign key references become navigable links
 ### Option A: Ollama
 
 ```bash
-ollama pull gemma4:26b
+ollama pull gemma3:27b   # or a smaller model — see sizes below
 ollama serve
 ```
 

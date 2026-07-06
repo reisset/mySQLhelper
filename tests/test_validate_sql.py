@@ -300,3 +300,17 @@ class TestValidateSqlEdgeCases:
     def test_nested_quotes(self):
         valid, _ = validate_sql("SELECT * FROM t WHERE x = 'it''s a test'")
         assert valid
+
+    def test_leading_line_comment_allowed(self):
+        valid, _ = validate_sql("-- recent logs\nSELECT * FROM logs")
+        assert valid
+
+    def test_leading_block_comment_allowed(self):
+        """A /* ... */ prefix must not reject an otherwise valid query."""
+        valid, _ = validate_sql("/* find recent */ SELECT * FROM logs")
+        assert valid
+
+    def test_only_block_comment_rejected(self):
+        valid, msg = validate_sql("/* nothing here */")
+        assert not valid
+        assert "must start with" in msg
