@@ -40,6 +40,7 @@ from yoursqlfriend.llm import (
     check_llm_available, check_ollama_available, resolve_provider_model,
     build_schema_context, build_system_prompt, build_error_correction_prompt,
     call_llm_non_streaming, stream_llm_response, extract_sql_from_response,
+    build_llm_messages, get_context_window,
 )
 
 # --- Paths ---
@@ -212,7 +213,7 @@ def _remove_with_retry(path, attempts=5):
                 logger.warning(f"Could not remove temp file: {path}")
 
 
-def update_chat_history_with_results(chat_history, sql_query, results_dict):
+def update_chat_history_with_results(chat_history, sql_query, results_dict, truncated=False):
     """Attach SQL query and result preview to the last assistant message in history."""
     if chat_history:
         last_msg = chat_history[-1]
@@ -220,6 +221,7 @@ def update_chat_history_with_results(chat_history, sql_query, results_dict):
             last_msg['sql_query'] = sql_query
             last_msg['query_results_preview'] = results_dict[:5]
             last_msg['total_results'] = len(results_dict)
+            last_msg['results_truncated'] = truncated
 
 
 @app.route('/api/ollama/status', methods=['GET'])
@@ -269,6 +271,7 @@ def get_provider_status():
             'models': models,
             'selected_model': selected,
             'url': OLLAMA_URL,
+            'context_length': get_context_window('ollama', selected) if available and selected else None,
         })
     else:
         # LM Studio check
@@ -278,7 +281,8 @@ def get_provider_status():
             'available': available,
             'models': [],
             'selected_model': None,
-            'url': LLM_API_URL
+            'url': LLM_API_URL,
+            'context_length': get_context_window('lmstudio') if available else None,
         })
 
 @app.route('/service-worker.js')
@@ -516,13 +520,11 @@ def chat_stream():
         "id": str(uuid.uuid4())
     })
 
-    # Build messages for LLM (strip metadata, cap history length)
+    # Build messages for LLM: cap history length, strip metadata, and annotate
+    # prior assistant turns with their query outcomes (see build_llm_messages).
     system_prompt = build_system_prompt(schema_context)
     recent_history = chat_history[-MAX_HISTORY_MESSAGES:]
-    messages_to_send = [{"role": "system", "content": system_prompt}] + [
-        {"role": msg["role"], "content": msg["content"]}
-        for msg in recent_history
-    ]
+    messages_to_send = [{"role": "system", "content": system_prompt}] + build_llm_messages(recent_history)
     logger.info(f"Messages to send count: {len(messages_to_send)}")
 
     # Stream based on provider
@@ -605,7 +607,7 @@ def execute_sql():
         logger.info(f"SQL Executed Successfully. Rows returned: {len(results_dict)}"
                     + (" (truncated)" if truncated else ""))
 
-        update_chat_history_with_results(chat_history, sql_query, results_dict)
+        update_chat_history_with_results(chat_history, sql_query, results_dict, truncated)
         session['chat_history'] = chat_history
 
         return jsonify({
@@ -681,7 +683,7 @@ def execute_sql():
                     continue
 
                 logger.info(f"Corrected SQL executed successfully (round {round_num}). Rows returned: {len(results_dict)}")
-                update_chat_history_with_results(chat_history, corrected_sql, results_dict)
+                update_chat_history_with_results(chat_history, corrected_sql, results_dict, truncated)
                 session['chat_history'] = chat_history
 
                 return jsonify({
@@ -818,7 +820,9 @@ def search_all_tables():
 
 def _generate_chat_html(chat_history):
     chat_html_parts = []
-    cumulative_tokens = 0  # Track cumulative tokens for export
+    # Cumulative session spend for the export label — NOT context occupancy
+    # (each turn's prompt re-contains the history; see updateContextBar in ui.js).
+    cumulative_tokens = 0
 
     for entry in chat_history:
         role = entry.get("role")

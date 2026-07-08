@@ -1,7 +1,7 @@
 // LLM provider management: status polling, model selection
 
 import { state } from './state.js';
-import { showAlertModal, fetchJson } from './ui.js';
+import { showAlertModal, fetchJson, updateContextBar } from './ui.js';
 
 // Human-readable provider name, shared by chat errors and status UI.
 export function providerLabel(provider) {
@@ -31,6 +31,11 @@ export async function checkProviderStatus() {
             state.ollamaAvailable = data.available;
             state.selectedOllamaModel = data.selected_model;
         }
+
+        // Real model window (null when the provider can't report one); the 30s
+        // poll + provider-switch re-check keep it fresh across model swaps.
+        state.contextWindow = data.context_length || null;
+        updateContextBar();
 
         updateProviderStatusUI(data.available, data.models || []);
 

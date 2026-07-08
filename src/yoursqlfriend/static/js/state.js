@@ -12,4 +12,6 @@ export const state = {
     currentDraft: '',
     queryHistory: [], // visible bottom-left panel; entries: { q, ts, msgIndex }
     richSchema: {},
+    contextTokens: 0,    // last completed turn's total_tokens — prompt already includes system+schema+history
+    contextWindow: null, // model context window from /api/provider/status; null = unknown
 };

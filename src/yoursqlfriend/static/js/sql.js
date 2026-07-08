@@ -10,15 +10,26 @@ function inferTableName(sqlQuery) {
     return match ? match[1] : null;
 }
 
+// Mirrors the backend's extract_sql_from_response() tiers (llm.py), with one
+// difference: chat answers mix prose and code, so untagged fences and bare
+// text only count when they start with an allowed statement keyword —
+// otherwise a fenced JSON/example block would trigger a spurious execution
+// error. Server-side validate_sql() remains the security boundary.
+const TAGGED_SQL_RE = /```(?:sqlite|sql)[ \t]*\r?\n?([\s\S]*?)```/i;
+const ANY_FENCE_RE = /```[^\n`]*\r?\n([\s\S]*?)```/;
+const SQL_START_RE = /^(SELECT|WITH|EXPLAIN|PRAGMA)\b/i;
+
+function extractSql(fullText) {
+    const tagged = fullText.match(TAGGED_SQL_RE);
+    if (tagged) return tagged[1].trim() || null;
+    const fence = fullText.match(ANY_FENCE_RE);
+    const candidate = (fence ? fence[1] : fullText).trim();
+    return SQL_START_RE.test(candidate) ? candidate : null;
+}
+
 export async function executeSqlAndRender(fullText, contentContainer) {
-    // Tolerant fence matching: case-insensitive sql/sqlite tag, optional
-    // whitespace after the tag, single-line fences, optional trailing newline.
-    const sqlRegex = /```(?:sqlite|sql)[ \t]*\r?\n?([\s\S]*?)```/i;
-    const match = fullText.match(sqlRegex);
-
-    if (!match) return { ran: false }; // No SQL to execute
-
-    const sqlQuery = match[1].trim();
+    const sqlQuery = extractSql(fullText);
+    if (!sqlQuery) return { ran: false }; // No SQL to execute
 
     try {
         const data = await fetchJson('/execute_sql', { sql_query: sqlQuery });

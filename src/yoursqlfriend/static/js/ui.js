@@ -1,5 +1,29 @@
 // UI utilities: modals, theme, rendering helpers
 
+import { state } from './state.js';
+
+// --- Header context bar ---
+// Numerator: the LAST turn's total_tokens — each prompt re-contains the system
+// prompt + schema + history, so summing turns would double-count. Denominator:
+// the provider-reported window when known; the fallback is only an estimate.
+const CONTEXT_WINDOW_FALLBACK = 32000;
+
+export function updateContextBar() {
+    const fill = document.getElementById('cp-context-fill');
+    const count = document.getElementById('cp-context-count');
+    const wrap = document.getElementById('cp-context');
+    if (!fill || !count) return;
+    const windowSize = state.contextWindow || CONTEXT_WINDOW_FALLBACK;
+    const tokens = state.contextTokens;
+    fill.style.width = Math.min(100, (tokens / windowSize) * 100).toFixed(1) + '%';
+    count.textContent = tokens < 1000 ? String(tokens) : (tokens / 1000).toFixed(1) + 'k';
+    if (wrap) {
+        wrap.title = state.contextWindow
+            ? `Context used: ${tokens.toLocaleString()} of ${windowSize.toLocaleString()} tokens (last turn)`
+            : `Context used: ~${tokens.toLocaleString()} of ${windowSize.toLocaleString()} tokens (context window unknown — 32k estimate)`;
+    }
+}
+
 // --- HTML Escape Helper (XSS Prevention) ---
 export function escapeHtml(text) {
     const div = document.createElement('div');

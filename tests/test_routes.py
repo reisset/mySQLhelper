@@ -689,3 +689,85 @@ class TestServiceWorker:
         body = resp.get_data(as_text=True)
         assert '%%VERSION%%' not in body
         assert VERSION in body
+
+
+# --- GET /api/provider/status (context window for the CTX bar) ---
+
+class TestProviderStatus:
+    @patch('yoursqlfriend.app.get_context_window', return_value=108000)
+    @patch('yoursqlfriend.app.check_llm_available', return_value=True)
+    def test_lmstudio_status_carries_context_length(self, mock_health, mock_ctx, client):
+        resp = client.get('/api/provider/status?provider=lmstudio')
+        assert resp.status_code == 200
+        assert resp.get_json()['context_length'] == 108000
+        mock_ctx.assert_called_once_with('lmstudio')
+
+    @patch('yoursqlfriend.app.get_context_window', return_value=32768)
+    @patch('yoursqlfriend.app.check_ollama_available', return_value=(True, ['m1', 'm2']))
+    def test_ollama_status_carries_context_length(self, mock_avail, mock_ctx, client):
+        resp = client.get('/api/provider/status?provider=ollama')
+        data = resp.get_json()
+        assert data['context_length'] == 32768
+        mock_ctx.assert_called_once_with('ollama', 'm1')
+
+    @patch('yoursqlfriend.app.get_context_window')
+    @patch('yoursqlfriend.app.check_llm_available', return_value=False)
+    def test_offline_provider_context_length_null(self, mock_health, mock_ctx, client):
+        resp = client.get('/api/provider/status?provider=lmstudio')
+        assert resp.get_json()['context_length'] is None
+        mock_ctx.assert_not_called()
+
+    @patch('yoursqlfriend.app.get_context_window')
+    @patch('yoursqlfriend.app.check_ollama_available', return_value=(True, []))
+    def test_ollama_no_models_context_length_null(self, mock_avail, mock_ctx, client):
+        resp = client.get('/api/provider/status?provider=ollama')
+        assert resp.get_json()['context_length'] is None
+        mock_ctx.assert_not_called()
+
+
+# --- POST /chat_stream (query-outcome annotations) ---
+
+class TestChatStreamOutcomeFeedback:
+    def _seed_history(self, client, preview, total, content='Ran the query.'):
+        with client.session_transaction() as sess:
+            sess['chat_history'] = [
+                {'role': 'user', 'content': 'find zebras', 'id': '1'},
+                {
+                    'role': 'assistant', 'content': content, 'id': '2',
+                    'sql_query': "SELECT * FROM users WHERE name = 'Zebra'",
+                    'query_results_preview': preview,
+                    'total_results': total,
+                    'results_truncated': False,
+                },
+            ]
+
+    @patch('yoursqlfriend.app.stream_llm_response', return_value=iter([]))
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    @patch('yoursqlfriend.app.check_llm_available', return_value=True)
+    def test_zero_row_outcome_reaches_llm(self, mock_health, mock_resolve, mock_stream,
+                                          client, temp_db):
+        """The model must see that its previous query returned nothing."""
+        _load_db(client, temp_db)
+        self._seed_history(client, preview=[], total=0)
+        client.post('/chat_stream', json={'message': 'why no results?'}).get_data()
+        messages_sent = mock_stream.call_args[0][0]
+        assistant_msgs = [m for m in messages_sent if m['role'] == 'assistant']
+        assert '[Query outcome: 0 rows returned]' in assistant_msgs[0]['content']
+        # Stored session history must NOT be mutated — annotations are per-request
+        with client.session_transaction() as sess:
+            stored = sess['chat_history']
+        assert stored[1]['content'] == 'Ran the query.'
+
+    @patch('yoursqlfriend.app.stream_llm_response', return_value=iter([]))
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    @patch('yoursqlfriend.app.check_llm_available', return_value=True)
+    def test_result_preview_reaches_llm(self, mock_health, mock_resolve, mock_stream,
+                                        client, temp_db):
+        _load_db(client, temp_db)
+        self._seed_history(client, preview=[{'id': 1, 'name': 'Alice'}], total=1)
+        client.post('/chat_stream', json={'message': 'now filter by email'}).get_data()
+        messages_sent = mock_stream.call_args[0][0]
+        assistant_msgs = [m for m in messages_sent if m['role'] == 'assistant']
+        assert '[Query outcome: 1 rows returned]' in assistant_msgs[0]['content']
+        assert '<<UNTRUSTED_DATA' in assistant_msgs[0]['content']
+        assert 'name=Alice' in assistant_msgs[0]['content']

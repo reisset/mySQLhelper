@@ -1,7 +1,7 @@
 // Chat messaging: send, stream, render, token tracking
 
 import { state } from './state.js';
-import { renderText, fetchJson, renderQueryHistory, setFooterMetrics, clearFooterMetrics, minimizeWelcomeScreen } from './ui.js';
+import { renderText, fetchJson, renderQueryHistory, setFooterMetrics, clearFooterMetrics, minimizeWelcomeScreen, updateContextBar } from './ui.js';
 import { executeSqlAndRender } from './sql.js';
 import { providerLabel, PROVIDER_HELP } from './providers.js';
 
@@ -499,19 +499,8 @@ function addTokenCounter(containerElement, tokenUsage) {
     // Insert as first child of content container
     containerElement.insertBefore(tokenCounter, containerElement.firstChild);
 
-    updateContextBar(cumulativeTotal);
-}
-
-// Header context bar. We don't know the model's real context window,
-// so use a soft default (32k) — still useful as a "session heft" gauge.
-const CONTEXT_WINDOW_SOFT = 32000;
-function updateContextBar(cumulativeTokens) {
-    const fill = document.getElementById('cp-context-fill');
-    const count = document.getElementById('cp-context-count');
-    if (!fill || !count) return;
-    const pct = Math.min(100, (cumulativeTokens / CONTEXT_WINDOW_SOFT) * 100);
-    fill.style.width = pct.toFixed(1) + '%';
-    count.textContent = cumulativeTokens < 1000
-        ? String(cumulativeTokens)
-        : (cumulativeTokens / 1000).toFixed(1) + 'k';
+    // Header bar shows context occupancy: the last turn's total already
+    // includes system prompt + schema + history, so no summing across turns.
+    state.contextTokens = totalTokens;
+    updateContextBar();
 }

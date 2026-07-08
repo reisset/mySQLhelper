@@ -1,5 +1,43 @@
 CHANGELOG
 
+### v3.16.0 - Honest context bar + the model finally sees its own results (Jul 2026)
+
+Driven by a real failure transcript: valid queries kept returning 0 rows and
+the model never knew — the user had to paste "no results" back by hand.
+
+#### Context (ctx) bar now tells the truth
+- **Real denominator:** the model's actual context window is fetched from the
+  provider (LM Studio `/api/v0/models` `loaded_context_length`, Ollama
+  `/api/show` `num_ctx`/GGUF metadata) and surfaced via `/api/provider/status`
+  (60s cache). Previously hardcoded to 32k — a 108k model showed a full bar
+  at a third of its capacity.
+- **Real numerator:** the bar now shows the *last* turn's total tokens (the
+  prompt already re-contains system + schema + history). The old cumulative
+  sum double-counted every turn — in practice the bar pinned at "full" while
+  real occupancy was ~5%. Per-bubble token counters keep the session total.
+- Tooltip shows `used of window (last turn)`; when the provider can't report
+  a window (older LM Studio builds), the bar falls back to a marked ~32k
+  estimate.
+
+#### SQL accuracy: query-outcome feedback
+- **The model now sees what its queries returned.** Prior turns carry a
+  compact `[Query outcome: N rows returned]` note (the most recent also gets
+  a ≤3-row preview, safely fenced as untrusted data). An empty result is no
+  longer invisible: ask "why did that return nothing?" and the model knows.
+  Context only — never an auto-retry; "no rows" can be the forensically
+  correct answer.
+- **Prompt hardening for local models:** positive capability note (CTEs,
+  window functions), SQLite's silent bare-column-in-aggregate trap, type
+  affinity (`IS NULL`, TEXT-stored dates/numbers), and explicit guidance to
+  treat 0-row outcomes as evidence rather than guessing variations.
+- **INTEGER enum grounding:** value annotations now cover low-cardinality
+  INTEGER columns (message direction, status codes — ubiquitous in forensic
+  DBs), numerically sorted, primary keys skipped.
+- **Mis-fenced SQL still executes:** the frontend now accepts untagged fences
+  and bare SELECT/WITH/EXPLAIN/PRAGMA responses (matching the backend's
+  tolerant extraction); weak models that forget the ```sql tag no longer
+  produce silent no-ops. Server-side validation unchanged.
+
 ### v3.15.0 - Senior-dev sweep: trust fixes, resilience, release hardening (Jul 2026)
 
 Full-project audit pass (backend, frontend, distribution) before wrap-up.
