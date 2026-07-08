@@ -21,6 +21,26 @@ MAX_UPLOAD_SIZE_BYTES = 1024 * 1024 * 1024
 MAX_RESULT_ROWS = 2000
 
 
+def jsonsafe_value(v):
+    """Make a SQLite cell value JSON-serializable.
+
+    BLOBs (bytes) crash jsonify; real forensic databases are full of them
+    (avatars, thumbnails, protobufs). Render a placeholder that preserves
+    the forensic signal: size plus the leading bytes as hex, so a file
+    signature (89504e47 = PNG) is still recognizable at a glance.
+    """
+    if isinstance(v, bytes):
+        if not v:
+            return '<BLOB 0 bytes>'
+        return f"<BLOB {len(v)} bytes, hex {v[:8].hex()}{'…' if len(v) > 8 else ''}>"
+    return v
+
+
+def jsonsafe_row(row_dict):
+    """Apply jsonsafe_value to every cell of a row dict."""
+    return {k: jsonsafe_value(v) for k, v in row_dict.items()}
+
+
 @contextmanager
 def get_readonly_connection(db_filepath):
     """Yield a read-only SQLite connection with query_only pragma.
@@ -86,7 +106,7 @@ def build_rich_schema(db_filepath, sample_rows=3):
 
             try:
                 cursor.execute(f'SELECT * FROM "{table_name}" LIMIT ?;', (sample_rows,))
-                samples = [dict(r) for r in cursor.fetchall()]
+                samples = [jsonsafe_row(dict(r)) for r in cursor.fetchall()]
             except sqlite3.Error:
                 samples = []
 
@@ -114,7 +134,7 @@ def execute_and_parse_query(db_filepath, sql_query):
         cursor.execute(cleaned)
         results = cursor.fetchmany(MAX_RESULT_ROWS + 1)
         truncated = len(results) > MAX_RESULT_ROWS
-        return [dict(row) for row in results[:MAX_RESULT_ROWS]], truncated
+        return [jsonsafe_row(dict(row)) for row in results[:MAX_RESULT_ROWS]], truncated
 
 
 def calculate_file_hash(filepath):

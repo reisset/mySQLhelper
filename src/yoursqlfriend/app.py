@@ -33,7 +33,7 @@ from yoursqlfriend.validation import validate_sql
 from yoursqlfriend.database import (
     get_readonly_connection, execute_and_parse_query, calculate_file_hash,
     validate_upload_file, convert_csv_to_sqlite, execute_sql_file,
-    build_rich_schema,
+    build_rich_schema, jsonsafe_row,
 )
 from yoursqlfriend.llm import (
     LLM_API_URL, OLLAMA_URL, OLLAMA_MODEL,
@@ -907,7 +907,7 @@ def row_lookup():
                 f'SELECT * FROM "{table}" WHERE "{column}" = ? LIMIT ?;',
                 (value, max(1, min(limit, 200))),
             )
-            rows = [dict(r) for r in cursor.fetchall()]
+            rows = [jsonsafe_row(dict(r)) for r in cursor.fetchall()]
         return jsonify({'rows': rows})
 
     except sqlite3.Error as e:

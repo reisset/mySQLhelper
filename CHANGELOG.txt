@@ -1,5 +1,19 @@
 CHANGELOG
 
+### v3.16.1 - BLOB columns no longer crash uploads and queries (Jul 2026)
+
+Uploading a real-world forensic DB (Skype) 500'd: BLOB values (avatars,
+capability bitmasks, protobufs) in the rich-schema sample rows aren't JSON
+serializable. The same latent bug sat in /execute_sql (any `SELECT *` over a
+BLOB column) and the Row Inspector's FK lookup.
+
+- All JSON row paths now sanitize cells via `jsonsafe_row()`: BLOBs render as
+  `<BLOB 108 bytes, hex 89504e47…>` — size plus leading hex, so file
+  signatures (89504e47 = PNG) stay recognizable to an examiner.
+- The LLM's schema sample rows show the same placeholder instead of a noisy
+  Python bytes repr, telling the model the column is binary.
+- 7 new regression tests (255 total), verified against the real Skype DB.
+
 ### v3.16.0 - Honest context bar + the model finally sees its own results (Jul 2026)
 
 Driven by a real failure transcript: valid queries kept returning 0 rows and

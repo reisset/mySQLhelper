@@ -8,7 +8,7 @@ import time
 
 import requests
 
-from yoursqlfriend.database import get_readonly_connection
+from yoursqlfriend.database import get_readonly_connection, jsonsafe_value
 
 logger = logging.getLogger(__name__)
 
@@ -301,7 +301,7 @@ def _safe_sample_val(v):
     """Format a sample cell value, neutralising fence-marker sequences."""
     if v is None:
         return 'NULL'
-    s = str(v)
+    s = str(jsonsafe_value(v))  # BLOBs → "<BLOB n bytes, hex ...>" placeholder
     return (s[:50] + '...' if len(s) > 50 else s).replace('<<', '««')
 
 

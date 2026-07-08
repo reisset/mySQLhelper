@@ -11,11 +11,31 @@ import tempfile
 import pytest
 from werkzeug.datastructures import FileStorage
 
+import json
+
 from yoursqlfriend.database import (
     get_readonly_connection, execute_and_parse_query, calculate_file_hash,
     validate_upload_file, convert_csv_to_sqlite, execute_sql_file,
+    build_rich_schema, jsonsafe_value,
     MAX_RESULT_ROWS,
 )
+
+
+@pytest.fixture
+def blob_db():
+    """DB with a BLOB column — real forensic databases (Skype, iOS) are full of them."""
+    fd, path = tempfile.mkstemp(suffix='.db')
+    os.close(fd)
+    conn = sqlite3.connect(path)
+    conn.execute('CREATE TABLE contacts (id INTEGER PRIMARY KEY, name TEXT, avatar BLOB)')
+    conn.execute("INSERT INTO contacts VALUES (1, 'Alice', ?)",
+                 (b'\x89PNG\r\n\x1a\n' + b'\x00' * 100,))
+    conn.execute("INSERT INTO contacts VALUES (2, 'Bob', NULL)")
+    conn.commit()
+    conn.close()  # explicit close — required for os.unlink on Windows
+    yield path
+    gc.collect()
+    os.unlink(path)
 
 
 @pytest.fixture
@@ -69,6 +89,31 @@ class TestReadonlyConnection:
             pass
         with pytest.raises(sqlite3.ProgrammingError):
             conn.execute('SELECT 1')
+
+
+# --- BLOB safety (bytes crash jsonify; every JSON row path must sanitize) ---
+
+class TestBlobSafety:
+    def test_jsonsafe_value_renders_blob_placeholder(self):
+        v = jsonsafe_value(b'\x89PNG\r\n\x1a\n' + b'\x00' * 100)
+        assert v == '<BLOB 108 bytes, hex 89504e470d0a1a0a…>'  # file signature visible
+        assert jsonsafe_value(b'') == '<BLOB 0 bytes>'
+        assert jsonsafe_value(b'ab') == '<BLOB 2 bytes, hex 6162>'  # short: no ellipsis
+
+    def test_jsonsafe_value_passes_other_types_through(self):
+        for v in (None, 1, 1.5, 'text'):
+            assert jsonsafe_value(v) is v
+
+    def test_query_results_with_blob_are_json_serializable(self, blob_db):
+        results, _ = execute_and_parse_query(blob_db, 'SELECT * FROM contacts ORDER BY id')
+        json.dumps(results)  # must not raise
+        assert results[0]['avatar'].startswith('<BLOB 108 bytes')
+        assert results[1]['avatar'] is None
+
+    def test_rich_schema_samples_with_blob_are_json_serializable(self, blob_db):
+        rich = build_rich_schema(blob_db)
+        json.dumps(rich)  # must not raise — this was the /upload 500
+        assert rich['contacts']['sample_rows'][0]['avatar'].startswith('<BLOB')
 
 
 # --- execute_and_parse_query ---

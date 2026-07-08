@@ -39,6 +39,21 @@ def temp_db():
     os.unlink(path)
 
 
+@pytest.fixture
+def blob_db():
+    """DB with a BLOB column (avatars/thumbnails — ubiquitous in forensic DBs)."""
+    fd, path = tempfile.mkstemp(suffix='.db')
+    os.close(fd)
+    conn = sqlite3.connect(path)
+    conn.execute('CREATE TABLE contacts (id INTEGER PRIMARY KEY, name TEXT, avatar BLOB)')
+    conn.execute("INSERT INTO contacts VALUES (1, 'Alice', ?)", (b'\x89PNG\r\n\x1a\n',))
+    conn.commit()
+    conn.close()  # explicit close — required for os.unlink on Windows
+    yield path
+    gc.collect()
+    os.unlink(path)
+
+
 def _load_db(client, db_path):
     """Helper: set session state as if a DB was uploaded."""
     with client.session_transaction() as sess:
@@ -94,6 +109,16 @@ class TestUpload:
         assert 'schema' in body
         assert 'users' in body['schema']
 
+    def test_blob_db_upload(self, client, blob_db):
+        """Regression: BLOB sample rows in the rich schema 500'd the upload
+        (bytes is not JSON serializable) — real forensic DBs are full of BLOBs."""
+        with open(blob_db, 'rb') as f:
+            data = {'database_file': (f, 'skype.db')}
+            resp = client.post('/upload', data=data, content_type='multipart/form-data')
+        assert resp.status_code == 200
+        sample = resp.get_json()['rich_schema']['contacts']['sample_rows'][0]
+        assert sample['avatar'].startswith('<BLOB')
+
 
 # --- POST /execute_sql ---
 
@@ -118,6 +143,22 @@ class TestExecuteSQL:
         _load_db(client, temp_db)
         resp = client.post('/execute_sql', json={'sql_query': 'DROP TABLE users'})
         assert resp.status_code == 403
+
+    def test_select_blob_column(self, client, blob_db):
+        """Regression: SELECT * over a BLOB column must not 500 on jsonify."""
+        _load_db(client, blob_db)
+        resp = client.post('/execute_sql', json={'sql_query': 'SELECT * FROM contacts'})
+        assert resp.status_code == 200
+        row = resp.get_json()['query_results'][0]
+        assert row['avatar'].startswith('<BLOB 8 bytes, hex 89504e47')
+
+    def test_row_lookup_with_blob(self, client, blob_db):
+        """Regression: Row Inspector FK-follow into a BLOB-bearing table."""
+        _load_db(client, blob_db)
+        resp = client.post('/api/row/lookup',
+                           json={'table': 'contacts', 'column': 'id', 'value': 1})
+        assert resp.status_code == 200
+        assert resp.get_json()['rows'][0]['avatar'].startswith('<BLOB')
 
 
 # --- POST /search_all_tables ---
