@@ -46,3 +46,7 @@ script (`drive.cjs`):
 - Route tests that POST must not set a foreign Origin/Host header (403 guard).
 - Editable install caches version metadata; refresh after bumping
   `pyproject.toml` or `?v=` cache-bust tokens go stale.
+- DB-replace flows: `setInputFiles` with the *same* path twice fires no
+  `change` event — the replace-confirm modal never opens and the check
+  silently tests nothing. Replace with a second copy of the fixture; the
+  confirm button is `.confirm-modal-confirm` ("Continue").
