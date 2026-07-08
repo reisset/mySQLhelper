@@ -1,5 +1,32 @@
 CHANGELOG
 
+### v3.17.1 - Lost user messages no longer poison the conversation (Jul 2026)
+
+After one successful question, every follow-up silently got no reply. Root
+cause chain (verified against a live LM Studio + the actual session file):
+a session write race dropped the first user message from the stored history,
+the history then started with an assistant turn — a shape qwen chat templates
+hard-reject ("No user query found in messages") — and the backend swallowed
+LM Studio's error frame, rendering an empty bubble instead of the error.
+
+- **User messages are persisted explicitly.** chat_stream appended the user
+  message in place and relied on flask-session rewriting the whole session on
+  every request (Flask's SESSION_REFRESH_EACH_REQUEST default). That implicit
+  rewrite was also the data-loss vector: the read-only 30s provider-status
+  poll could rewrite the file from a stale copy and clobber a chat request's
+  concurrent write. Now the append is saved explicitly and implicit refresh
+  writes are disabled — read-only requests never touch the session file.
+- **Assistant-before-first-user is never sent to the model.**
+  build_llm_messages drops leading assistant turns, healing already-corrupted
+  stored histories and fixing a latent variant: the 20-message history cap
+  slicing an alternating conversation mid-exchange (long conversations would
+  have hit the same template error deterministically).
+- **Provider stream errors reach the user.** LM Studio streams failures as an
+  SSE error frame over HTTP 200 (e.g. jinja prompt-template errors); Ollama
+  as an {"error": ...} line. Both now surface as a proper error bubble, as
+  does a stream that ends with zero tokens. Partial responses still render.
+- 7 new regression tests (264 total).
+
 ### v3.17.0 - Slow hardware is not a timeout (Jul 2026)
 
 A healthy model that took >90s to prefill a large schema prompt was cut off

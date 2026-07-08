@@ -99,6 +99,12 @@ app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 # Localhost tool: Lax blocks the session cookie on cross-site POSTs (CSRF class)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# Only requests that set session.modified write the session file. The Flask
+# default (True) makes flask-session rewrite the whole session on EVERY
+# request — so a read-only request (e.g. the 30s provider-status poll) that
+# loaded a stale copy can clobber a chat request's concurrent write. That
+# lost-update race silently dropped user messages from chat_history.
+app.config['SESSION_REFRESH_EACH_REQUEST'] = False
 
 # --- Logging Setup ---
 # Ensure upload directory exists (defined early for logging)
@@ -513,12 +519,17 @@ def chat_stream():
                 logger.error(f"Database access error during schema injection: {e}")
                 return jsonify({'error': f"Database access error: {e}"}), 500
 
-    # Append user message to history
+    # Append user message to history and persist it explicitly — an in-place
+    # append alone never marks the session dirty, so with implicit refresh
+    # writes disabled the message would be lost and the stored history would
+    # start with an assistant turn (a shape qwen chat templates hard-reject).
     chat_history.append({
         "role": "user",
         "content": user_message,
         "id": str(uuid.uuid4())
     })
+    session['chat_history'] = chat_history
+    session.modified = True
 
     # Build messages for LLM: cap history length, strip metadata, and annotate
     # prior assistant turns with their query outcomes (see build_llm_messages).

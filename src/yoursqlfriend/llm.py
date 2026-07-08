@@ -598,6 +598,12 @@ def build_llm_messages(history):
             annotation = _format_outcome_annotation(entry, with_preview=(i == latest_result_idx))
             content = f"{content}\n\n{annotation}"
         messages.append({'role': entry['role'], 'content': content})
+    # Never send an assistant turn before the first user turn: qwen chat
+    # templates hard-fail on that shape ("No user query found in messages").
+    # It arises from corrupted stored histories (a lost user message) and from
+    # the MAX_HISTORY_MESSAGES cap slicing at an assistant boundary.
+    while messages and messages[0]['role'] != 'user':
+        messages.pop(0)
     return messages
 
 
@@ -704,6 +710,17 @@ def _iter_lines_with_keepalive(response):
         yield item
 
 
+def _provider_error_message(err):
+    """Normalize a provider-reported error payload to a display string.
+
+    LM Studio sends {"error": {"message": "..."}}, Ollama sends
+    {"error": "..."} — accept both shapes (and anything else via str()).
+    """
+    if isinstance(err, dict):
+        return str(err.get('message') or err)
+    return str(err)
+
+
 def stream_llm_response(messages_to_send, provider, model=None):
     """Stream response from LLM provider as proper SSE events.
 
@@ -723,6 +740,7 @@ def stream_llm_response(messages_to_send, provider, model=None):
             r.raise_for_status()
             token_usage = None
             done_sent = False
+            tokens_emitted = False
 
             # Provider lines are pumped through a queue by a reader thread so
             # keep-alives flow even while the provider is completely silent —
@@ -741,8 +759,16 @@ def stream_llm_response(messages_to_send, provider, model=None):
                 if config['provider'] == 'ollama':
                     try:
                         data = json.loads(line)
+                        if data.get('error'):
+                            # Provider-reported failure mid-stream (bad request,
+                            # template error, model unloaded…) — surface it.
+                            msg = f"{config['label']} error: {_provider_error_message(data['error'])}"
+                            logger.error(f"{config['label']} stream error: {msg}")
+                            yield f"event: error\ndata: {json.dumps({'message': msg})}\n\n"
+                            return
                         content = data.get('message', {}).get('content', '')
                         if content:
+                            tokens_emitted = True
                             yield f"event: token\ndata: {json.dumps({'chunk': content})}\n\n"
 
                         if data.get('done', False):
@@ -775,6 +801,15 @@ def stream_llm_response(messages_to_send, provider, model=None):
                     try:
                         json_data = json.loads(decoded_line[6:])
 
+                        if json_data.get('error'):
+                            # LM Studio streams failures as an SSE error frame
+                            # over HTTP 200 (e.g. a jinja prompt-template error).
+                            # Swallowing it rendered as a silent empty reply.
+                            msg = f"{config['label']} error: {_provider_error_message(json_data['error'])}"
+                            logger.error(f"{config['label']} stream error: {msg}")
+                            yield f"event: error\ndata: {json.dumps({'message': msg})}\n\n"
+                            return
+
                         if 'usage' in json_data:
                             token_usage = json_data['usage']
 
@@ -782,16 +817,24 @@ def stream_llm_response(messages_to_send, provider, model=None):
                             delta = json_data['choices'][0].get('delta', {})
                             content_chunk = delta.get('content', '')
                             if content_chunk:
+                                tokens_emitted = True
                                 yield f"event: token\ndata: {json.dumps({'chunk': content_chunk})}\n\n"
                     except json.JSONDecodeError:
                         continue
 
             # Stream closed without a terminal signal (e.g. server crash before [DONE] /
-            # Ollama dropped connection before done:true). Emit done so the client can
-            # render whatever was received rather than showing a timeout error.
+            # Ollama dropped connection before done:true). If partial text was streamed,
+            # emit done so the client renders what was received. If NOTHING was streamed,
+            # a bare done would render as a silent empty reply — report an error instead.
             if not done_sent:
-                logger.warning(f"{config['label']} stream ended without terminal signal; emitting done")
-                yield f"event: done\ndata: {json.dumps({'token_usage': token_usage})}\n\n"
+                if tokens_emitted:
+                    logger.warning(f"{config['label']} stream ended without terminal signal; emitting done")
+                    yield f"event: done\ndata: {json.dumps({'token_usage': token_usage})}\n\n"
+                else:
+                    label = config['label']
+                    logger.error(f"{label} stream ended with no content and no terminal signal")
+                    msg = f"{label} returned no response. Check the {label} server log for errors."
+                    yield f"event: error\ndata: {json.dumps({'message': msg})}\n\n"
 
     except requests.exceptions.Timeout:
         label, hint = config['label'], config['hint']

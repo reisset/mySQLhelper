@@ -409,6 +409,13 @@ export async function sendMessage() {
 
         shimmer.softDismiss();
 
+        if (!fullResponse) {
+            // Complete stream, zero text (e.g. provider quirk the backend
+            // couldn't classify). An empty bubble reads as the app ignoring
+            // the user — show an error instead; nothing to save or execute.
+            throw new Error('The model returned an empty response. Check the provider server log.');
+        }
+
         // Add token counter to chat bubble if usage data available
         if (tokenUsage) {
             addTokenCounter(contentContainer, tokenUsage);

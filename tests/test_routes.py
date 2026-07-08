@@ -553,6 +553,29 @@ class TestChatStream:
         assert len(messages_sent) == 1 + MAX_HISTORY_MESSAGES
         assert messages_sent[-1]['content'] == 'latest'
 
+    @patch('yoursqlfriend.app.stream_llm_response', return_value=iter([]))
+    @patch('yoursqlfriend.app.resolve_provider_model', return_value=None)
+    @patch('yoursqlfriend.app.check_llm_available', return_value=True)
+    def test_history_cap_never_sends_leading_assistant(self, mock_health, mock_resolve, mock_stream, client, temp_db):
+        """The MAX_HISTORY_MESSAGES slice can land on an assistant turn in a
+        long alternating conversation. qwen chat templates hard-fail when an
+        assistant turn precedes the first user turn, so the first non-system
+        message sent to the provider must always be a user turn."""
+        _load_db(client, temp_db)
+        with client.session_transaction() as sess:
+            # MAX entries of alternating user/assistant; appending the new
+            # user message makes the [-MAX:] slice start on an assistant turn.
+            sess['chat_history'] = [
+                {'role': 'user' if i % 2 == 0 else 'assistant', 'content': f'm{i}', 'id': str(i)}
+                for i in range(MAX_HISTORY_MESSAGES)
+            ]
+        client.post('/chat_stream', json={'message': 'latest'}).get_data()
+        messages_sent = mock_stream.call_args[0][0]
+        assert messages_sent[0]['role'] == 'system'
+        assert messages_sent[1]['role'] == 'user', 'leading assistant turn must be trimmed'
+        assert len(messages_sent) == 1 + MAX_HISTORY_MESSAGES - 1
+        assert messages_sent[-1]['content'] == 'latest'
+
 
 # --- POST /upload (CSV / .sql conversion branches) ---
 
