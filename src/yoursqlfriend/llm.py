@@ -23,9 +23,17 @@ OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL')
 # Degradation: sample rows are dropped first (optional for SQL generation).
 SCHEMA_CONTEXT_CHAR_BUDGET = 20_000
 
-# Seconds between SSE keepalive comments; prevents proxy idle-timeout drops on slow
-# local models. Keepalives fire between tokens, not during initial prefill.
+# Seconds between SSE keepalive comments; prevents proxy idle-timeout drops and
+# lets the frontend distinguish a slow provider from a dead connection. Flows
+# continuously — including during prefill, when the provider itself is silent.
 KEEPALIVE_INTERVAL = 15
+
+# How long the provider may stay completely silent before the stream errors out.
+# Prefill of a 10k+-token schema prompt on weak hardware can take many minutes —
+# the frontend stays informed via keep-alives the whole time, so this guard only
+# exists to catch a truly wedged provider. Override for extreme cases:
+#   LLM_STREAM_READ_TIMEOUT=1200 yoursqlfriend
+LLM_STREAM_READ_TIMEOUT = int(os.environ.get('LLM_STREAM_READ_TIMEOUT', '600'))
 
 # Value-grounding annotations: enum-like TEXT columns get their distinct values
 # listed in the schema context ("-- values of t.col: 'a', 'b'"). Guardrails keep
@@ -206,7 +214,10 @@ def get_provider_config(provider, model=None):
             'model': model,
             'label': 'Ollama',
             'hint': 'Is Ollama running? (ollama serve)',
-            'stream_timeout': (3.05, 120),
+            # (connect, read): read = max provider silence, not total duration.
+            # Generous because slow hardware prefills for minutes (see
+            # LLM_STREAM_READ_TIMEOUT); keep-alives keep the client informed.
+            'stream_timeout': (3.05, LLM_STREAM_READ_TIMEOUT),
         }
     return {
         'provider': 'lmstudio',
@@ -215,7 +226,7 @@ def get_provider_config(provider, model=None):
         'model': model,
         'label': 'LM Studio',
         'hint': 'Is the server running at http://localhost:1234?',
-        'stream_timeout': (3.05, 60),
+        'stream_timeout': (3.05, LLM_STREAM_READ_TIMEOUT),
     }
 
 
@@ -650,6 +661,49 @@ def call_llm_non_streaming(messages, provider='lmstudio', model=None, use_struct
         return ''
 
 
+# Sentinels for _iter_lines_with_keepalive
+_KEEPALIVE = object()
+_STREAM_END = object()
+
+
+def _iter_lines_with_keepalive(response):
+    """Iterate response lines, yielding _KEEPALIVE during provider silence.
+
+    response.iter_lines() blocks while the provider is prefilling, which would
+    starve the SSE stream of keep-alives exactly when they matter most. A
+    daemon reader thread pumps lines into a queue; the consumer emits
+    _KEEPALIVE whenever KEEPALIVE_INTERVAL passes without a line. Exceptions
+    from the reader (e.g. ReadTimeout after LLM_STREAM_READ_TIMEOUT of true
+    silence) are re-raised here so callers' error handling is unchanged.
+    """
+    import queue
+    import threading
+
+    q = queue.Queue()
+
+    def _pump():
+        try:
+            for line in response.iter_lines():
+                q.put(line)
+            q.put(_STREAM_END)
+        except Exception as e:  # noqa: BLE001 — forwarded to the consumer
+            q.put(e)
+
+    threading.Thread(target=_pump, daemon=True).start()
+
+    while True:
+        try:
+            item = q.get(timeout=KEEPALIVE_INTERVAL)
+        except queue.Empty:
+            yield _KEEPALIVE
+            continue
+        if item is _STREAM_END:
+            return
+        if isinstance(item, Exception):
+            raise item
+        yield item
+
+
 def stream_llm_response(messages_to_send, provider, model=None):
     """Stream response from LLM provider as proper SSE events.
 
@@ -662,7 +716,6 @@ def stream_llm_response(messages_to_send, provider, model=None):
     """
     config = get_provider_config(provider, model)
     payload = _build_llm_payload(config, messages_to_send, stream=True)
-    last_keepalive = time.monotonic()
 
     try:
         with requests.post(config['url'], headers=config['headers'], json=payload,
@@ -671,13 +724,16 @@ def stream_llm_response(messages_to_send, provider, model=None):
             token_usage = None
             done_sent = False
 
-            for line in r.iter_lines():
-                # Emit keepalive comment if enough time has passed since the last yield;
-                # prevents proxies from closing idle connections during slow generation.
-                now = time.monotonic()
-                if now - last_keepalive >= KEEPALIVE_INTERVAL:
-                    last_keepalive = now
+            # Provider lines are pumped through a queue by a reader thread so
+            # keep-alives flow even while the provider is completely silent —
+            # prefill of a large schema on slow hardware can take minutes, and
+            # blocking here (the old design) meant the frontend saw zero bytes
+            # and couldn't distinguish "slow" from "dead". The read timeout
+            # (LLM_STREAM_READ_TIMEOUT) is now the only wedged-provider guard.
+            for line in _iter_lines_with_keepalive(r):
+                if line is _KEEPALIVE:
                     yield ": keep-alive\n\n"
+                    continue
 
                 if not line:
                     continue
@@ -687,7 +743,6 @@ def stream_llm_response(messages_to_send, provider, model=None):
                         data = json.loads(line)
                         content = data.get('message', {}).get('content', '')
                         if content:
-                            last_keepalive = time.monotonic()
                             yield f"event: token\ndata: {json.dumps({'chunk': content})}\n\n"
 
                         if data.get('done', False):
@@ -727,7 +782,6 @@ def stream_llm_response(messages_to_send, provider, model=None):
                             delta = json_data['choices'][0].get('delta', {})
                             content_chunk = delta.get('content', '')
                             if content_chunk:
-                                last_keepalive = time.monotonic()
                                 yield f"event: token\ndata: {json.dumps({'chunk': content_chunk})}\n\n"
                     except json.JSONDecodeError:
                         continue

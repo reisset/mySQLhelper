@@ -761,6 +761,42 @@ class TestStreamLLMResponseSSE:
         assert event == 'error'
         assert 'timed out' in json.loads(data)['message'].lower()
 
+    @patch('yoursqlfriend.llm.KEEPALIVE_INTERVAL', 0.05)
+    @patch('yoursqlfriend.llm.requests.post')
+    def test_keepalives_flow_during_provider_silence(self, mock_post):
+        """Prefill on slow hardware = minutes of provider silence. Keep-alives
+        must still reach the client so it can tell slow from dead."""
+        import time as time_mod
+
+        def slow_lines():
+            time_mod.sleep(0.3)  # provider silent (prefilling)
+            yield b'data: {"choices": [{"delta": {"content": "Hi"}}]}'
+            yield b'data: [DONE]'
+
+        mock_post.return_value = _make_stream_mock(slow_lines())
+        frames = list(stream_llm_response([{'role': 'user', 'content': 'hi'}], provider='lmstudio'))
+
+        keepalives = [f for f in frames if f.startswith(': keep-alive')]
+        token_frames = [f for f in frames if f.startswith('event: token')]
+        assert len(keepalives) >= 2, 'keep-alives must be emitted while the provider is silent'
+        assert frames.index(keepalives[0]) < frames.index(token_frames[0])
+
+    @patch('yoursqlfriend.llm.requests.post')
+    def test_midstream_read_timeout_yields_error_after_tokens(self, mock_post):
+        """A provider that wedges mid-stream must surface as an error frame,
+        with the tokens received so far already emitted."""
+        def lines_then_timeout():
+            yield b'data: {"choices": [{"delta": {"content": "partial"}}]}'
+            raise requests.exceptions.Timeout('read timed out')
+
+        mock_post.return_value = _make_stream_mock(lines_then_timeout())
+        frames = list(stream_llm_response([{'role': 'user', 'content': 'hi'}], provider='lmstudio'))
+
+        assert any(f.startswith('event: token') for f in frames)
+        event, data = _parse_sse_frame(frames[-1])
+        assert event == 'error'
+        assert 'timed out' in json.loads(data)['message'].lower()
+
     @patch('yoursqlfriend.llm.requests.post')
     def test_no_full_response_resent_in_done_frame(self, mock_post):
         """The done frame must only carry token_usage, not a copy of the full response."""

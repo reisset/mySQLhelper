@@ -1,5 +1,27 @@
 CHANGELOG
 
+### v3.17.0 - Slow hardware is not a timeout (Jul 2026)
+
+A healthy model that took >90s to prefill a large schema prompt was cut off
+with "Request Timed Out" — the model WAS generating, just slowly. On modest
+hardware, prefilling a 10k-token prompt (big schemas) legitimately takes
+minutes. Slow and dead are now distinguished instead of conflated:
+
+- **Keep-alives now flow during prefill.** Provider lines are pumped through
+  a reader thread, so the backend's 15s `: keep-alive` heartbeat reaches the
+  browser even while the model is silently reading the prompt (previously the
+  heartbeat itself was blocked exactly when it mattered).
+- **Frontend watchdogs now measure transport liveness, not model speed** —
+  re-armed by any received bytes, keep-alives included. A model can prefill
+  for 10 minutes without being cut off; a genuinely dead connection still
+  fails in 90s, and the error now says "Connection Lost", not "Timed Out".
+- **Wedged-provider guard moved to the backend**: the stream errors only
+  after `LLM_STREAM_READ_TIMEOUT` of true provider silence (default 600s;
+  set the env var higher for extreme hardware).
+- After 45s without a first token, the status bar pins a notice ("model is
+  still reading the schema…") so a long prefill doesn't look like a hang.
+  The Stop button works the whole time.
+
 ### v3.16.1 - BLOB columns no longer crash uploads and queries (Jul 2026)
 
 Uploading a real-world forensic DB (Skype) 500'd: BLOB values (avatars,

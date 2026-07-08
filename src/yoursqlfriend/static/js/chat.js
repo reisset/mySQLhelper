@@ -5,8 +5,13 @@ import { renderText, fetchJson, renderQueryHistory, setFooterMetrics, clearFoote
 import { executeSqlAndRender } from './sql.js';
 import { providerLabel, PROVIDER_HELP } from './providers.js';
 
-const WATCHDOG_MS = 90000;      // local models need time to prefill large schemas
-const IDLE_WATCHDOG_MS = 120000; // max silence between tokens once streaming started
+// Watchdogs measure TRANSPORT liveness, not model speed: the backend sends a
+// keep-alive comment every 15s even while the provider is silently prefilling,
+// so a healthy connection re-arms these continuously. A slow model never trips
+// them — only a dead connection does. Provider-wedged detection lives in the
+// backend (LLM_STREAM_READ_TIMEOUT in llm.py, default 600s, env-overridable).
+const WATCHDOG_MS = 90000;      // max silence before any model event arrives
+const IDLE_WATCHDOG_MS = 120000; // max silence once streaming has started
 const SHIMMER_MIN_MS = 2500;    // minimum shimmer display so it doesn't flash
 const SHIMMER_ROTATE_MS = 3500; // status message rotation cadence
 
@@ -36,10 +41,11 @@ function parseFrame(frame) {
 }
 
 // Consume the SSE body: parse frames, dispatch token chunks to onToken,
-// call onFirstEvent once on the first real model event (not keepalives —
-// they arrive before any content and would disarm the watchdog prematurely).
+// call onFirstEvent once on the first real model event. onActivity fires on
+// EVERY received chunk — including keep-alive comments — so the caller can
+// re-arm its transport watchdog while a slow provider is still prefilling.
 // Returns { tokenUsage, streamComplete }; throws on an error frame.
-async function readChatStream(response, { onToken, onFirstEvent }) {
+async function readChatStream(response, { onToken, onFirstEvent, onActivity }) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -54,6 +60,7 @@ async function readChatStream(response, { onToken, onFirstEvent }) {
     outer: while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        if (onActivity) onActivity();
 
         buffer += decoder.decode(value, { stream: true });
         const { frames, remainder } = parseFrames(buffer);
@@ -161,6 +168,12 @@ function createStatusShimmer(statusBar) {
     };
 
     return {
+        // Pin a fixed status line (stops the playful rotation). Used for the
+        // long-prefill reassurance so slow hardware doesn't look like a hang.
+        setNotice(text) {
+            clearInterval(interval);
+            textSpan.textContent = text;
+        },
         softDismiss() {
             clearInterval(interval);
             if (dismissed) return;
@@ -198,8 +211,10 @@ function renderChatError(pText, error) {
     errorDetails.className = 'error-details';
 
     if (error.name === 'AbortError') {
-        errorTitle.textContent = 'Request Timed Out';
-        errorDetails.textContent = `The ${label} server did not start responding within ${WATCHDOG_MS / 1000} seconds.`;
+        errorTitle.textContent = 'Connection Lost';
+        errorDetails.textContent = `Nothing was received from the server for ${WATCHDOG_MS / 1000} seconds. `
+            + `This is not the model being slow — the server sends keep-alives while the model works — `
+            + `it means data stopped flowing entirely. Check that ${label} and yourSQLfriend are still running.`;
     } else if (error.message.includes("503") || error.message.includes("Failed to fetch") || error.message.includes("LM Studio") || error.message.includes("Ollama")) {
         errorTitle.textContent = `Unable to connect to ${label}`;
 
@@ -299,6 +314,13 @@ export async function sendMessage() {
 
     const shimmer = createStatusShimmer(document.getElementById('status-bar'));
 
+    // If the model hasn't produced anything after a while, say why — prefill
+    // of a large schema on slow hardware can take minutes and shouldn't read
+    // as a hang. Cancelled on the first real model event.
+    const prefillNoticeId = setTimeout(() => {
+        shimmer.setNotice('Model is still reading the schema — first responses can take a few minutes on slower hardware…');
+    }, 45000);
+
     // Bot message container (created now but empty until streaming)
     const botMessageElement = appendMessage('', 'bot');
     const contentContainer = botMessageElement.querySelector('.content-container');
@@ -313,11 +335,14 @@ export async function sendMessage() {
     const controller = new AbortController();
     state.activeStreamController = controller;
 
-    // Watchdog: WATCHDOG_MS to the first model event (local prefill is slow),
-    // then re-armed on every token so a provider that wedges mid-stream can't
-    // leave the composer stuck in Stop-state forever.
+    // Transport watchdog: re-armed by ANY received bytes (keep-alives included),
+    // so a slow model prefilling for minutes never trips it — the backend pings
+    // every 15s while it waits. It only fires when the connection actually dies,
+    // which also means the composer can't be left stuck in Stop-state forever.
     let watchdogId = null;
+    let watchdogMs = WATCHDOG_MS; // current phase: pre-first-event vs streaming
     const armWatchdog = (ms) => {
+        watchdogMs = ms;
         clearTimeout(watchdogId);
         watchdogId = setTimeout(() => {
             controller.abortCause = 'watchdog';
@@ -348,7 +373,11 @@ export async function sendMessage() {
         }
 
         const { tokenUsage, streamComplete } = await readChatStream(response, {
-            onFirstEvent: () => armWatchdog(IDLE_WATCHDOG_MS), // switch to inter-token idle guard
+            onActivity: () => armWatchdog(watchdogMs), // any bytes (incl. keep-alives) = transport alive
+            onFirstEvent: () => {
+                clearTimeout(prefillNoticeId); // model responded — drop the slow-prefill notice
+                armWatchdog(IDLE_WATCHDOG_MS); // switch to inter-token idle guard
+            },
             onToken: (chunk) => {
                 armWatchdog(IDLE_WATCHDOG_MS);
                 fullResponse += chunk;
@@ -422,6 +451,7 @@ export async function sendMessage() {
         }
     } finally {
         clearTimeout(watchdogId); // Ensure cleanup
+        clearTimeout(prefillNoticeId);
         shimmer.forceDismiss(); // no-op after softDismiss; bar ownership is checked inside
         if (state.activeStreamController === controller) {
             state.activeStreamController = null;
