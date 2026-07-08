@@ -14,6 +14,11 @@ description: Build, launch, and drive yourSQLfriend end-to-end to verify fronten
 curl -s http://127.0.0.1:5099/api/version   # readiness check
 ```
 
+The readiness check must return the version you just built — a stale verify
+instance from an earlier session can still be squatting on the port, and a
+200 from old code silently verifies nothing. On a mismatch, kill the
+listener (`Get-NetTCPConnection -LocalPort 5099`) or launch on a fresh port.
+
 An LLM provider must be live for chat flows: LM Studio on `localhost:1234`
 (usually qwen3.6-27b on this machine) or Ollama on `localhost:11434`.
 Without one, only upload/schema/search/UI flows are drivable; chat renders
